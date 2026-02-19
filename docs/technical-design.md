@@ -428,22 +428,39 @@ Markdown PRD (input)
 │              │  Identify existing Slices/Scenarios if present (re-import)
 └──────┬──────┘
        │
-       ▼
-┌─────────────┐
-│ Suggest      │  Each Key Idea → suggest Command + Event pair
-│ Placement    │  Position suggestions on timeline (left to right)
-│              │  Assign to default swimlane
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│ Dispatch     │  ImportPrd command → PrdImported event
-│ Commands     │  PlaceElement commands for each suggested element
-│              │  User reviews and adjusts on canvas
-└─────────────┘
+       ├──── ```emlang``` blocks found? ────┐
+       │  No                                │ Yes
+       ▼                                    ▼
+┌─────────────┐                    ┌─────────────┐
+│ Suggest      │                    │ Parse Emlang │  Parse each ```emlang``` block as YAML
+│ Placement    │                    │ Blocks       │  Extract: slice names, element types,
+│ (heuristic)  │                    │              │  props, swimlanes, tests
+│              │                    └──────┬──────┘
+│ Key Idea →   │                           │
+│ Command +    │                           ▼
+│ Event pair   │                    ┌─────────────┐
+│              │                    │ Map Elements │  t: → Wireframe, c: → Command,
+└──────┬──────┘                    │              │  e: → Event, v: → View
+       │                           │              │  x: → Scenario exception
+       │                           │              │  Swimlane prefix → swimlane assignment
+       │                           │              │  tests: → Scenario definitions
+       │                           └──────┬──────┘
+       │                                  │
+       ▼                                  ▼
+┌─────────────────────────────────────────────┐
+│ Position &    │  Arrange elements on timeline (left to right)
+│ Dispatch      │  Assign swimlanes from prefixes or defaults
+│               │  ImportPrd command → PrdImported event
+│               │  PlaceElement commands for each element
+│               │  DefineSlice commands for each named slice
+│               │  AddScenario commands for each test
+│               │  User reviews and adjusts on canvas
+└───────────────┘
 ```
 
 The import produces **suggestions**, not final placements. Users review the suggested elements on the canvas and adjust, connect, and extend them during the modeling session.
+
+The emlang path is more precise than the Key Ideas heuristic: it extracts exact element types, properties, swimlane assignments, and GWT tests directly from the structured YAML, rather than guessing Command + Event pairs from bullet-point text.
 
 ### Export Flow
 
@@ -458,9 +475,12 @@ Board (read model)
        │
        ▼
 ┌─────────────┐
-│ Build Slice  │  For each slice: collect Command → Event → View chain
-│ Sections     │  Format as markdown with fields and connections
-│              │  Attach scenarios as Given/When/Then
+│ Build Slice  │  For each slice: collect elements in connection order
+│ Sections     │  (Trigger → Command → Event → View)
+│ (emlang)     │  Format as emlang YAML steps: list with props:
+│              │  Include scenarios as emlang tests: blocks
+│              │  Wrap in ```emlang fenced code block
+│              │  Wireframe description as **Wireframe:** above block
 └──────┬──────┘
        │
        ▼
@@ -473,10 +493,10 @@ Board (read model)
 ┌─────────────┐
 │ Assemble     │  YAML frontmatter (title, status: refined, domain)
 │ PRD          │  Preserved: Overview, Key Ideas, Sources (from import)
-│              │  Generated: Slices, Scenarios, Data Flows
+│              │  Generated: Slices (emlang), Scenarios, Data Flows
 └──────┬──────┘
        │
-       ├──→ Markdown (.md)
+       ├──→ Markdown (.md) — with ```emlang slice blocks
        └──→ JSON (.json)
 ```
 
@@ -788,3 +808,5 @@ Both deployments target Kubernetes (see [Hosting Architecture](https://github.co
 - [TODO List Pattern](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/todo-list-pattern.md) — Async export
 - [Event Enrichment](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/event-enrichment.md) — Projection consistency
 - [Elixir/Phoenix/LiveView](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/elixir-phoenix-liveview.md) — Stack rationale
+- [Emlang spec v1.0.0](https://github.com/emlang-project/spec) — Slice notation DSL (used in PRD import/export)
+- [Emlang CLI](https://github.com/emlang-project/emlang) — Linting and diagram generation
