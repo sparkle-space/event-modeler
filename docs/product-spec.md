@@ -30,9 +30,29 @@ EventModeler ships as an **Elixir hex package** (`event_modeler`) that mounts in
 
 EventModeler defines a structured PRD format in markdown with YAML frontmatter. The format is machine-readable enough for import/export and human-readable enough to review in a markdown editor or git diff.
 
+### Slice Notation: Emlang
+
+Slice definitions use [emlang](https://github.com/emlang-project/spec) (Event Modeling Language) v1.0.0, a YAML-based DSL for describing systems with Event Modeling patterns. Emlang provides:
+
+- **Named slices** as first-class constructs, mapping directly to EventModeler's slice concept
+- **Five element types:** trigger (`t:`), command (`c:`), event (`e:`), view (`v:`), exception (`x:`)
+- **Swimlane prefixes** (e.g., `User/UserRegistered`) for bounded context grouping
+- **Properties** (`props:`) on each element for field definitions
+- **GWT tests** (`tests:`) attached to slices with given/when/then constraints
+- **Linting** via the `emlang` CLI (10 rules enforcing Event Modeling best practices)
+
+Slices are embedded in PRD markdown as fenced `` ```emlang `` code blocks -- one block per slice, directly beneath its `### Slice:` heading. This makes the blocks extractable for linting and diagram generation:
+
+```bash
+# Extract all emlang blocks from a PRD and lint them
+awk '/^```emlang/{p=1; print "---"; next} /^```/{p=0; next} p' feature-prd.md | emlang lint -
+```
+
+For the full rationale and comparison with alternative DSLs, see the [emlang PRD format proposal](https://github.com/sparkle-space/masterplan/blob/main/00-scratchpad/emlang-prd-format/prd-format-proposal.md).
+
 ### Format
 
-```markdown
+````markdown
 ---
 title: "Feature Name"
 status: draft | modeling | refined | approved
@@ -58,21 +78,47 @@ tags:
 
 ## Slices
 
-Slices are derived from the event model. Each slice is a vertical unit of work:
-Command → Event → View.
+Slices are derived from the event model. Each slice is a vertical unit of work
+defined in emlang notation.
 
 ### Slice: Register User
 
-**Command:** `RegisterUser` (actor: Visitor)
-**Events:** `UserRegistered`
-**View:** `RegistrationConfirmation`
 **Wireframe:** Registration form with email, password, display name
 
-**Scenario:**
-- **Given** no user exists with email "alice@example.com"
-- **When** `RegisterUser` with email "alice@example.com"
-- **Then** `UserRegistered` with assigned user ID
-- **And** `RegistrationConfirmation` shows welcome message
+```emlang
+slices:
+  RegisterUser:
+    steps:
+      - t: Visitor/RegistrationForm
+      - c: RegisterUser
+        props:
+          email: string
+          password: string
+      - e: User/UserRegistered
+        props:
+          userId: string
+          email: string
+      - v: RegistrationConfirmation
+    tests:
+      HappyPath:
+        when:
+          - c: RegisterUser
+            props:
+              email: alice@example.com
+        then:
+          - e: User/UserRegistered
+      DuplicateEmail:
+        given:
+          - e: User/UserRegistered
+            props:
+              email: alice@example.com
+        when:
+          - c: RegisterUser
+            props:
+              email: alice@example.com
+        then:
+          - x: EmailAlreadyInUse
+```
 
 ### Slice: [Next Slice]
 
@@ -83,11 +129,11 @@ Command → Event → View.
 Additional Given/When/Then scenarios not covered by individual slices,
 particularly cross-slice or edge-case scenarios.
 
-### Scenario: Duplicate Email Registration
+### Scenario: End-to-End Registration Flow
 
-- **Given** `UserRegistered` with email "alice@example.com"
-- **When** `RegisterUser` with email "alice@example.com"
-- **Then** Command rejected with "email already taken"
+- **Given** no user exists with email "alice@example.com"
+- **When** user completes registration and then logs in
+- **Then** Dashboard shows welcome message with user's display name
 
 ## Data Flows
 
@@ -95,7 +141,7 @@ What data enters, transforms within, and exits the system.
 
 | Source | Enters as | Transforms via | Exits as |
 |--------|-----------|---------------|----------|
-| Registration form | `RegisterUser` command | `UserRegistered` event | `UserProfile` view |
+| Registration form | `RegisterUser` command | `UserRegistered` event | `RegistrationConfirmation` view |
 
 ## Dependencies
 
@@ -105,7 +151,7 @@ What data enters, transforms within, and exits the system.
 
 - [Requirements document or research](link)
 - Stakeholder interviews (date)
-```
+````
 
 ### Relationship to Existing PRD Format
 
@@ -116,7 +162,7 @@ The existing format in `00-scratchpad/prd-ideas/` (Overview + Key Ideas + Source
 | Frontmatter | Optional | Always present |
 | Overview | Required | Preserved from input |
 | Key Ideas | Required | Preserved, linked to slices |
-| Slices | Absent | Generated from model |
+| Slices (emlang blocks) | Absent or present (re-import) | Generated from model as `` ```emlang `` code blocks |
 | Scenarios | Absent | Generated from model |
 | Data Flows | Absent | Generated from model |
 | Dependencies | Optional | Enriched from model |
@@ -290,5 +336,8 @@ EventModeler occupies a unique position:
 - [Event Sourcing & CQRS](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/event-sourcing-cqrs.md) — Underlying architecture
 - [Collaboration Architecture](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/collaboration-architecture.md) — Real-time collaboration patterns
 - [Optimistic UI Updates](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/optimistic-ui-updates.md) — UI update tier system
+- [Emlang spec v1.0.0](https://github.com/emlang-project/spec) — Slice notation DSL
+- [Emlang CLI](https://github.com/emlang-project/emlang) — Linting and diagram generation
+- [Emlang PRD format proposal](https://github.com/sparkle-space/masterplan/blob/main/00-scratchpad/emlang-prd-format/prd-format-proposal.md) — DSL comparison and format proposal
 - `00-scratchpad/prd-ideas/` — Existing PRD format (input for format definition)
 - `00-scratchpad/event-modelling/` — Competitive research
