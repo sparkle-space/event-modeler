@@ -78,11 +78,11 @@ slices:
           keyIdeas: list
       - v: BoardCanvasWithElements
     tests:
-      WithEmlangBlocks:
+      WithValidContent:
         when:
           - c: ImportPrd
             props:
-              markdownContent: "---\ntitle: Feature\n---\n## Overview\nA feature.\n## Slices\n```emlang\nslices:\n  Register:\n    steps:\n      - c: Register\n```"
+              markdownContent: "valid PRD content"
         then:
           - e: Prd/PrdImported
       EmptyPrd:
