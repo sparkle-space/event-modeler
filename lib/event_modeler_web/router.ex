@@ -21,6 +21,7 @@ defmodule EventModelerWeb.Router do
     live "/visualize", VisualizeLive
     live "/boards", BoardsLive
     live "/boards/:path", BoardLive
+    get "/boards/:path/export", ExportController, :export
   end
 
   # Other scopes may use custom stacks.

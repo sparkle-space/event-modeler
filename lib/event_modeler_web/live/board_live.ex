@@ -291,7 +291,16 @@ defmodule EventModelerWeb.BoardLive do
             <span :if={@dirty} class="text-xs text-amber-600 font-medium">Unsaved changes</span>
           </div>
           <div class="flex items-center gap-2">
+            <span :if={@prd.updated} class="text-xs text-gray-400">
+              Updated: {String.slice(@prd.updated || "", 0..18)}
+            </span>
             <p :if={@save_message} class="text-sm text-green-600">{@save_message}</p>
+            <a
+              href={~p"/boards/#{Base.url_encode64(@file_path, padding: false)}/export"}
+              class="bg-gray-100 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-200 border border-gray-300"
+            >
+              Export
+            </a>
             <button
               phx-click="save"
               class="bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700"

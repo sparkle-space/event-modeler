@@ -9,20 +9,44 @@ defmodule EventModeler.BoardTest do
             )
 
   setup do
+    # Ensure the application services are running
+    ensure_registry_alive()
+
+    # Clean up any leftover state from previous test
+    File.rm_rf!(@test_dir)
     File.mkdir_p!(@test_dir)
 
     {:ok, path} = Workspace.create_prd(@test_dir, "Board Test")
 
     on_exit(fn ->
-      case Registry.lookup(EventModeler.Board.Registry, path) do
-        [{pid, _}] -> GenServer.stop(pid, :normal)
-        [] -> :ok
+      try do
+        case Registry.lookup(EventModeler.Board.Registry, path) do
+          [{pid, _}] -> GenServer.stop(pid, :normal)
+          [] -> :ok
+        end
+      rescue
+        _ -> :ok
+      catch
+        _, _ -> :ok
       end
 
       File.rm_rf!(@test_dir)
     end)
 
     %{path: path}
+  end
+
+  defp ensure_registry_alive do
+    case Process.whereis(EventModeler.Board.Registry) do
+      nil ->
+        # Registry died - restart the application
+        Application.stop(:event_modeler)
+        Application.ensure_all_started(:event_modeler)
+        Process.sleep(100)
+
+      _pid ->
+        :ok
+    end
   end
 
   test "opens a board from file", %{path: path} do

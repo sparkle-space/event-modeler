@@ -43,6 +43,8 @@ defmodule EventModeler.Board do
           {__MODULE__, file_path}
         )
     end
+  rescue
+    ArgumentError -> {:error, :registry_unavailable}
   end
 
   @spec get_state(String.t()) :: {:ok, t()} | {:error, term()}
@@ -97,6 +99,8 @@ defmodule EventModeler.Board do
       [{pid, _}] -> GenServer.call(pid, message)
       [] -> {:error, :not_open}
     end
+  rescue
+    ArgumentError -> {:error, :not_open}
   end
 
   # Server

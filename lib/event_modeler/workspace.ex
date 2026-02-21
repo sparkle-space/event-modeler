@@ -77,10 +77,11 @@ defmodule EventModeler.Workspace do
 
   @doc """
   Serializes a `%Prd{}` and writes it to disk.
+  Updates frontmatter timestamps on save.
   """
   @spec write_prd(String.t(), Prd.t()) :: :ok | {:error, String.t()}
   def write_prd(path, %Prd{} = prd) do
-    content = Serializer.serialize(prd)
+    content = Serializer.serialize_for_save(prd)
 
     case File.write(path, content) do
       :ok -> :ok

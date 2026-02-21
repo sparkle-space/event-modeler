@@ -21,7 +21,7 @@ defmodule EventModeler.Prd.Serializer do
       render_key_ideas(prd.key_ideas),
       render_slices(prd.slices),
       render_scenarios(prd.scenarios),
-      render_section("Data Flows", prd.data_flows),
+      render_data_flows(prd),
       render_section("Dependencies", prd.prd_dependencies),
       render_section("Sources", prd.sources),
       render_event_stream(prd.event_stream)
@@ -31,6 +31,28 @@ defmodule EventModeler.Prd.Serializer do
     |> String.trim_trailing()
     |> Kernel.<>("\n")
   end
+
+  @doc """
+  Serializes with updated frontmatter for a save operation.
+  Updates `status` to "refined" and `updated` to current timestamp.
+  """
+  @spec serialize_for_save(%Prd{}) :: String.t()
+  def serialize_for_save(%Prd{} = prd) do
+    now = DateTime.utc_now() |> DateTime.to_iso8601()
+
+    prd
+    |> Map.put(:updated, now)
+    |> maybe_update_status()
+    |> serialize()
+  end
+
+  defp maybe_update_status(%Prd{status: "draft"} = prd) do
+    # Only promote to "refined" if we have slices with scenarios
+    has_scenarios = Enum.any?(prd.slices || [], fn s -> s.tests != nil and s.tests != [] end)
+    if has_scenarios, do: %{prd | status: "refined"}, else: prd
+  end
+
+  defp maybe_update_status(prd), do: prd
 
   defp render_frontmatter(%Prd{} = prd) do
     fm = %{}
@@ -187,6 +209,62 @@ defmodule EventModeler.Prd.Serializer do
     ["        #{name}:" | clause_lines]
   end
 
+  defp render_data_flows(%Prd{data_flows: data_flows})
+       when is_binary(data_flows) and data_flows != "" do
+    "## Data Flows\n\n#{data_flows}\n"
+  end
+
+  defp render_data_flows(%Prd{slices: slices}) when is_list(slices) and slices != [] do
+    rows = generate_data_flow_rows(slices)
+
+    if rows == [] do
+      nil
+    else
+      header = "| Source | Field | Target | Field |\n|--------|-------|--------|-------|\n"
+
+      table =
+        Enum.map_join(rows, "\n", fn {src, sf, tgt, tf} ->
+          "| #{src} | #{sf} | #{tgt} | #{tf} |"
+        end)
+
+      "## Data Flows\n\n#{header}#{table}\n"
+    end
+  end
+
+  defp render_data_flows(_prd), do: nil
+
+  defp generate_data_flow_rows(slices) do
+    Enum.flat_map(slices, fn slice ->
+      steps = slice.steps || []
+      commands = Enum.filter(steps, &(&1.type == :command))
+      events = Enum.filter(steps, &(&1.type == :event))
+      views = Enum.filter(steps, &(&1.type == :view))
+
+      # Command fields -> Event fields (command produces events)
+      cmd_to_evt =
+        for cmd <- commands,
+            {ck, _cv} <- cmd.props || %{},
+            evt <- events,
+            {ek, _ev} <- evt.props || %{},
+            String.downcase(ck) == String.downcase(ek) do
+          {cmd.label, ck, evt.label, ek}
+        end
+
+      # Event fields -> View fields (event updates read models)
+      evt_to_view =
+        for evt <- events,
+            {ek, _ev} <- evt.props || %{},
+            view <- views,
+            {vk, _vv} <- view.props || %{},
+            String.downcase(ek) == String.downcase(vk) do
+          {evt.label, ek, view.label, vk}
+        end
+
+      cmd_to_evt ++ evt_to_view
+    end)
+    |> Enum.uniq()
+  end
+
   defp render_event_stream(nil), do: nil
   defp render_event_stream([]), do: nil
 
@@ -222,11 +300,15 @@ defmodule EventModeler.Prd.Serializer do
     end)
   end
 
-  defp format_value(v) when is_binary(v), do: "\"#{v}\""
+  defp format_value(v) when is_binary(v) do
+    escaped = String.replace(v, "\"", "\\\"")
+    "\"#{escaped}\""
+  end
+
   defp format_value(v) when is_number(v), do: to_string(v)
   defp format_value(v) when is_atom(v), do: to_string(v)
   defp format_value(v) when is_list(v), do: "[#{Enum.map_join(v, ", ", &to_string/1)}]"
-  defp format_value(v), do: inspect(v)
+  defp format_value(v), do: format_value(inspect(v))
 
   defp render_yaml_map(map) do
     # Render in a stable order for frontmatter
