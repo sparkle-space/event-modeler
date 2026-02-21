@@ -52,7 +52,7 @@ defmodule EventModeler.Canvas.SvgRenderer do
       fill: colors.fill,
       stroke: colors.stroke,
       text_color: colors.text,
-      rx: if(elem.type == :command, do: 8, else: 2),
+      rx: 12,
       props: elem.props,
       slice_name: elem.slice_name
     }
