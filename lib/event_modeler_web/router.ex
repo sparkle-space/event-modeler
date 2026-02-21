@@ -18,6 +18,10 @@ defmodule EventModelerWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+    live "/visualize", VisualizeLive
+    live "/boards", BoardsLive
+    live "/boards/:path", BoardLive
+    get "/boards/:path/export", ExportController, :export
   end
 
   # Other scopes may use custom stacks.
