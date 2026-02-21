@@ -24,6 +24,7 @@ defmodule EventModelerWeb.BoardLive do
                    error: nil,
                    selected_element: nil,
                    editing_element: nil,
+                   editing_element_data: nil,
                    flash_message: nil,
                    palette_type: nil,
                    selected_slice: nil,
@@ -113,15 +114,79 @@ defmodule EventModelerWeb.BoardLive do
   end
 
   def handle_event("element_dblclick", %{"element_id" => id}, socket) do
-    {:noreply, assign(socket, editing_element: id)}
+    elem = Enum.find(socket.assigns.canvas_data.elements, &(&1.id == id))
+
+    if elem do
+      props = elem[:props] || %{}
+
+      editing_data = %{
+        label: elem.label,
+        swimlane: elem[:swimlane] || "",
+        props: Enum.map(props, fn {k, v} -> %{key: k, value: v} end)
+      }
+
+      {:noreply, assign(socket, editing_element: id, editing_element_data: editing_data)}
+    else
+      {:noreply, socket}
+    end
   end
 
-  def handle_event("edit_label", %{"element_id" => id, "label" => label}, socket) do
-    Board.edit_element(socket.assigns.file_path, id, %{"label" => label})
+  def handle_event("edit_element", params, socket) do
+    id = socket.assigns.editing_element
+    data = socket.assigns.editing_element_data
+
+    label = params["label"] || data.label
+    swimlane = params["swimlane"]
+    swimlane = if swimlane == "", do: nil, else: swimlane
+
+    props =
+      data.props
+      |> Enum.reject(fn row -> String.trim(row.key) == "" end)
+      |> Map.new(fn row -> {row.key, row.value} end)
+
+    changes =
+      %{"label" => label}
+      |> then(fn c -> Map.put(c, "swimlane", swimlane) end)
+      |> then(fn c -> Map.put(c, "props", props) end)
+
+    Board.edit_element(socket.assigns.file_path, id, changes)
 
     {:noreply,
      refresh_state(socket)
-     |> assign(editing_element: nil)}
+     |> assign(editing_element: nil, editing_element_data: nil)}
+  end
+
+  def handle_event("cancel_edit", _params, socket) do
+    {:noreply, assign(socket, editing_element: nil, editing_element_data: nil)}
+  end
+
+  def handle_event("add_prop", _params, socket) do
+    data = socket.assigns.editing_element_data
+    updated = %{data | props: data.props ++ [%{key: "", value: ""}]}
+    {:noreply, assign(socket, editing_element_data: updated)}
+  end
+
+  def handle_event(
+        "update_prop",
+        %{"index" => index_str, "field" => field, "value" => value},
+        socket
+      ) do
+    index = String.to_integer(index_str)
+    data = socket.assigns.editing_element_data
+
+    updated_props =
+      List.update_at(data.props, index, fn row ->
+        Map.put(row, String.to_existing_atom(field), value)
+      end)
+
+    {:noreply, assign(socket, editing_element_data: %{data | props: updated_props})}
+  end
+
+  def handle_event("remove_prop", %{"index" => index_str}, socket) do
+    index = String.to_integer(index_str)
+    data = socket.assigns.editing_element_data
+    updated_props = List.delete_at(data.props, index)
+    {:noreply, assign(socket, editing_element_data: %{data | props: updated_props})}
   end
 
   def handle_event("connect_elements", %{"from_id" => from_id, "to_id" => to_id}, socket) do
@@ -256,7 +321,7 @@ defmodule EventModelerWeb.BoardLive do
   defp default_label(:command), do: "NewCommand"
   defp default_label(:event), do: "NewEvent"
   defp default_label(:view), do: "NewView"
-  defp default_label(:trigger), do: "NewTrigger"
+  defp default_label(:wireframe), do: "NewWireframe"
   defp default_label(:automation), do: "NewAutomation"
   defp default_label(:exception), do: "NewException"
   defp default_label(_), do: "New"
@@ -342,7 +407,7 @@ defmodule EventModelerWeb.BoardLive do
                     {:event, "Event", "bg-[#F97316]", "--shadow-event"},
                     {:command, "Command", "bg-[#3B82F6]", "--shadow-command"},
                     {:view, "View", "bg-[#22C55E]", "--shadow-view"},
-                    {:trigger, "Wireframe", "bg-[#9CA3AF]", "--shadow-trigger"},
+                    {:wireframe, "Wireframe", "bg-[#9CA3AF]", "--shadow-wireframe"},
                     {:automation, "Automation", "bg-[#8B5CF6]", "--shadow-automation"}
                   ]
                 }
@@ -600,28 +665,98 @@ defmodule EventModelerWeb.BoardLive do
               </div>
             </div>
 
-            <%!-- Inline label editor --%>
+            <%!-- Element editor --%>
             <div
-              :if={@editing_element}
+              :if={@editing_element && @editing_element_data}
               class="mt-4 bg-[var(--color-surface-alt)] rounded-[var(--radius-element)] p-3"
             >
               <h3 class="text-xs font-semibold text-[var(--color-text-secondary)] mb-2">
-                Edit Label
+                Edit Element
               </h3>
-              <form phx-submit="edit_label">
-                <input type="hidden" name="element_id" value={@editing_element} />
+              <form phx-submit="edit_element">
+                <label class="block text-xs text-[var(--color-text-secondary)] mb-1">Label</label>
                 <input
                   type="text"
                   name="label"
-                  class="w-full text-sm border border-[var(--color-border)] rounded-[8px] px-2 py-1 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
+                  value={@editing_element_data.label}
+                  class="w-full text-sm border border-[var(--color-border)] rounded-[8px] px-2 py-1 mb-2 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
                   autofocus
                 />
-                <button
-                  type="submit"
-                  class="mt-2 w-full bg-primary text-primary-content px-2 py-1 rounded-[8px] text-sm"
+
+                <label class="block text-xs text-[var(--color-text-secondary)] mb-1">Swimlane</label>
+                <input
+                  type="text"
+                  name="swimlane"
+                  value={@editing_element_data.swimlane}
+                  placeholder="Default"
+                  class="w-full text-sm border border-[var(--color-border)] rounded-[8px] px-2 py-1 mb-2 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
+                />
+
+                <div class="flex items-center justify-between mb-1">
+                  <label class="text-xs text-[var(--color-text-secondary)]">Fields</label>
+                  <button
+                    type="button"
+                    phx-click="add_prop"
+                    class="text-xs text-primary hover:text-primary/80 transition-colors"
+                  >
+                    + Add
+                  </button>
+                </div>
+
+                <div
+                  :for={{row, idx} <- Enum.with_index(@editing_element_data.props)}
+                  class="flex items-center gap-1 mb-1"
                 >
-                  Update
-                </button>
+                  <input
+                    type="text"
+                    value={row.key}
+                    placeholder="key"
+                    phx-blur="update_prop"
+                    phx-value-index={idx}
+                    phx-value-field="key"
+                    class="flex-1 text-xs border border-[var(--color-border)] rounded-[6px] px-1.5 py-0.5 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
+                  />
+                  <input
+                    type="text"
+                    value={row.value}
+                    placeholder="type"
+                    phx-blur="update_prop"
+                    phx-value-index={idx}
+                    phx-value-field="value"
+                    class="flex-1 text-xs border border-[var(--color-border)] rounded-[6px] px-1.5 py-0.5 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
+                  />
+                  <button
+                    type="button"
+                    phx-click="remove_prop"
+                    phx-value-index={idx}
+                    class="text-xs text-error hover:text-error/80 px-1 transition-colors"
+                  >
+                    &times;
+                  </button>
+                </div>
+
+                <div
+                  :if={@editing_element_data.props == []}
+                  class="text-xs text-[var(--color-text-secondary)] italic mb-2"
+                >
+                  No fields defined.
+                </div>
+
+                <div class="flex gap-2 mt-2">
+                  <button
+                    type="submit"
+                    class="flex-1 bg-primary text-primary-content px-2 py-1 rounded-[8px] text-sm"
+                  >
+                    Update
+                  </button>
+                  <button
+                    type="button"
+                    phx-click="cancel_edit"
+                    class="flex-1 bg-[var(--color-surface)] text-[var(--color-text-primary)] px-2 py-1 rounded-[8px] text-sm border border-[var(--color-border)]"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </form>
             </div>
 
@@ -641,7 +776,7 @@ defmodule EventModelerWeb.BoardLive do
   defp type_label(:command), do: "Command"
   defp type_label(:event), do: "Event"
   defp type_label(:view), do: "View"
-  defp type_label(:trigger), do: "Trigger"
+  defp type_label(:wireframe), do: "Wireframe"
   defp type_label(:exception), do: "Exception"
   defp type_label(:automation), do: "Automation"
   defp type_label(_), do: ""

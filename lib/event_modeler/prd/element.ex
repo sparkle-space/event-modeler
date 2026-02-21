@@ -1,6 +1,6 @@
 defmodule EventModeler.Prd.Element do
   @moduledoc """
-  Represents a single element (trigger, command, event, view, exception) in a slice.
+  Represents a single element (wireframe, command, event, view, exception) in a slice.
   """
 
   defstruct [
@@ -11,7 +11,7 @@ defmodule EventModeler.Prd.Element do
     props: %{}
   ]
 
-  @type element_type :: :trigger | :command | :event | :view | :exception | :automation
+  @type element_type :: :wireframe | :command | :event | :view | :exception | :automation
 
   @type t :: %__MODULE__{
           id: String.t() | nil,
@@ -25,7 +25,7 @@ defmodule EventModeler.Prd.Element do
   Maps emlang type prefix to element type atom.
   """
   @spec type_from_prefix(String.t()) :: element_type()
-  def type_from_prefix("t"), do: :trigger
+  def type_from_prefix("t"), do: :wireframe
   def type_from_prefix("c"), do: :command
   def type_from_prefix("e"), do: :event
   def type_from_prefix("v"), do: :view
@@ -36,7 +36,7 @@ defmodule EventModeler.Prd.Element do
   Maps element type atom to emlang type prefix.
   """
   @spec prefix_from_type(element_type()) :: String.t()
-  def prefix_from_type(:trigger), do: "t"
+  def prefix_from_type(:wireframe), do: "t"
   def prefix_from_type(:command), do: "c"
   def prefix_from_type(:event), do: "e"
   def prefix_from_type(:view), do: "v"

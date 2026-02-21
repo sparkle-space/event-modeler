@@ -116,7 +116,7 @@
   --shadow-command: 0 4px 12px rgba(59, 130, 246, 0.25);
   --shadow-event: 0 4px 12px rgba(249, 115, 22, 0.25);
   --shadow-view: 0 4px 12px rgba(34, 197, 94, 0.25);
-  --shadow-trigger: 0 4px 12px rgba(120, 113, 108, 0.2);
+  --shadow-wireframe: 0 4px 12px rgba(120, 113, 108, 0.2);
   --shadow-automation: 0 4px 12px rgba(139, 92, 246, 0.25);
   --shadow-exception: 0 4px 12px rgba(239, 68, 68, 0.25);
 
@@ -140,7 +140,7 @@
   --shadow-command: 0 4px 12px rgba(59, 130, 246, 0.3);
   --shadow-event: 0 4px 12px rgba(249, 115, 22, 0.3);
   --shadow-view: 0 4px 12px rgba(34, 197, 94, 0.3);
-  --shadow-trigger: 0 4px 12px rgba(168, 162, 158, 0.2);
+  --shadow-wireframe: 0 4px 12px rgba(168, 162, 158, 0.2);
   --shadow-automation: 0 4px 12px rgba(167, 139, 250, 0.3);
   --shadow-exception: 0 4px 12px rgba(239, 68, 68, 0.3);
 

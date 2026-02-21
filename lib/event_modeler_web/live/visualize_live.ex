@@ -270,6 +270,6 @@ defmodule EventModelerWeb.VisualizeLive do
   defp type_label(:command), do: "Command"
   defp type_label(:event), do: "Event"
   defp type_label(:view), do: "View"
-  defp type_label(:trigger), do: "Trigger"
+  defp type_label(:wireframe), do: "Wireframe"
   defp type_label(:exception), do: "Exception"
 end

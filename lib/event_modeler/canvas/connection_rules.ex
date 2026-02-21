@@ -20,8 +20,8 @@ defmodule EventModeler.Canvas.ConnectionRules do
     {:event, :automation},
     {:exception, :view},
     {:automation, :command},
-    {:trigger, :command},
-    {:trigger, :view}
+    {:wireframe, :command},
+    {:wireframe, :view}
   ]
 
   @doc """
@@ -80,8 +80,8 @@ defmodule EventModeler.Canvas.ConnectionRules do
     "Views are read-only and cannot have outgoing connections"
   end
 
-  defp describe_rejection(_from_type, :trigger) do
-    "Triggers are entry points and cannot be connection targets"
+  defp describe_rejection(_from_type, :wireframe) do
+    "Wireframes are entry points and cannot be connection targets"
   end
 
   defp describe_rejection(:event, :command) do
@@ -92,16 +92,16 @@ defmodule EventModeler.Canvas.ConnectionRules do
     "Commands cannot connect directly to Views — a Command must first produce an Event, which then updates a View"
   end
 
-  defp describe_rejection(:trigger, :event) do
-    "Triggers cannot connect directly to Events — a Trigger invokes a Command, which then produces an Event"
+  defp describe_rejection(:wireframe, :event) do
+    "Wireframes cannot connect directly to Events — a Wireframe invokes a Command, which then produces an Event"
   end
 
-  defp describe_rejection(:trigger, :automation) do
-    "Triggers represent user interactions and cannot connect to Automations"
+  defp describe_rejection(:wireframe, :automation) do
+    "Wireframes represent user interactions and cannot connect to Automations"
   end
 
-  defp describe_rejection(:trigger, :exception) do
-    "Triggers cannot connect directly to Exceptions — a Trigger invokes a Command, which may produce an Exception"
+  defp describe_rejection(:wireframe, :exception) do
+    "Wireframes cannot connect directly to Exceptions — a Wireframe invokes a Command, which may produce an Exception"
   end
 
   defp describe_rejection(from_type, to_type) do
@@ -111,7 +111,7 @@ defmodule EventModeler.Canvas.ConnectionRules do
   defp format_type(:command), do: "Command"
   defp format_type(:event), do: "Event"
   defp format_type(:view), do: "View"
-  defp format_type(:trigger), do: "Trigger/Wireframe"
+  defp format_type(:wireframe), do: "Wireframe"
   defp format_type(:automation), do: "Automation"
   defp format_type(:exception), do: "Exception"
   defp format_type(other), do: to_string(other)
