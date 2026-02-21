@@ -155,3 +155,9 @@ body {
   background: var(--color-bg);
   font-family: var(--font-family);
 }
+
+/* Dashed selection ring for slice-definition mode */
+.ring-dashed-selection {
+  outline: 3px dashed #7C3AED;
+  outline-offset: 2px;
+}

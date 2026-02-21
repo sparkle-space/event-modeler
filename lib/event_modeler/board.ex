@@ -10,17 +10,17 @@ defmodule EventModeler.Board do
 
   alias EventModeler.Prd
   alias EventModeler.Prd.{Element, Slice, EventStreamWriter}
-  alias EventModeler.Canvas.{Layout, SvgRenderer, ConnectionRules}
+  alias EventModeler.Canvas.{Layout, HtmlRenderer, ConnectionRules}
   alias EventModeler.Workshop.ScenarioGenerator
   alias EventModeler.Workspace
 
-  defstruct [:file_path, :prd, :layout, :svg_data, dirty: false, connections: []]
+  defstruct [:file_path, :prd, :layout, :canvas_data, dirty: false, connections: []]
 
   @type t :: %__MODULE__{
           file_path: String.t(),
           prd: Prd.t(),
           layout: map(),
-          svg_data: map(),
+          canvas_data: map(),
           dirty: boolean(),
           connections: [{String.t(), String.t()}]
         }
@@ -348,8 +348,8 @@ defmodule EventModeler.Board do
 
   defp recompute_layout(state) do
     layout = Layout.compute(state.prd)
-    svg_data = SvgRenderer.render(layout)
-    %{state | layout: layout, svg_data: svg_data}
+    canvas_data = HtmlRenderer.render(layout)
+    %{state | layout: layout, canvas_data: canvas_data}
   end
 
   defp generate_id do
