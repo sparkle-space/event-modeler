@@ -115,4 +115,75 @@ defmodule EventModeler.BoardTest do
     {:ok, state_after} = Board.get_state(path)
     assert length(state_after.prd.event_stream) > stream_count_before
   end
+
+  test "define_slice groups elements into a named slice", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, cmd_id} = Board.place_element(path, :command, "RegisterUser")
+    {:ok, evt_id} = Board.place_element(path, :event, "UserRegistered")
+
+    assert :ok = Board.define_slice(path, "RegisterUser", [cmd_id, evt_id])
+
+    {:ok, state} = Board.get_state(path)
+    slice = Enum.find(state.prd.slices, &(&1.name == "RegisterUser"))
+    assert slice != nil
+    assert length(slice.steps) == 2
+    assert Enum.any?(slice.steps, &(&1.label == "RegisterUser"))
+    assert Enum.any?(slice.steps, &(&1.label == "UserRegistered"))
+  end
+
+  test "define_slice returns error for no matching elements", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+
+    assert {:error, "No matching elements found"} =
+             Board.define_slice(path, "Empty", ["nonexistent"])
+  end
+
+  test "rename_slice updates slice name", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, cmd_id} = Board.place_element(path, :command, "DoThing")
+    :ok = Board.define_slice(path, "OldName", [cmd_id])
+
+    :ok = Board.rename_slice(path, "OldName", "NewName")
+
+    {:ok, state} = Board.get_state(path)
+    assert Enum.any?(state.prd.slices, &(&1.name == "NewName"))
+    refute Enum.any?(state.prd.slices, &(&1.name == "OldName"))
+  end
+
+  test "generate_scenarios creates GWT scenarios for a slice", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, cmd_id} = Board.place_element(path, :command, "CreateBoard")
+    {:ok, evt_id} = Board.place_element(path, :event, "BoardCreated")
+    :ok = Board.define_slice(path, "CreateBoard", [cmd_id, evt_id])
+
+    assert {:ok, scenarios} = Board.generate_scenarios(path, "CreateBoard")
+    assert length(scenarios) == 1
+
+    [scenario] = scenarios
+    assert scenario.name == "CreateBoardHappyPath"
+    assert scenario.auto_generated == true
+    assert length(scenario.when_clause) == 1
+    assert hd(scenario.when_clause).label == "CreateBoard"
+  end
+
+  test "generate_scenarios returns error for unknown slice", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+
+    assert {:error, "Slice not found"} =
+             Board.generate_scenarios(path, "NonexistentSlice")
+  end
+
+  test "generate_scenarios stores scenarios in slice tests", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, cmd_id} = Board.place_element(path, :command, "Login")
+    {:ok, evt_id} = Board.place_element(path, :event, "LoggedIn")
+    :ok = Board.define_slice(path, "Login", [cmd_id, evt_id])
+
+    {:ok, _scenarios} = Board.generate_scenarios(path, "Login")
+
+    {:ok, state} = Board.get_state(path)
+    slice = Enum.find(state.prd.slices, &(&1.name == "Login"))
+    assert slice.tests != nil
+    assert length(slice.tests) == 1
+  end
 end

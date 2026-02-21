@@ -9,8 +9,9 @@ defmodule EventModeler.Board do
   use GenServer
 
   alias EventModeler.Prd
-  alias EventModeler.Prd.{Element, EventStreamWriter}
+  alias EventModeler.Prd.{Element, Slice, EventStreamWriter}
   alias EventModeler.Canvas.{Layout, SvgRenderer, ConnectionRules}
+  alias EventModeler.Workshop.ScenarioGenerator
   alias EventModeler.Workspace
 
   defstruct [:file_path, :prd, :layout, :svg_data, dirty: false]
@@ -74,6 +75,21 @@ defmodule EventModeler.Board do
   @spec remove_element(String.t(), String.t()) :: :ok | {:error, term()}
   def remove_element(file_path, element_id) do
     call(file_path, {:remove_element, element_id})
+  end
+
+  @spec define_slice(String.t(), String.t(), [String.t()]) :: :ok | {:error, term()}
+  def define_slice(file_path, name, element_ids) do
+    call(file_path, {:define_slice, name, element_ids})
+  end
+
+  @spec rename_slice(String.t(), String.t(), String.t()) :: :ok | {:error, term()}
+  def rename_slice(file_path, old_name, new_name) do
+    call(file_path, {:rename_slice, old_name, new_name})
+  end
+
+  @spec generate_scenarios(String.t(), String.t()) :: {:ok, [map()]} | {:error, term()}
+  def generate_scenarios(file_path, slice_name) do
+    call(file_path, {:generate_scenarios, slice_name})
   end
 
   defp call(file_path, message) do
@@ -211,6 +227,87 @@ defmodule EventModeler.Board do
       |> recompute_layout()
 
     {:reply, :ok, state, @inactivity_timeout}
+  end
+
+  def handle_call({:define_slice, name, element_ids}, _from, state) do
+    # Collect elements matching the given IDs
+    all_elements = Enum.flat_map(state.prd.slices, & &1.steps)
+    selected = Enum.filter(all_elements, &(&1.id in element_ids))
+
+    if selected == [] do
+      {:reply, {:error, "No matching elements found"}, state, @inactivity_timeout}
+    else
+      # Create new slice, remove elements from their current slices
+      new_slice = %Slice{name: name, steps: selected, tests: []}
+
+      updated_slices =
+        state.prd.slices
+        |> Enum.map(fn slice ->
+          %{slice | steps: Enum.reject(slice.steps, &(&1.id in element_ids))}
+        end)
+        |> Enum.reject(fn s -> s.steps == [] and s.name == "Unassigned" end)
+
+      prd = %{state.prd | slices: updated_slices ++ [new_slice]}
+
+      prd =
+        EventStreamWriter.append(prd, "SliceAdded", "user", %{
+          "sliceName" => name,
+          "elementCount" => length(selected)
+        })
+
+      state =
+        %{state | prd: prd, dirty: true}
+        |> recompute_layout()
+
+      {:reply, :ok, state, @inactivity_timeout}
+    end
+  end
+
+  def handle_call({:rename_slice, old_name, new_name}, _from, state) do
+    updated_slices =
+      Enum.map(state.prd.slices, fn slice ->
+        if slice.name == old_name, do: %{slice | name: new_name}, else: slice
+      end)
+
+    prd = %{state.prd | slices: updated_slices}
+
+    prd =
+      EventStreamWriter.append(prd, "SliceRenamed", "user", %{
+        "oldName" => old_name,
+        "newName" => new_name
+      })
+
+    state = %{state | prd: prd, dirty: true}
+    {:reply, :ok, state, @inactivity_timeout}
+  end
+
+  def handle_call({:generate_scenarios, slice_name}, _from, state) do
+    case Enum.find(state.prd.slices, &(&1.name == slice_name)) do
+      nil ->
+        {:reply, {:error, "Slice not found"}, state, @inactivity_timeout}
+
+      slice ->
+        scenarios = ScenarioGenerator.generate(slice)
+
+        updated_slices =
+          Enum.map(state.prd.slices, fn s ->
+            if s.name == slice_name, do: %{s | tests: scenarios}, else: s
+          end)
+
+        prd = %{state.prd | slices: updated_slices}
+
+        prd =
+          EventStreamWriter.append(prd, "ScenarioAdded", "user", %{
+            "sliceName" => slice_name,
+            "count" => length(scenarios)
+          })
+
+        state =
+          %{state | prd: prd, dirty: true}
+          |> recompute_layout()
+
+        {:reply, {:ok, scenarios}, state, @inactivity_timeout}
+    end
   end
 
   @impl true

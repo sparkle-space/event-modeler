@@ -19,12 +19,17 @@ defmodule EventModelerWeb.BoardLive do
                    svg_data: state.svg_data,
                    dirty: state.dirty,
                    slice_names: Enum.map(state.prd.slices, & &1.name),
+                   slices: state.prd.slices,
                    save_message: nil,
                    error: nil,
                    selected_element: nil,
                    editing_element: nil,
                    flash_message: nil,
-                   palette_type: nil
+                   palette_type: nil,
+                   selected_slice: nil,
+                   defining_slice: false,
+                   slice_selection: [],
+                   new_slice_name: ""
                  )}
 
               {:error, reason} ->
@@ -92,7 +97,19 @@ defmodule EventModelerWeb.BoardLive do
   end
 
   def handle_event("element_selected", %{"element_id" => id}, socket) do
-    {:noreply, assign(socket, selected_element: id)}
+    if socket.assigns.defining_slice do
+      # In define-slice mode, toggle element selection for the slice
+      selection = socket.assigns.slice_selection
+
+      updated =
+        if id in selection,
+          do: List.delete(selection, id),
+          else: selection ++ [id]
+
+      {:noreply, assign(socket, slice_selection: updated)}
+    else
+      {:noreply, assign(socket, selected_element: id)}
+    end
   end
 
   def handle_event("element_dblclick", %{"element_id" => id}, socket) do
@@ -129,6 +146,97 @@ defmodule EventModelerWeb.BoardLive do
     {:noreply, assign(socket, flash_message: nil)}
   end
 
+  # Slice management events
+
+  def handle_event("select_slice", %{"name" => name}, socket) do
+    {:noreply, assign(socket, selected_slice: name)}
+  end
+
+  def handle_event("start_define_slice", _params, socket) do
+    {:noreply, assign(socket, defining_slice: true, slice_selection: [], new_slice_name: "")}
+  end
+
+  def handle_event("cancel_define_slice", _params, socket) do
+    {:noreply, assign(socket, defining_slice: false, slice_selection: [], new_slice_name: "")}
+  end
+
+  def handle_event("toggle_slice_element", %{"element_id" => id}, socket) do
+    selection = socket.assigns.slice_selection
+
+    updated =
+      if id in selection,
+        do: List.delete(selection, id),
+        else: selection ++ [id]
+
+    {:noreply, assign(socket, slice_selection: updated)}
+  end
+
+  def handle_event("set_slice_name", %{"name" => name}, socket) do
+    {:noreply, assign(socket, new_slice_name: name)}
+  end
+
+  def handle_event("confirm_define_slice", _params, socket) do
+    name = socket.assigns.new_slice_name
+    element_ids = socket.assigns.slice_selection
+
+    cond do
+      String.trim(name) == "" ->
+        {:noreply, assign(socket, flash_message: "Slice name is required")}
+
+      element_ids == [] ->
+        {:noreply, assign(socket, flash_message: "Select at least one element")}
+
+      true ->
+        case Board.define_slice(socket.assigns.file_path, name, element_ids) do
+          :ok ->
+            {:noreply,
+             refresh_state(socket)
+             |> assign(
+               defining_slice: false,
+               slice_selection: [],
+               new_slice_name: "",
+               selected_slice: name
+             )}
+
+          {:error, reason} ->
+            {:noreply, assign(socket, flash_message: "Error: #{reason}")}
+        end
+    end
+  end
+
+  def handle_event("generate_scenarios", %{"slice" => slice_name}, socket) do
+    case Board.generate_scenarios(socket.assigns.file_path, slice_name) do
+      {:ok, scenarios} ->
+        {:noreply,
+         refresh_state(socket)
+         |> assign(flash_message: "Generated #{length(scenarios)} scenario(s)")}
+
+      {:error, reason} ->
+        {:noreply, assign(socket, flash_message: "Error: #{reason}")}
+    end
+  end
+
+  def handle_event("rename_slice", %{"old_name" => old_name, "new_name" => new_name}, socket) do
+    if String.trim(new_name) == "" do
+      {:noreply, assign(socket, flash_message: "Slice name cannot be empty")}
+    else
+      case Board.rename_slice(socket.assigns.file_path, old_name, new_name) do
+        :ok ->
+          selected =
+            if socket.assigns.selected_slice == old_name,
+              do: new_name,
+              else: socket.assigns.selected_slice
+
+          {:noreply,
+           refresh_state(socket)
+           |> assign(selected_slice: selected)}
+
+        {:error, reason} ->
+          {:noreply, assign(socket, flash_message: "Error: #{reason}")}
+      end
+    end
+  end
+
   defp refresh_state(socket) do
     case Board.get_state(socket.assigns.file_path) do
       {:ok, state} ->
@@ -136,7 +244,8 @@ defmodule EventModelerWeb.BoardLive do
           prd: state.prd,
           svg_data: state.svg_data,
           dirty: state.dirty,
-          slice_names: Enum.map(state.prd.slices, & &1.name)
+          slice_names: Enum.map(state.prd.slices, & &1.name),
+          slices: state.prd.slices
         )
 
       {:error, _} ->
@@ -334,8 +443,21 @@ defmodule EventModelerWeb.BoardLive do
                   height={elem.height}
                   rx={elem.rx}
                   fill={elem.fill}
-                  stroke={if(@selected_element == elem.id, do: "#1D4ED8", else: elem.stroke)}
-                  stroke-width={if(@selected_element == elem.id, do: "3", else: "2")}
+                  stroke={
+                    cond do
+                      elem.id in @slice_selection -> "#7C3AED"
+                      @selected_element == elem.id -> "#1D4ED8"
+                      true -> elem.stroke
+                    end
+                  }
+                  stroke-width={
+                    cond do
+                      elem.id in @slice_selection -> "3"
+                      @selected_element == elem.id -> "3"
+                      true -> "2"
+                    end
+                  }
+                  stroke-dasharray={if(elem.id in @slice_selection, do: "6 3", else: nil)}
                 />
                 <text
                   x={elem.x + div(elem.width, 2)}
@@ -376,17 +498,122 @@ defmodule EventModelerWeb.BoardLive do
 
           <%!-- Right sidebar --%>
           <div class="w-64 bg-white border-l border-gray-200 p-4 overflow-y-auto shrink-0">
-            <h2 class="text-sm font-semibold text-gray-700 mb-3">Slices</h2>
-            <div :if={@slice_names == []} class="text-sm text-gray-400">No slices defined.</div>
-            <ul class="space-y-1">
-              <li :for={name <- @slice_names} class="text-sm text-gray-600 flex items-center gap-2">
-                <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
-                {name}
+            <%!-- Define Slice mode --%>
+            <div :if={@defining_slice} class="mb-4 bg-blue-50 border border-blue-200 rounded p-3">
+              <h3 class="text-xs font-semibold text-blue-700 mb-2">Define New Slice</h3>
+              <form phx-change="set_slice_name">
+                <input
+                  type="text"
+                  name="name"
+                  placeholder="Slice name"
+                  value={@new_slice_name}
+                  class="w-full text-sm border border-blue-300 rounded px-2 py-1 mb-2"
+                />
+              </form>
+              <p class="text-xs text-blue-600 mb-2">
+                Click elements on the canvas to select them.
+                Selected: {length(@slice_selection)}
+              </p>
+              <div class="flex gap-2">
+                <button
+                  phx-click="confirm_define_slice"
+                  class="flex-1 bg-blue-600 text-white px-2 py-1 rounded text-xs"
+                >
+                  Create
+                </button>
+                <button
+                  phx-click="cancel_define_slice"
+                  class="flex-1 bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+
+            <%!-- Slices list --%>
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="text-sm font-semibold text-gray-700">Slices</h2>
+              <button
+                :if={!@defining_slice}
+                phx-click="start_define_slice"
+                class="text-xs text-blue-600 hover:text-blue-800"
+              >
+                + Define
+              </button>
+            </div>
+
+            <div :if={@slice_names == []} class="text-sm text-gray-400 mb-4">No slices defined.</div>
+
+            <ul class="space-y-1 mb-4">
+              <li
+                :for={name <- @slice_names}
+                phx-click="select_slice"
+                phx-value-name={name}
+                class={[
+                  "text-sm text-gray-600 flex items-center gap-2 px-2 py-1 rounded cursor-pointer",
+                  if(@selected_slice == name,
+                    do: "bg-blue-50 ring-1 ring-blue-200",
+                    else: "hover:bg-gray-50"
+                  )
+                ]}
+              >
+                <span class="w-2 h-2 bg-blue-500 rounded-full shrink-0"></span>
+                <span class="truncate">{name}</span>
               </li>
             </ul>
 
+            <%!-- Selected slice details --%>
+            <div :if={@selected_slice} class="mb-4">
+              <% slice = Enum.find(@slices, &(&1.name == @selected_slice)) %>
+              <div :if={slice} class="bg-gray-50 rounded p-3">
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="text-xs font-semibold text-gray-700">{slice.name}</h3>
+                  <span class="text-xs text-gray-400">{length(slice.steps)} elements</span>
+                </div>
+
+                <button
+                  phx-click="generate_scenarios"
+                  phx-value-slice={slice.name}
+                  class="w-full bg-green-600 text-white px-2 py-1 rounded text-xs mb-2 hover:bg-green-700"
+                >
+                  Generate Scenarios
+                </button>
+
+                <%!-- Scenarios list --%>
+                <div :if={slice.tests != nil and slice.tests != []}>
+                  <h4 class="text-xs font-semibold text-gray-500 mb-1">Scenarios</h4>
+                  <div
+                    :for={scenario <- slice.tests}
+                    class="text-xs bg-white rounded p-2 mb-1 border border-gray-200"
+                  >
+                    <p class="font-medium text-gray-700">{scenario.name}</p>
+                    <div :if={scenario.given != []} class="mt-1">
+                      <span class="text-gray-400">Given:</span>
+                      <span :for={g <- scenario.given} class="ml-1 text-orange-600">{g.label}</span>
+                    </div>
+                    <div class="mt-0.5">
+                      <span class="text-gray-400">When:</span>
+                      <span :for={w <- scenario.when_clause} class="ml-1 text-blue-600">
+                        {w.label}
+                      </span>
+                    </div>
+                    <div :if={scenario.then_clause != []} class="mt-0.5">
+                      <span class="text-gray-400">Then:</span>
+                      <span :for={t <- scenario.then_clause} class="ml-1 text-green-600">
+                        {t.label}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div :if={slice.tests == nil or slice.tests == []}>
+                  <p class="text-xs text-gray-400 italic">No scenarios yet.</p>
+                </div>
+              </div>
+            </div>
+
             <%!-- Inline label editor --%>
-            <div :if={@editing_element} class="mt-6 bg-gray-50 rounded p-3">
+            <div :if={@editing_element} class="mt-4 bg-gray-50 rounded p-3">
               <h3 class="text-xs font-semibold text-gray-500 mb-2">Edit Label</h3>
               <form phx-submit="edit_label">
                 <input type="hidden" name="element_id" value={@editing_element} />
