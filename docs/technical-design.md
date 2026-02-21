@@ -6,7 +6,7 @@
 
 ## Overview
 
-EventModeler is an Elixir hex package (`event_modeler`) that adds event modeling capability to any Phoenix app, plus a thin SaaS wrapper for standalone deployment. This document describes the architecture, data model, canvas design, collaboration strategy, and PRD import/export pipeline.
+EventModeler is a standalone Phoenix/LiveView application for collaborative event modeling. This document describes the architecture, data model, canvas design, collaboration strategy, and PRD import/export pipeline.
 
 For the product vision, feature set, and PRD format definition, see the [Product Specification](product-spec.md).
 
@@ -15,32 +15,35 @@ For the product vision, feature set, and PRD format definition, see the [Product
 | Decision | Choice |
 |----------|--------|
 | **Repo/package name** | `event_modeler` |
-| **Repo structure** | Mono-repo: hex module as core, SaaS as thin wrapper app |
-| **Licensing** | Start private. SaaS hosted at sparkle.space. Hex module open-sourced later |
+| **Repo structure** | Standalone Phoenix application |
+| **Licensing** | Start private. Open-source when hex module is extracted |
 | **Docs strategy** | Masterplan keeps overview summary + link to repo. Repo gets detailed specs in `docs/` |
-
-The mono-repo contains two Mix projects:
 
 ```
 event_modeler/
-├── lib/                        # Hex module (core)
-│   └── event_modeler/
-├── mix.exs                     # {:event_modeler, "~> 0.1"}
-├── apps/
-│   └── event_modeling_saas/    # SaaS wrapper (depends on core)
-│       ├── lib/
-│       └── mix.exs
+├── lib/
+│   ├── event_modeler/          # Core domain logic
+│   ├── event_modeler_web/      # Phoenix web layer
+│   └── event_modeler.ex
+├── assets/                     # JS/CSS for canvas
+├── priv/
+│   └── repo/migrations/
+├── test/
+├── config/
 ├── docs/
-│   ├── product-spec.md         # Detailed product specification
-│   └── technical-design.md     # Detailed technical design
+│   ├── product-spec.md
+│   └── technical-design.md
+├── mix.exs
 └── README.md
 ```
 
-The hex module (`lib/`) is the publishable package. The SaaS app (`apps/event_modeling_saas/`) is a thin Phoenix wrapper that adds auth, billing, and multi-tenancy — it depends on the hex module via a path dependency. Both ship from the same repo, ensuring the SaaS always runs the same code as the open-source module.
+The application is a standard Phoenix project. Once the core is mature, the reusable domain logic (`lib/event_modeler/`) will be extracted into a publishable hex package.
 
-## Hex Module Architecture
+## Future: Hex Module Extraction
 
-EventModeler follows the Phoenix library pattern established by `phoenix_live_dashboard` and `live_storybook`: a self-contained package that brings its own routes, LiveView modules, JS hooks, CSS, Ecto schemas, and migrations. The host app provides authentication, user context, Ecto Repo, and PubSub.
+When the standalone app is mature, the core will be extracted into a hex package following the Phoenix library pattern established by `phoenix_live_dashboard` and `live_storybook`: a self-contained package that brings its own routes, LiveView modules, JS hooks, CSS, Ecto schemas, and migrations. The host app would provide authentication, user context, Ecto Repo, and PubSub.
+
+The design below describes the target hex module architecture. During the standalone app phase, these same components exist but are not yet packaged for external consumption.
 
 ### Router Integration
 
@@ -114,7 +117,7 @@ end
 
 ## Stack
 
-The technology choices align with the existing sparkle.space stack:
+The technology choices align with the sparkle.space ecosystem:
 
 | Layer | Technology | Reference |
 |-------|------------|-----------|
@@ -509,6 +512,29 @@ When a PRD is imported and then exported:
 - **Updated:** Frontmatter status changes from `draft` to `refined`
 - **Re-importable:** The exported PRD can be re-imported into a new board, with existing slices and scenarios restored
 
+### Event Stream Parser/Writer
+
+The PRD event stream is an append-only log embedded at the bottom of the markdown file. The parser reads it on import; the writer appends to it during modeling sessions.
+
+#### Parse Algorithm
+
+1. **Locate sentinel** — scan for `<!-- event-stream -->` HTML comment
+2. **Extract blocks** — find all fenced `` ```eventstream `` blocks after the sentinel
+3. **Parse YAML** — each block is a single YAML document with `seq`, `ts`, `type`, `actor`, `data` (plus optional `session`, `ref`, `note`)
+4. **Validate sequence** — verify `seq` values are monotonically increasing with no gaps
+5. **Return** — list of parsed event structs, ordered by `seq`
+
+If no sentinel is found, the event stream is empty (new PRD).
+
+#### Write Algorithm
+
+1. **Check sentinel** — if `<!-- event-stream -->` is absent, append it plus `## Event Stream` heading
+2. **Determine next seq** — read the last event's `seq` value, increment by 1 (or start at 1)
+3. **Format block** — render the event as a fenced `` ```eventstream `` YAML block
+4. **Append** — write the new block at the end of the file (after all existing event blocks)
+
+During modeling sessions, events are held in-memory by the `BoardSession` GenServer. They are flushed to the PRD file on save or session end, not on every individual action. This batches disk writes and keeps the append operation atomic.
+
 ## Workshop Step Enforcement
 
 The 7-step workshop mode constrains available tools at each step to guide participants through the Event Modeling process. Enforcement is server-authoritative — the `BoardSession` GenServer and Commanded aggregates reject disallowed actions. The UI hides unavailable tools as a convenience, but the server is the gate.
@@ -747,7 +773,21 @@ This prevents cross-projector race conditions where one projector needs data fro
 
 ## Deployment
 
-### Hex Module Deployment
+### Standalone Server
+
+```bash
+# Clone and setup
+git clone <repo-url> && cd event_modeler
+mix deps.get
+mix ecto.setup     # Create DB, run migrations, seed
+mix phx.server     # Start at localhost:4000
+```
+
+For production, build a Phoenix release and deploy to the target infrastructure.
+
+### Future: Hex Module Deployment
+
+Once extracted, host apps will add the hex module as a dependency:
 
 ```bash
 # mix.exs
@@ -760,41 +800,16 @@ mix ecto.migrate   # Runs EventModeler's migrations
 
 Host app adds the router mount, auth adapter, and supervision tree entries. EventModeler runs within the host app's BEAM node.
 
-### SaaS Deployment
-
-`eventmodeling.sparkle.space` is a thin Phoenix app that wraps the hex module:
-
-```
-eventmodeling.sparkle.space/
-├── lib/
-│   ├── event_modeling_saas/
-│   │   ├── accounts/          # User registration, auth (own aggregate)
-│   │   ├── billing/           # Stripe integration (own aggregate)
-│   │   └── tenancy/           # Org/team management (own aggregate)
-│   └── event_modeling_saas_web/
-│       └── router.ex          # Mounts event_modeler + auth + billing routes
-├── mix.exs                    # Depends on {:event_modeler, path: "../.."}
-└── config/
-```
-
-The SaaS app adds:
-- User registration and authentication (not in the hex module)
-- Stripe billing and subscription management
-- Multi-tenancy: orgs, teams, per-org boards
-- Landing page, onboarding flow, admin dashboard
-
-The hex module code is identical in both deployments. The SaaS is the hex module + auth + billing + multi-tenancy.
-
 ### Infrastructure
 
-Both deployments target Kubernetes (see [Hosting Architecture](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/hosting/hosting-architecture.md)):
+Standalone server deployment targets Kubernetes (see [Hosting Architecture](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/hosting/hosting-architecture.md)):
 
 | Component | Configuration |
 |-----------|---------------|
-| App pods | Phoenix release with EventModeler included |
+| App pods | Phoenix release |
 | Database | PostgreSQL (event store + read models) |
 | PubSub | Erlang distribution for cross-node PubSub (see [Erlang Clustering](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/hosting/erlang-clustering.md)) |
-| Assets | CDN-served JS/CSS bundles from hex module |
+| Assets | Bundled JS/CSS served by Phoenix |
 
 ## References
 
