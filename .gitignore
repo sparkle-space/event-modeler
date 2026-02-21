@@ -29,3 +29,6 @@ Thumbs.db
 # Phoenix
 /tmp/
 *.pem
+
+# Claude Code session
+.session-info
