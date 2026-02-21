@@ -1,3 +1,6 @@
 [tools]
+erlang = "28.3.2"
+elixir = "1.19.5-otp-28"
+node = "22"
 "npm:@playwright/cli" = "latest"
 "pipx:shot-scraper" = "latest"
