@@ -11,7 +11,7 @@ defmodule EventModeler.Prd.Element do
     props: %{}
   ]
 
-  @type element_type :: :trigger | :command | :event | :view | :exception
+  @type element_type :: :trigger | :command | :event | :view | :exception | :automation
 
   @type t :: %__MODULE__{
           id: String.t() | nil,
@@ -30,6 +30,7 @@ defmodule EventModeler.Prd.Element do
   def type_from_prefix("e"), do: :event
   def type_from_prefix("v"), do: :view
   def type_from_prefix("x"), do: :exception
+  def type_from_prefix("a"), do: :automation
 
   @doc """
   Maps element type atom to emlang type prefix.
@@ -40,4 +41,5 @@ defmodule EventModeler.Prd.Element do
   def prefix_from_type(:event), do: "e"
   def prefix_from_type(:view), do: "v"
   def prefix_from_type(:exception), do: "x"
+  def prefix_from_type(:automation), do: "a"
 end

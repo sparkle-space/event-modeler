@@ -14,14 +14,15 @@ defmodule EventModeler.Board do
   alias EventModeler.Workshop.ScenarioGenerator
   alias EventModeler.Workspace
 
-  defstruct [:file_path, :prd, :layout, :svg_data, dirty: false]
+  defstruct [:file_path, :prd, :layout, :svg_data, dirty: false, connections: []]
 
   @type t :: %__MODULE__{
           file_path: String.t(),
           prd: Prd.t(),
           layout: map(),
           svg_data: map(),
-          dirty: boolean()
+          dirty: boolean(),
+          connections: [{String.t(), String.t()}]
         }
 
   @inactivity_timeout :timer.minutes(30)
@@ -115,7 +116,16 @@ defmodule EventModeler.Board do
   def init(file_path) do
     case Workspace.read_prd(file_path) do
       {:ok, prd} ->
-        state = recompute_layout(%__MODULE__{file_path: file_path, prd: prd, dirty: false})
+        connections = extract_connections(prd.event_stream)
+
+        state =
+          recompute_layout(%__MODULE__{
+            file_path: file_path,
+            prd: prd,
+            dirty: false,
+            connections: connections
+          })
+
         {:ok, state, @inactivity_timeout}
 
       {:error, reason} ->
@@ -190,30 +200,40 @@ defmodule EventModeler.Board do
   end
 
   def handle_call({:connect_elements, from_id, to_id}, _from, state) do
-    from_elem = find_element(state.prd, from_id)
-    to_elem = find_element(state.prd, to_id)
-
     cond do
-      is_nil(from_elem) ->
-        {:reply, {:error, "Source element not found"}, state, @inactivity_timeout}
+      from_id == to_id ->
+        {:reply, {:error, "Cannot connect an element to itself"}, state, @inactivity_timeout}
 
-      is_nil(to_elem) ->
-        {:reply, {:error, "Target element not found"}, state, @inactivity_timeout}
+      {from_id, to_id} in state.connections ->
+        {:reply, {:error, "These elements are already connected"}, state, @inactivity_timeout}
 
       true ->
-        case ConnectionRules.rejection_reason(from_elem.type, to_elem.type) do
-          nil ->
-            prd =
-              EventStreamWriter.append(state.prd, "ElementsConnected", "user", %{
-                "fromId" => from_id,
-                "toId" => to_id
-              })
+        from_elem = find_element(state.prd, from_id)
+        to_elem = find_element(state.prd, to_id)
 
-            state = %{state | prd: prd, dirty: true}
-            {:reply, :ok, state, @inactivity_timeout}
+        cond do
+          is_nil(from_elem) ->
+            {:reply, {:error, "Source element not found"}, state, @inactivity_timeout}
 
-          reason ->
-            {:reply, {:error, reason}, state, @inactivity_timeout}
+          is_nil(to_elem) ->
+            {:reply, {:error, "Target element not found"}, state, @inactivity_timeout}
+
+          true ->
+            case ConnectionRules.rejection_reason(from_elem.type, to_elem.type) do
+              nil ->
+                prd =
+                  EventStreamWriter.append(state.prd, "ElementsConnected", "user", %{
+                    "fromId" => from_id,
+                    "toId" => to_id
+                  })
+
+                connections = [{from_id, to_id} | state.connections]
+                state = %{state | prd: prd, dirty: true, connections: connections}
+                {:reply, :ok, state, @inactivity_timeout}
+
+              reason ->
+                {:reply, {:error, reason}, state, @inactivity_timeout}
+            end
         end
     end
   end
@@ -226,8 +246,13 @@ defmodule EventModeler.Board do
         "elementId" => element_id
       })
 
+    connections =
+      Enum.reject(state.connections, fn {from, to} ->
+        from == element_id or to == element_id
+      end)
+
     state =
-      %{state | prd: prd, dirty: true}
+      %{state | prd: prd, dirty: true, connections: connections}
       |> recompute_layout()
 
     {:reply, :ok, state, @inactivity_timeout}
@@ -387,5 +412,11 @@ defmodule EventModeler.Board do
     Enum.find_value(slices, fn slice ->
       Enum.find(slice.steps, &(&1.id == element_id))
     end)
+  end
+
+  defp extract_connections(event_stream) do
+    event_stream
+    |> Enum.filter(fn entry -> entry.type == "ElementsConnected" end)
+    |> Enum.map(fn entry -> {entry.data["fromId"], entry.data["toId"]} end)
   end
 end

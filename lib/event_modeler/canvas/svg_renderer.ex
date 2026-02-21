@@ -18,7 +18,8 @@ defmodule EventModeler.Canvas.SvgRenderer do
     event: %{fill: "#F97316", stroke: "#EA580C", text: "#FFFFFF"},
     view: %{fill: "#22C55E", stroke: "#16A34A", text: "#FFFFFF"},
     trigger: %{fill: "#E5E7EB", stroke: "#9CA3AF", text: "#374151"},
-    exception: %{fill: "#EF4444", stroke: "#DC2626", text: "#FFFFFF"}
+    exception: %{fill: "#EF4444", stroke: "#DC2626", text: "#FFFFFF"},
+    automation: %{fill: "#8B5CF6", stroke: "#7C3AED", text: "#FFFFFF"}
   }
 
   @doc """

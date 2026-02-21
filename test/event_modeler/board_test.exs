@@ -210,4 +210,35 @@ defmodule EventModeler.BoardTest do
     assert slice.tests != nil
     assert length(slice.tests) == 1
   end
+
+  test "connect_elements rejects self-connection", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, cmd_id} = Board.place_element(path, :command, "Cmd")
+
+    assert {:error, reason} = Board.connect_elements(path, cmd_id, cmd_id)
+    assert reason =~ "itself"
+  end
+
+  test "connect_elements rejects duplicate connection", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, cmd_id} = Board.place_element(path, :command, "Cmd")
+    {:ok, evt_id} = Board.place_element(path, :event, "Evt")
+
+    assert :ok = Board.connect_elements(path, cmd_id, evt_id)
+    assert {:error, reason} = Board.connect_elements(path, cmd_id, evt_id)
+    assert reason =~ "already connected"
+  end
+
+  test "remove_element cleans up connections", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, cmd_id} = Board.place_element(path, :command, "Cmd")
+    {:ok, evt_id} = Board.place_element(path, :event, "Evt")
+
+    :ok = Board.connect_elements(path, cmd_id, evt_id)
+    :ok = Board.remove_element(path, cmd_id)
+
+    # After removing cmd, a new command should be able to connect to the same event
+    {:ok, cmd_id2} = Board.place_element(path, :command, "Cmd2")
+    assert :ok = Board.connect_elements(path, cmd_id2, evt_id)
+  end
 end
