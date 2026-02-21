@@ -60,7 +60,7 @@ defmodule EventModeler.Workshop.ScenarioGeneratorTest do
     slice = %Slice{
       name: "CreateBoard",
       steps: [
-        %Element{id: "1", type: :trigger, label: "DashboardPage", swimlane: "User", props: %{}},
+        %Element{id: "1", type: :wireframe, label: "DashboardPage", swimlane: "User", props: %{}},
         %Element{id: "2", type: :command, label: "CreateBoard", props: %{"title" => "string"}},
         %Element{
           id: "3",

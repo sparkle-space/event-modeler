@@ -70,7 +70,7 @@ defmodule EventModeler.Canvas.SvgRendererTest do
   end
 
   test "renders different colors for each element type" do
-    types = [:command, :event, :view, :trigger, :exception]
+    types = [:command, :event, :view, :wireframe, :exception]
 
     elements =
       types

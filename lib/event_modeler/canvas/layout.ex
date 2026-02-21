@@ -4,7 +4,7 @@ defmodule EventModeler.Canvas.Layout do
   for SVG rendering.
 
   Elements are laid out left-to-right per slice in step order
-  (trigger -> command -> event -> view). Swimlane rows group elements
+  (wireframe -> command -> event -> view). Swimlane rows group elements
   by their swimlane prefix.
   """
 
@@ -103,7 +103,7 @@ defmodule EventModeler.Canvas.Layout do
   defp layout_slices(slices, swimlane_y) do
     initial_x = @swimlane_label_width + @padding
 
-    {positioned, connections, labels, _x} =
+    {positioned, connections, labels, final_x} =
       Enum.reduce(slices, {[], [], [], initial_x}, fn slice, {elems, conns, labels, x_offset} ->
         {slice_elems, slice_conns, next_x} =
           layout_slice(slice, swimlane_y, x_offset)
@@ -117,8 +117,7 @@ defmodule EventModeler.Canvas.Layout do
         {elems ++ slice_elems, conns ++ slice_conns, labels ++ [label], next_x}
       end)
 
-    {positioned, connections, labels,
-     initial_x + length(slices) * (@element_width + @h_gap + @slice_gap)}
+    {positioned, connections, labels, final_x}
   end
 
   defp layout_slice(slice, swimlane_y, start_x) do

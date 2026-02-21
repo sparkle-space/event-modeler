@@ -72,7 +72,7 @@ defmodule EventModeler.Canvas.HtmlRendererTest do
   end
 
   test "renders different classes for each element type" do
-    types = [:command, :event, :view, :trigger, :exception, :automation]
+    types = [:command, :event, :view, :wireframe, :exception, :automation]
 
     elements =
       types

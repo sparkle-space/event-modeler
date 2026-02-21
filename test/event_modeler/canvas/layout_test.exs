@@ -21,7 +21,7 @@ defmodule EventModeler.Canvas.LayoutTest do
         %Slice{
           name: "CreateBoard",
           steps: [
-            %Element{id: "1", type: :trigger, label: "DashboardPage", swimlane: "User"},
+            %Element{id: "1", type: :wireframe, label: "DashboardPage", swimlane: "User"},
             %Element{id: "2", type: :command, label: "CreateBoard", swimlane: nil},
             %Element{id: "3", type: :event, label: "BoardCreated", swimlane: "Board"},
             %Element{id: "4", type: :view, label: "BoardCanvas", swimlane: nil}
@@ -78,7 +78,7 @@ defmodule EventModeler.Canvas.LayoutTest do
         %Slice{
           name: "Test",
           steps: [
-            %Element{id: "1", type: :trigger, label: "Form", swimlane: "User"},
+            %Element{id: "1", type: :wireframe, label: "Form", swimlane: "User"},
             %Element{id: "2", type: :event, label: "Created", swimlane: "System"}
           ]
         }
@@ -94,6 +94,40 @@ defmodule EventModeler.Canvas.LayoutTest do
     # Elements in different swimlanes should have different y positions
     ys = result.elements |> Enum.map(& &1.y) |> Enum.uniq()
     assert length(ys) == 2
+  end
+
+  test "canvas width accommodates multi-element slices" do
+    prd = %Prd{
+      slices: [
+        %Slice{
+          name: "BigSlice",
+          steps: [
+            %Element{id: "1", type: :wireframe, label: "Screen"},
+            %Element{id: "2", type: :command, label: "DoThing"},
+            %Element{id: "3", type: :event, label: "ThingDone"},
+            %Element{id: "4", type: :view, label: "Result"}
+          ]
+        }
+      ]
+    }
+
+    result = Layout.compute(prd)
+
+    # The rightmost element's right edge should be within the canvas width
+    rightmost = result.elements |> Enum.map(&(&1.x + &1.width)) |> Enum.max()
+    assert result.width >= rightmost
+
+    # Swimlane bands should be at least as wide as the canvas
+    Enum.each(result.swimlanes, fn sl ->
+      assert result.width >= rightmost
+      assert sl.height > 0
+    end)
+
+    # Slice label width should span all elements in the slice
+    [label] = result.slice_labels
+    first_x = Enum.min_by(result.elements, & &1.x).x
+    assert label.x == first_x
+    assert label.width > 0
   end
 
   test "includes slice labels" do

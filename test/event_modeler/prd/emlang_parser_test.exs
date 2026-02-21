@@ -31,7 +31,7 @@ defmodule EventModeler.Prd.EmlangParserTest do
     assert length(slice.steps) == 4
 
     [trigger, command, event, view] = slice.steps
-    assert trigger.type == :trigger
+    assert trigger.type == :wireframe
     assert trigger.label == "DashboardPage"
     assert trigger.swimlane == "User"
 

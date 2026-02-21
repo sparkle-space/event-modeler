@@ -16,7 +16,7 @@ defmodule EventModeler.Canvas.HtmlRenderer do
     command: %{bg: "bg-[#3B82F6]", text: "text-white", ring: "ring-[#2563EB]"},
     event: %{bg: "bg-[#F97316]", text: "text-white", ring: "ring-[#EA580C]"},
     view: %{bg: "bg-[#22C55E]", text: "text-white", ring: "ring-[#16A34A]"},
-    trigger: %{bg: "bg-[#E5E7EB]", text: "text-[#374151]", ring: "ring-[#9CA3AF]"},
+    wireframe: %{bg: "bg-[#E5E7EB]", text: "text-[#374151]", ring: "ring-[#9CA3AF]"},
     automation: %{bg: "bg-[#8B5CF6]", text: "text-white", ring: "ring-[#7C3AED]"},
     exception: %{bg: "bg-[#EF4444]", text: "text-white", ring: "ring-[#DC2626]"}
   }

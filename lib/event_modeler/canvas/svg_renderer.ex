@@ -7,7 +7,7 @@ defmodule EventModeler.Canvas.SvgRenderer do
   - Commands = blue rounded rectangles
   - Events = orange rectangles
   - Views = green rectangles
-  - Triggers/Wireframes = gray with monospace text
+  - Wireframes = gray with monospace text
   - Exceptions = red rectangles
   """
 
@@ -17,7 +17,7 @@ defmodule EventModeler.Canvas.SvgRenderer do
     command: %{fill: "#3B82F6", stroke: "#2563EB", text: "#FFFFFF"},
     event: %{fill: "#F97316", stroke: "#EA580C", text: "#FFFFFF"},
     view: %{fill: "#22C55E", stroke: "#16A34A", text: "#FFFFFF"},
-    trigger: %{fill: "#E5E7EB", stroke: "#9CA3AF", text: "#374151"},
+    wireframe: %{fill: "#E5E7EB", stroke: "#9CA3AF", text: "#374151"},
     exception: %{fill: "#EF4444", stroke: "#DC2626", text: "#FFFFFF"},
     automation: %{fill: "#8B5CF6", stroke: "#7C3AED", text: "#FFFFFF"}
   }

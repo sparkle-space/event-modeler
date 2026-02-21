@@ -28,12 +28,12 @@ defmodule EventModeler.Canvas.ConnectionRulesTest do
       assert ConnectionRules.valid?(:automation, :command)
     end
 
-    test "trigger -> command is valid" do
-      assert ConnectionRules.valid?(:trigger, :command)
+    test "wireframe -> command is valid" do
+      assert ConnectionRules.valid?(:wireframe, :command)
     end
 
-    test "trigger -> view is valid" do
-      assert ConnectionRules.valid?(:trigger, :view)
+    test "wireframe -> view is valid" do
+      assert ConnectionRules.valid?(:wireframe, :view)
     end
   end
 
@@ -50,8 +50,8 @@ defmodule EventModeler.Canvas.ConnectionRulesTest do
       refute ConnectionRules.valid?(:view, :view)
     end
 
-    test "view -> trigger is rejected" do
-      refute ConnectionRules.valid?(:view, :trigger)
+    test "view -> wireframe is rejected" do
+      refute ConnectionRules.valid?(:view, :wireframe)
     end
 
     test "view -> automation is rejected" do
@@ -63,25 +63,25 @@ defmodule EventModeler.Canvas.ConnectionRulesTest do
     end
   end
 
-  describe "invalid connections - nothing can target triggers" do
-    test "command -> trigger is rejected" do
-      refute ConnectionRules.valid?(:command, :trigger)
+  describe "invalid connections - nothing can target wireframes" do
+    test "command -> wireframe is rejected" do
+      refute ConnectionRules.valid?(:command, :wireframe)
     end
 
-    test "event -> trigger is rejected" do
-      refute ConnectionRules.valid?(:event, :trigger)
+    test "event -> wireframe is rejected" do
+      refute ConnectionRules.valid?(:event, :wireframe)
     end
 
-    test "automation -> trigger is rejected" do
-      refute ConnectionRules.valid?(:automation, :trigger)
+    test "automation -> wireframe is rejected" do
+      refute ConnectionRules.valid?(:automation, :wireframe)
     end
 
-    test "exception -> trigger is rejected" do
-      refute ConnectionRules.valid?(:exception, :trigger)
+    test "exception -> wireframe is rejected" do
+      refute ConnectionRules.valid?(:exception, :wireframe)
     end
 
-    test "trigger -> trigger is rejected" do
-      refute ConnectionRules.valid?(:trigger, :trigger)
+    test "wireframe -> wireframe is rejected" do
+      refute ConnectionRules.valid?(:wireframe, :wireframe)
     end
   end
 
@@ -102,16 +102,16 @@ defmodule EventModeler.Canvas.ConnectionRulesTest do
       refute ConnectionRules.valid?(:event, :event)
     end
 
-    test "trigger -> event is rejected" do
-      refute ConnectionRules.valid?(:trigger, :event)
+    test "wireframe -> event is rejected" do
+      refute ConnectionRules.valid?(:wireframe, :event)
     end
 
-    test "trigger -> automation is rejected" do
-      refute ConnectionRules.valid?(:trigger, :automation)
+    test "wireframe -> automation is rejected" do
+      refute ConnectionRules.valid?(:wireframe, :automation)
     end
 
-    test "trigger -> exception is rejected" do
-      refute ConnectionRules.valid?(:trigger, :exception)
+    test "wireframe -> exception is rejected" do
+      refute ConnectionRules.valid?(:wireframe, :exception)
     end
 
     test "command -> automation is rejected" do
@@ -165,8 +165,8 @@ defmodule EventModeler.Canvas.ConnectionRulesTest do
       assert reason =~ "read-only"
     end
 
-    test "targeting trigger explains they are entry points" do
-      reason = ConnectionRules.rejection_reason(:event, :trigger)
+    test "targeting wireframe explains they are entry points" do
+      reason = ConnectionRules.rejection_reason(:event, :wireframe)
       assert reason =~ "entry point"
     end
 
@@ -180,18 +180,18 @@ defmodule EventModeler.Canvas.ConnectionRulesTest do
       assert reason =~ "Event"
     end
 
-    test "trigger -> event explains command step is required" do
-      reason = ConnectionRules.rejection_reason(:trigger, :event)
+    test "wireframe -> event explains command step is required" do
+      reason = ConnectionRules.rejection_reason(:wireframe, :event)
       assert reason =~ "Command"
     end
 
-    test "trigger -> automation explains triggers are user interactions" do
-      reason = ConnectionRules.rejection_reason(:trigger, :automation)
+    test "wireframe -> automation explains wireframes are user interactions" do
+      reason = ConnectionRules.rejection_reason(:wireframe, :automation)
       assert reason =~ "user interaction"
     end
 
-    test "trigger -> exception explains command step is required" do
-      reason = ConnectionRules.rejection_reason(:trigger, :exception)
+    test "wireframe -> exception explains command step is required" do
+      reason = ConnectionRules.rejection_reason(:wireframe, :exception)
       assert reason =~ "Command"
     end
   end
@@ -211,8 +211,8 @@ defmodule EventModeler.Canvas.ConnectionRulesTest do
       assert length(targets) == 2
     end
 
-    test "trigger can target command and view" do
-      targets = ConnectionRules.valid_targets(:trigger)
+    test "wireframe can target command and view" do
+      targets = ConnectionRules.valid_targets(:wireframe)
       assert :command in targets
       assert :view in targets
       assert length(targets) == 2
@@ -232,10 +232,10 @@ defmodule EventModeler.Canvas.ConnectionRulesTest do
   end
 
   describe "valid_sources/1" do
-    test "command can be sourced from automation and trigger" do
+    test "command can be sourced from automation and wireframe" do
       sources = ConnectionRules.valid_sources(:command)
       assert :automation in sources
-      assert :trigger in sources
+      assert :wireframe in sources
       assert length(sources) == 2
     end
 
@@ -243,11 +243,11 @@ defmodule EventModeler.Canvas.ConnectionRulesTest do
       assert ConnectionRules.valid_sources(:event) == [:command]
     end
 
-    test "view can be sourced from event, exception, and trigger" do
+    test "view can be sourced from event, exception, and wireframe" do
       sources = ConnectionRules.valid_sources(:view)
       assert :event in sources
       assert :exception in sources
-      assert :trigger in sources
+      assert :wireframe in sources
       assert length(sources) == 3
     end
 
@@ -259,8 +259,8 @@ defmodule EventModeler.Canvas.ConnectionRulesTest do
       assert ConnectionRules.valid_sources(:exception) == [:command]
     end
 
-    test "trigger has no valid sources" do
-      assert ConnectionRules.valid_sources(:trigger) == []
+    test "wireframe has no valid sources" do
+      assert ConnectionRules.valid_sources(:wireframe) == []
     end
   end
 
@@ -274,8 +274,8 @@ defmodule EventModeler.Canvas.ConnectionRulesTest do
       assert {:event, :automation} in valid
       assert {:exception, :view} in valid
       assert {:automation, :command} in valid
-      assert {:trigger, :command} in valid
-      assert {:trigger, :view} in valid
+      assert {:wireframe, :command} in valid
+      assert {:wireframe, :view} in valid
     end
   end
 end
