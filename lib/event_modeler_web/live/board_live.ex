@@ -214,7 +214,15 @@ defmodule EventModelerWeb.BoardLive do
   # Slice management events
 
   def handle_event("select_slice", %{"name" => name}, socket) do
-    {:noreply, assign(socket, selected_slice: name)}
+    socket = assign(socket, selected_slice: name)
+
+    case Enum.find(socket.assigns.canvas_data.slice_labels, &(&1.name == name)) do
+      %{x: x, width: width} ->
+        {:noreply, push_event(socket, "pan_to_slice", %{x: x, width: width})}
+
+      nil ->
+        {:noreply, socket}
+    end
   end
 
   def handle_event("start_define_slice", _params, socket) do

@@ -44,9 +44,29 @@ const EventModelerCanvas = {
         e.target.tagName !== "INPUT" &&
         e.target.tagName !== "TEXTAREA"
       ) {
-        this.handleDelete()
+        this.onDelete()
       }
     })
+
+    // Listen for server-pushed pan_to_slice events
+    this.handleEvent("pan_to_slice", (payload) => {
+      this.panToSlice(payload.x, payload.width)
+    })
+  },
+
+  panToSlice(sliceX, sliceWidth) {
+    const viewportWidth = this.viewport.getBoundingClientRect().width
+    const sliceCenterX = sliceX + sliceWidth / 2
+
+    // Center the slice horizontally: viewportCenter = translateX + sliceCenterX * scale
+    this.translateX = viewportWidth / 2 - sliceCenterX * this.scale
+
+    // Smooth transition, then remove so manual pan stays responsive
+    this.world.style.transition = "transform 0.3s ease-out"
+    this.applyTransform()
+    setTimeout(() => {
+      this.world.style.transition = ""
+    }, 300)
   },
 
   applyTransform() {
@@ -115,7 +135,7 @@ const EventModelerCanvas = {
     this.applyTransform()
   },
 
-  handleDelete() {
+  onDelete() {
     const selected = this.viewport.querySelector("[data-selected='true']")
     if (selected) {
       this.pushEvent("remove_element", {
