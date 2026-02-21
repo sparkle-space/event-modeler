@@ -2,8 +2,8 @@
  * EventModelerCanvas hook - handles canvas interactions
  *
  * Provides:
- * - Pan: mousedown+mousemove on background -> CSS transform translate
- * - Zoom: wheel -> CSS transform scale (cursor-centered)
+ * - Pan: mousedown+mousemove on background, or scroll wheel -> CSS transform translate
+ * - Zoom: Ctrl/Cmd+scroll or trackpad pinch -> CSS transform scale (cursor-centered)
  * - Select: click element -> pushEvent (handled by phx-click)
  * - Connect: shift+click source, shift+click target -> pushEvent
  * - Delete: Delete/Backspace -> pushEvent for selected element
@@ -96,15 +96,22 @@ const EventModelerCanvas = {
 
   onWheel(e) {
     e.preventDefault()
-    const factor = e.deltaY > 0 ? 0.9 : 1.1
-    const rect = this.viewport.getBoundingClientRect()
 
-    // Zoom toward the cursor position
-    const px = e.clientX - rect.left
-    const py = e.clientY - rect.top
-    this.translateX = px - factor * (px - this.translateX)
-    this.translateY = py - factor * (py - this.translateY)
-    this.scale *= factor
+    if (e.ctrlKey || e.metaKey) {
+      // Zoom toward cursor (Ctrl/Cmd+scroll or trackpad pinch)
+      const factor = e.deltaY > 0 ? 0.9 : 1.1
+      const rect = this.viewport.getBoundingClientRect()
+      const px = e.clientX - rect.left
+      const py = e.clientY - rect.top
+      this.translateX = px - factor * (px - this.translateX)
+      this.translateY = py - factor * (py - this.translateY)
+      this.scale *= factor
+    } else {
+      // Pan
+      this.translateX -= e.deltaX
+      this.translateY -= e.deltaY
+    }
+
     this.applyTransform()
   },
 
