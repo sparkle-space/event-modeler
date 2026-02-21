@@ -18,6 +18,7 @@ defmodule EventModelerWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+    live "/visualize", VisualizeLive
   end
 
   # Other scopes may use custom stacks.
