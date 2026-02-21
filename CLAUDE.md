@@ -51,6 +51,10 @@ Prerequisites (install via [mise](https://mise.jdx.dev/)):
 mise install elixir erlang node
 ```
 
+External tools (Python CLIs, npm CLIs) are installed locally via `mise use` into `mise.toml` — never via `brew`, global `pip`, or global `npm install -g`.
+
+**Bash tool quirk:** mise shims aren't on PATH in Claude Code's Bash tool. Prefix commands with `eval "$(mise activate bash)" &&`.
+
 Database (via Docker):
 
 ```bash
@@ -88,6 +92,42 @@ Append-only event log at the bottom of PRD files. Fenced `` ```eventstream `` YA
 - **Slice** — A vertical unit of work: Trigger → Command → Event → View. Named, testable, deliverable.
 - **PRD lifecycle** — draft → modeling → refined → approved. Import starts modeling; export produces refined.
 - **Two-level sync** — Ephemeral (GenServer + Channels for cursors/drags) + Persistent (event-sourced for model state).
+
+## Visual Web Inspection
+
+Two CLI tools for token-efficient visual inspection of the running Phoenix app. Both installed locally via `mise` (see `mise.toml`).
+
+### shot-scraper (quick visual checks)
+
+Takes a screenshot and saves to disk. Zero tokens until you read the image.
+
+```bash
+eval "$(mise activate bash)" && shot-scraper http://localhost:4000 -o /tmp/page.png
+# Then: Read /tmp/page.png  (Claude vision analyzes the image)
+```
+
+Options: `--width 1280 --height 800`, `--selector "#canvas"`, `--wait 2000` (ms).
+
+### playwright-cli (interactive browser sessions)
+
+Full browser interaction via CLI. Saves snapshots and screenshots to disk.
+
+```bash
+eval "$(mise activate bash)" && playwright-cli open http://localhost:4000
+eval "$(mise activate bash)" && playwright-cli snapshot       # accessibility tree
+eval "$(mise activate bash)" && playwright-cli screenshot     # save screenshot
+eval "$(mise activate bash)" && playwright-cli click e21      # click element by ref
+eval "$(mise activate bash)" && playwright-cli fill e35 "text" # fill form field
+eval "$(mise activate bash)" && playwright-cli close
+```
+
+### When to use which
+
+| Task | Tool |
+|------|------|
+| Quick visual check / screenshot | `shot-scraper` |
+| Multi-step interaction (click, fill, navigate) | `playwright-cli` |
+| Accessibility tree inspection | `playwright-cli snapshot` |
 
 ## Skills
 

@@ -1,0 +1,3 @@
+[tools]
+"npm:@playwright/cli" = "latest"
+"pipx:shot-scraper" = "latest"
