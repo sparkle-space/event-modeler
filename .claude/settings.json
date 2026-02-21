@@ -1,4 +1,7 @@
 {
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
   "permissions": {
     "allow": [
       "Bash(mix *)",
@@ -63,9 +66,7 @@
     "plugin-dev@claude-plugins-official": true,
     "hookify@claude-plugins-official": true,
     "playground@claude-plugins-official": true,
-    "huggingface-skills@claude-plugins-official": true
-  },
-  "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+    "huggingface-skills@claude-plugins-official": true,
+    "frontend-design@claude-code-plugins": true
   }
 }

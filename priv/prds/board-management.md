@@ -1,14 +1,13 @@
 ---
 title: "Board Management"
-status: draft
+status: "refined"
 domain: "Board"
 version: 1
 created: "2026-02-21"
-updated: "2026-02-21"
-dependencies: []
+updated: "2026-02-21T16:28:55.223974Z"
 tags:
-  - event-modeling
-  - board
+  - "event-modeling"
+  - "board"
 ---
 
 # Board Management
@@ -25,8 +24,6 @@ Board Management provides the core workflow for creating and managing event mode
 
 ## Slices
 
-Slices are derived from the event model. Each slice is a vertical unit of work defined in emlang notation.
-
 ### Slice: CreateBoard
 
 **Wireframe:** Dashboard page with board list and "New Board" button
@@ -38,23 +35,24 @@ slices:
       - t: User/DashboardPage
       - c: CreateBoard
         props:
-          title: string
           ownerId: string
+          title: string
       - e: Board/BoardCreated
         props:
           boardId: string
-          title: string
           ownerId: string
+          title: string
       - v: BoardCanvas
     tests:
       HappyPath:
         when:
           - c: CreateBoard
             props:
-              title: "My Event Model"
+              title: My Event Model
         then:
           - e: Board/BoardCreated
 ```
+
 
 ### Slice: ImportPrd
 
@@ -71,28 +69,29 @@ slices:
           markdownContent: string
       - e: Prd/PrdImported
         props:
-          prdId: string
           boardId: string
-          title: string
-          overview: string
           keyIdeas: list
+          overview: string
+          prdId: string
+          title: string
       - v: BoardCanvasWithElements
     tests:
-      WithValidContent:
-        when:
-          - c: ImportPrd
-            props:
-              markdownContent: "valid PRD content"
-        then:
-          - e: Prd/PrdImported
       EmptyPrd:
         when:
           - c: ImportPrd
             props:
-              markdownContent: ""
+              markdownContent: 
         then:
           - x: InvalidPrdContent
+      WithValidContent:
+        when:
+          - c: ImportPrd
+            props:
+              markdownContent: valid PRD content
+        then:
+          - e: Prd/PrdImported
 ```
+
 
 ### Slice: VisualizeModel
 
@@ -105,23 +104,24 @@ slices:
       - t: System/PrdFile
       - c: LoadModel
         props:
-          prdId: string
           mode: string
+          prdId: string
       - e: Board/ModelLoaded
         props:
           boardId: string
-          prdId: string
           elementCount: number
+          prdId: string
       - v: ReadOnlyCanvas
     tests:
       LoadAndRender:
         when:
           - c: LoadModel
             props:
-              mode: "readonly"
+              mode: readonly
         then:
           - e: Board/ModelLoaded
 ```
+
 
 ## Scenarios
 
@@ -170,8 +170,8 @@ ts: "2026-02-21T10:00:00Z"
 type: PrdCreated
 actor: system
 data:
+  status: "draft"
   title: "Board Management"
-  status: draft
 ```
 
 ```eventstream
@@ -181,8 +181,8 @@ type: SliceAdded
 actor: system
 session: "initial-modeling"
 data:
-  sliceName: CreateBoard
   elements: [DashboardPage, CreateBoard, BoardCreated, BoardCanvas]
+  sliceName: "CreateBoard"
 ```
 
 ```eventstream
@@ -192,8 +192,8 @@ type: SliceAdded
 actor: system
 session: "initial-modeling"
 data:
-  sliceName: ImportPrd
   elements: [ImportDialog, ImportPrd, PrdImported, BoardCanvasWithElements]
+  sliceName: "ImportPrd"
 ```
 
 ```eventstream
@@ -203,6 +203,143 @@ type: SliceAdded
 actor: system
 session: "initial-modeling"
 data:
-  sliceName: VisualizeModel
   elements: [PrdFile, LoadModel, ModelLoaded, ReadOnlyCanvas]
+  sliceName: "VisualizeModel"
+```
+
+```eventstream
+seq: 5
+ts: "2026-02-21T16:27:53.871576Z"
+type: ElementMoved
+actor: user
+data:
+  elementId: "QvNnj7rPYag"
+```
+
+```eventstream
+seq: 6
+ts: "2026-02-21T16:27:55.107989Z"
+type: ElementMoved
+actor: user
+data:
+  elementId: "MVeOJ5ewS0s"
+```
+
+```eventstream
+seq: 7
+ts: "2026-02-21T16:27:56.989685Z"
+type: ElementMoved
+actor: user
+data:
+  elementId: "dh18Ps5uB5U"
+```
+
+```eventstream
+seq: 8
+ts: "2026-02-21T16:27:57.824315Z"
+type: ElementMoved
+actor: user
+data:
+  elementId: "MVeOJ5ewS0s"
+```
+
+```eventstream
+seq: 9
+ts: "2026-02-21T16:28:00.790519Z"
+type: ElementMoved
+actor: user
+data:
+  elementId: "MVeOJ5ewS0s"
+```
+
+```eventstream
+seq: 10
+ts: "2026-02-21T16:28:01.057208Z"
+type: ElementMoved
+actor: user
+data:
+  elementId: "MVeOJ5ewS0s"
+```
+
+```eventstream
+seq: 11
+ts: "2026-02-21T16:28:01.789799Z"
+type: ElementMoved
+actor: user
+data:
+  elementId: "MVeOJ5ewS0s"
+```
+
+```eventstream
+seq: 12
+ts: "2026-02-21T16:28:02.740819Z"
+type: ElementMoved
+actor: user
+data:
+  elementId: "MVeOJ5ewS0s"
+```
+
+```eventstream
+seq: 13
+ts: "2026-02-21T16:28:03.557775Z"
+type: ElementMoved
+actor: user
+data:
+  elementId: "MVeOJ5ewS0s"
+```
+
+```eventstream
+seq: 14
+ts: "2026-02-21T16:28:03.774501Z"
+type: ElementMoved
+actor: user
+data:
+  elementId: "MVeOJ5ewS0s"
+```
+
+```eventstream
+seq: 15
+ts: "2026-02-21T16:28:26.492019Z"
+type: ElementModified
+actor: user
+data:
+  changes: "%{\"label\" => \"Create\"}"
+  elementId: "MVeOJ5ewS0s"
+```
+
+```eventstream
+seq: 16
+ts: "2026-02-21T16:28:32.739811Z"
+type: ElementMoved
+actor: user
+data:
+  elementId: "MVeOJ5ewS0s"
+```
+
+```eventstream
+seq: 17
+ts: "2026-02-21T16:28:39.024506Z"
+type: ElementMoved
+actor: user
+data:
+  elementId: "MVeOJ5ewS0s"
+```
+
+```eventstream
+seq: 18
+ts: "2026-02-21T16:28:39.207298Z"
+type: ElementMoved
+actor: user
+data:
+  elementId: "MVeOJ5ewS0s"
+```
+
+```eventstream
+seq: 19
+ts: "2026-02-21T16:28:52.058066Z"
+type: ElementModified
+actor: user
+data:
+  changes: "%{\"label\" => \"CreateBoard\"}"
+  elementId: "MVeOJ5ewS0s"
 ```
