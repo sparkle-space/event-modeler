@@ -20,8 +20,18 @@ mix deps.get        # Elixir dependencies
 mix phx.server      # Start dev server at localhost:4000
 ```
 
-## Status
+## Done
 
-Early development — Phoenix scaffold with landing page. Product spec and technical design are complete.
+- **PRD Format Spec + Template** — Standalone format specification and reusable template with emlang notation, event stream format, and validation rules
+- **PRD Parser** — Parses PRD markdown into structured data: YAML frontmatter, emlang slice blocks, named sections, and event stream entries
+- **Read-Only Visualization** — SVG canvas rendering at `/visualize` with element layout, swimlane rows, connection arrows, and color-coded element types
+- **File Management + Board Model** — Workspace file operations, PRD serializer for round-trip markdown, Board GenServer per open file with DynamicSupervisor + Registry
+- **Interactive Canvas Editing** — Place, move, connect, edit, and delete elements on the canvas with JS hook for pan/zoom/drag, connection rule validation, and event stream audit log
+- **Slices + Scenario Generation** — Define named slices from element groups, auto-generate Given/When/Then scenarios from slice element graphs, sidebar UI for slice management
+- **Full PRD Round-Trip** — Save updates frontmatter timestamps and status, auto-generates data flows table, export controller for file download, verified with integration tests
 
-**Development strategy:** Build a standalone Phoenix app with full event modeling capability. Extract the reusable hex module (`event_modeler`) once the core is mature and the API surface is stable.
+## TODO
+
+- **Real-Time Collaboration** — Multiple users editing the same board simultaneously with cursor tracking, element locking, and Phoenix Presence
+- **Workshop Mode** — Guided 7-step Event Modeling workshop with per-step element constraints and facilitator controls
+- **Completeness Checking + Polish** — Field traceability (View → Event → Command), read-only sharing route, landing page navigation, dogfooding readiness
