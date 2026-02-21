@@ -8,6 +8,7 @@ A purpose-built collaborative canvas for designing information systems using [Ev
 
 - [Product Specification](docs/product-spec.md) — Feature set, PRD format, user stories, competitive landscape
 - [Technical Design](docs/technical-design.md) — Architecture, data model, canvas, collaboration, workshop enforcement, scenario generation, completeness checking, wireframe handling
+- [PRD Format Specification](docs/prd-format-spec.md) — Standalone format spec for PRD files (frontmatter, sections, emlang notation, event stream)
 
 ## Development Setup
 
