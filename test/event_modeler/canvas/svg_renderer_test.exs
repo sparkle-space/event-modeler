@@ -57,12 +57,12 @@ defmodule EventModeler.Canvas.SvgRendererTest do
     # Command should be blue
     cmd = Enum.find(svg_data.elements, &(&1.type == :command))
     assert cmd.fill == "#3B82F6"
-    assert cmd.rx == 8
+    assert cmd.rx == 12
 
     # Event should be orange
     evt = Enum.find(svg_data.elements, &(&1.type == :event))
     assert evt.fill == "#F97316"
-    assert evt.rx == 2
+    assert evt.rx == 12
 
     # Connection should have a path
     [conn] = svg_data.connections

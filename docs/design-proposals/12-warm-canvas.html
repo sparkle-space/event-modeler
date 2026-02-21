@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Warm Canvas - EventModeler Design Proposal #12</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ===== CSS Custom Properties ===== */
+    :root {
+      --color-bg: #FAF8F5;
+      --color-surface: #FFFFFF;
+      --color-surface-alt: #F5F0EA;
+      --color-text: #2D2419;
+      --color-text-secondary: #8A7D6F;
+      --color-border: #E5DDD2;
+      --color-accent: #D4956A;
+
+      --color-swimlane-user: rgba(212, 149, 106, 0.05);
+      --color-swimlane-system: rgba(138, 125, 111, 0.05);
+      --color-swimlane-external: rgba(139, 92, 246, 0.04);
+
+      --shadow-sm: 0 2px 8px rgba(45, 36, 25, 0.06);
+      --shadow-md: 0 6px 20px rgba(45, 36, 25, 0.08);
+      --radius-card: 14px;
+      --radius-element: 10px;
+      --font-family: 'Nunito Sans', system-ui, sans-serif;
+    }
+
+    [data-theme="dark"] {
+      --color-bg: #1C1914;
+      --color-surface: #28241E;
+      --color-surface-alt: #322D26;
+      --color-text: #E8E0D6;
+      --color-text-secondary: #A09080;
+      --color-border: #3D362E;
+      --color-accent: #E0A576;
+
+      --color-swimlane-user: rgba(224, 165, 118, 0.05);
+      --color-swimlane-system: rgba(160, 144, 128, 0.05);
+      --color-swimlane-external: rgba(167, 139, 250, 0.04);
+
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
+      --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    /* ===== Reset & Base ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-family);
+      background: var(--color-bg);
+      color: var(--color-text);
+      line-height: 1.6;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 48px 32px 80px;
+    }
+
+    /* ===== Header ===== */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 64px;
+      padding-bottom: 32px;
+      background: linear-gradient(180deg, var(--color-surface-alt) 0%, transparent 100%);
+      margin-left: -32px;
+      margin-right: -32px;
+      margin-top: -48px;
+      padding: 48px 32px 32px;
+    }
+
+    .header-title {
+      font-size: 2.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--color-text);
+    }
+
+    .header-subtitle {
+      font-size: 0.875rem;
+      font-weight: 400;
+      color: var(--color-text-secondary);
+      margin-top: 4px;
+    }
+
+    /* Toggle */
+    .theme-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle-track {
+      width: 48px;
+      height: 26px;
+      background: var(--color-border);
+      border-radius: 13px;
+      position: relative;
+      transition: background 0.25s ease;
+    }
+
+    [data-theme="dark"] .toggle-track { background: var(--color-accent); }
+
+    .toggle-knob {
+      width: 20px;
+      height: 20px;
+      background: var(--color-surface);
+      border-radius: 50%;
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      transition: transform 0.25s ease;
+      box-shadow: var(--shadow-sm);
+    }
+
+    [data-theme="dark"] .toggle-knob { transform: translateX(22px); }
+
+    /* ===== Section ===== */
+    .section { margin-bottom: 64px; }
+
+    .section-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+
+    .section-desc {
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+      margin-bottom: 28px;
+      max-width: 600px;
+      line-height: 1.7;
+    }
+
+    /* ===== Color Palette ===== */
+    .palette-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 16px;
+    }
+
+    .swatch {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-card);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.3s ease, background 0.3s ease;
+    }
+
+    .swatch:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+    }
+
+    .swatch-color {
+      height: 72px;
+      transition: background 0.3s ease;
+    }
+
+    .swatch-info { padding: 12px; }
+
+    .swatch-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .swatch-hex {
+      font-size: 0.6875rem;
+      color: var(--color-text-secondary);
+      font-family: 'Nunito Sans', monospace;
+    }
+
+    /* ===== Typography ===== */
+    .type-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-card);
+      padding: 32px;
+      box-shadow: var(--shadow-sm);
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+
+    .type-sample { margin-bottom: 24px; }
+    .type-sample:last-child { margin-bottom: 0; }
+
+    .type-meta {
+      font-size: 0.6875rem;
+      color: var(--color-text-secondary);
+      margin-bottom: 4px;
+      font-family: 'Nunito Sans', monospace;
+    }
+
+    .type-h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+    .type-h2 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.015em; line-height: 1.3; }
+    .type-h3 { font-size: 1.125rem; font-weight: 600; line-height: 1.4; }
+    .type-body { font-size: 0.9375rem; font-weight: 400; line-height: 1.7; color: var(--color-text-secondary); }
+    .type-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-secondary); }
+
+    /* ===== Mock Board ===== */
+    .board-wrapper {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-card);
+      padding: 20px;
+      box-shadow: var(--shadow-md);
+      overflow-x: auto;
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+
+    .board-svg text { font-family: var(--font-family); }
+
+    /* ===== Element Gallery ===== */
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 20px;
+    }
+
+    .gallery-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-card);
+      padding: 24px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      transition: box-shadow 0.25s ease, transform 0.25s ease, background 0.3s ease, border-color 0.3s ease;
+    }
+
+    .gallery-card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-3px);
+    }
+
+    .gallery-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-element);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .gallery-icon--trigger { color: #374151 !important; }
+
+    .gallery-label {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .gallery-desc {
+      font-size: 0.8125rem;
+      color: var(--color-text-secondary);
+      line-height: 1.6;
+    }
+
+    /* ===== Code Block ===== */
+    .code-block {
+      background: var(--color-surface-alt);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-card);
+      padding: 28px;
+      overflow-x: auto;
+      box-shadow: var(--shadow-sm);
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+
+    .code-block pre {
+      margin: 0;
+      font-family: 'Nunito Sans', 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.78rem;
+      line-height: 1.7;
+      color: var(--color-text-secondary);
+      white-space: pre;
+    }
+
+    .code-block .ck { color: var(--color-accent); }
+    .code-block .cv { color: #D4956A; }
+    .code-block .cc { color: var(--color-text-secondary); }
+
+    [data-theme="dark"] .code-block .cv { color: #E0A576; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ===== 1. Header ===== -->
+    <header class="header">
+      <div>
+        <h1 class="header-title">Warm Canvas</h1>
+        <p class="header-subtitle">EventModeler Design Proposal #12 &mdash; Warm Neutral, Linen Geometry</p>
+      </div>
+      <div class="theme-toggle" onclick="toggleTheme()" role="button" aria-label="Toggle dark mode">
+        <span>Light</span>
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span>Dark</span>
+      </div>
+    </header>
+
+    <!-- ===== 2. Color Palette ===== -->
+    <section class="section">
+      <h2 class="section-title">Color Palette</h2>
+      <p class="section-desc">Canonical element colors paired with warm linen-toned foundation tokens. All values adapt between light and dark modes via CSS custom properties.</p>
+      <div class="palette-grid">
+        <div class="swatch"><div class="swatch-color" style="background:#3B82F6"></div><div class="swatch-info"><div class="swatch-label">Command</div><div class="swatch-hex">#3B82F6</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#F97316"></div><div class="swatch-info"><div class="swatch-label">Event</div><div class="swatch-hex">#F97316</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#22C55E"></div><div class="swatch-info"><div class="swatch-label">View</div><div class="swatch-hex">#22C55E</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#E5E7EB"></div><div class="swatch-info"><div class="swatch-label">Trigger</div><div class="swatch-hex">#E5E7EB</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#EF4444"></div><div class="swatch-info"><div class="swatch-label">Exception</div><div class="swatch-hex">#EF4444</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#8B5CF6"></div><div class="swatch-info"><div class="swatch-label">Automation</div><div class="swatch-hex">#8B5CF6</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#FAF8F5"></div><div class="swatch-info"><div class="swatch-label">Background</div><div class="swatch-hex">#FAF8F5</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#FFFFFF;border-bottom:1px solid #E5DDD2"></div><div class="swatch-info"><div class="swatch-label">Surface</div><div class="swatch-hex">#FFFFFF</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#2D2419"></div><div class="swatch-info"><div class="swatch-label">Text</div><div class="swatch-hex">#2D2419</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#8A7D6F"></div><div class="swatch-info"><div class="swatch-label">Text Secondary</div><div class="swatch-hex">#8A7D6F</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#E5DDD2"></div><div class="swatch-info"><div class="swatch-label">Border</div><div class="swatch-hex">#E5DDD2</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#D4956A"></div><div class="swatch-info"><div class="swatch-label">Accent</div><div class="swatch-hex">#D4956A</div></div></div>
+      </div>
+    </section>
+
+    <!-- ===== 3. Typography ===== -->
+    <section class="section">
+      <h2 class="section-title">Typography</h2>
+      <p class="section-desc">Nunito Sans provides a friendly, rounded sans-serif with warm character and excellent readability across all sizes.</p>
+      <div class="type-card">
+        <div class="type-sample">
+          <div class="type-meta">Heading 1 &mdash; Nunito Sans 700 / 2rem / line-height 1.2 / tracking -0.02em</div>
+          <div class="type-h1">Event Modeling Canvas</div>
+        </div>
+        <div class="type-sample">
+          <div class="type-meta">Heading 2 &mdash; Nunito Sans 700 / 1.5rem / line-height 1.3 / tracking -0.015em</div>
+          <div class="type-h2">Slice: User Registration</div>
+        </div>
+        <div class="type-sample">
+          <div class="type-meta">Heading 3 &mdash; Nunito Sans 600 / 1.125rem / line-height 1.4</div>
+          <div class="type-h3">Command &amp; Event Definitions</div>
+        </div>
+        <div class="type-sample">
+          <div class="type-meta">Body &mdash; Nunito Sans 400 / 0.9375rem / line-height 1.7</div>
+          <div class="type-body">Each slice represents a vertical unit of work flowing from trigger through command and event to a read model view. Slices are independently testable and deliverable.</div>
+        </div>
+        <div class="type-sample">
+          <div class="type-meta">Label &mdash; Nunito Sans 700 / 0.75rem / uppercase / tracking 0.06em</div>
+          <div class="type-label">Swimlane &middot; User Interface</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 4. Mock Board ===== -->
+    <section class="section">
+      <h2 class="section-title">Mock Board</h2>
+      <p class="section-desc">A representative EventModeler canvas with two slices, three swimlanes, and warm-toned element cards connected by smooth curved paths.</p>
+      <div class="board-wrapper">
+        <svg class="board-svg" viewBox="0 0 820 420" width="820" height="420" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,3.5 L0,7 z" fill="#B8AD9E" opacity="0.6"/>
+            </marker>
+            <marker id="arrow-exc" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,3.5 L0,7 z" fill="#EF4444" opacity="0.5"/>
+            </marker>
+            <marker id="arrow-auto" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,3.5 L0,7 z" fill="#8B5CF6" opacity="0.5"/>
+            </marker>
+          </defs>
+
+          <!-- Swimlane backgrounds -->
+          <rect x="0" y="0" width="820" height="140" fill="var(--color-swimlane-user)"/>
+          <rect x="0" y="140" width="820" height="140" fill="var(--color-swimlane-system)"/>
+          <rect x="0" y="280" width="820" height="140" fill="var(--color-swimlane-external)"/>
+
+          <!-- Swimlane dividers -->
+          <line x1="0" y1="140" x2="820" y2="140" stroke="var(--color-border)" stroke-width="1" opacity="0.5"/>
+          <line x1="0" y1="280" x2="820" y2="280" stroke="var(--color-border)" stroke-width="1" opacity="0.5"/>
+
+          <!-- Swimlane labels -->
+          <text x="14" y="24" font-size="10" font-weight="700" fill="var(--color-text-secondary)" letter-spacing="0.08em" opacity="0.6">USER</text>
+          <text x="14" y="164" font-size="10" font-weight="700" fill="var(--color-text-secondary)" letter-spacing="0.08em" opacity="0.6">SYSTEM</text>
+          <text x="14" y="304" font-size="10" font-weight="700" fill="var(--color-text-secondary)" letter-spacing="0.08em" opacity="0.6">EXTERNAL</text>
+
+          <!-- === Slice 1: User Registration === -->
+          <text x="100" y="52" font-size="11" font-weight="700" fill="var(--color-text)" opacity="0.55">Slice 1: User Registration</text>
+
+          <!-- Trigger: SignUpClick -->
+          <rect x="50" y="66" width="100" height="46" rx="10" fill="#E5E7EB" stroke="#9CA3AF" stroke-width="1.5"/>
+          <text x="100" y="84" font-size="8.5" font-weight="700" fill="#374151" text-anchor="middle" opacity="0.65">TRIGGER</text>
+          <text x="100" y="100" font-size="11" font-weight="500" fill="#374151" text-anchor="middle">SignUpClick</text>
+
+          <!-- Connection: Trigger -> Command -->
+          <path d="M150,89 C175,89 175,195 200,195" fill="none" stroke="#B8AD9E" stroke-width="2" stroke-linecap="round" opacity="0.5" marker-end="url(#arrow)"/>
+
+          <!-- Command: RegisterUser -->
+          <rect x="200" y="172" width="120" height="46" rx="10" fill="#3B82F6" stroke="#2563EB" stroke-width="1.5"/>
+          <text x="260" y="190" font-size="8.5" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="0.8">COMMAND</text>
+          <text x="260" y="206" font-size="11" font-weight="500" fill="#FFFFFF" text-anchor="middle">RegisterUser</text>
+
+          <!-- Connection: Command -> Event -->
+          <path d="M320,195 C345,195 345,195 370,195" fill="none" stroke="#B8AD9E" stroke-width="2" stroke-linecap="round" opacity="0.5" marker-end="url(#arrow)"/>
+
+          <!-- Event: UserRegistered -->
+          <rect x="370" y="172" width="120" height="46" rx="10" fill="#F97316" stroke="#EA580C" stroke-width="1.5"/>
+          <text x="430" y="190" font-size="8.5" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="0.8">EVENT</text>
+          <text x="430" y="206" font-size="11" font-weight="500" fill="#FFFFFF" text-anchor="middle">UserRegistered</text>
+
+          <!-- Connection: Event -> View -->
+          <path d="M490,195 C515,195 515,89 540,89" fill="none" stroke="#B8AD9E" stroke-width="2" stroke-linecap="round" opacity="0.5" marker-end="url(#arrow)"/>
+
+          <!-- View: UserProfile -->
+          <rect x="540" y="66" width="100" height="46" rx="10" fill="#22C55E" stroke="#16A34A" stroke-width="1.5"/>
+          <text x="590" y="84" font-size="8.5" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="0.8">VIEW</text>
+          <text x="590" y="100" font-size="11" font-weight="500" fill="#FFFFFF" text-anchor="middle">UserProfile</text>
+
+          <!-- === Exception Element === -->
+          <rect x="195" y="330" width="130" height="46" rx="10" fill="#EF4444" stroke="#DC2626" stroke-width="1.5"/>
+          <text x="260" y="348" font-size="8.5" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="0.8">EXCEPTION</text>
+          <text x="260" y="364" font-size="10.5" font-weight="500" fill="#FFFFFF" text-anchor="middle">RegistrationFailed</text>
+
+          <!-- Connection: Command -> Exception (dashed) -->
+          <path d="M260,218 C260,262 260,298 260,330" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round" stroke-dasharray="5 4" opacity="0.4" marker-end="url(#arrow-exc)"/>
+
+          <!-- === Slice 2: Send Welcome Email === -->
+          <text x="435" y="252" font-size="11" font-weight="700" fill="var(--color-text)" opacity="0.55">Slice 2: Send Welcome Email</text>
+
+          <!-- Automation: OnUserRegistered -->
+          <rect x="380" y="268" width="130" height="46" rx="10" fill="#8B5CF6" stroke="#7C3AED" stroke-width="1.5"/>
+          <text x="445" y="286" font-size="8.5" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="0.8">AUTOMATION</text>
+          <text x="445" y="302" font-size="10" font-weight="500" fill="#FFFFFF" text-anchor="middle">OnUserRegistered</text>
+
+          <!-- Connection from Event to Automation (dashed) -->
+          <path d="M430,218 C430,238 445,250 445,268" fill="none" stroke="#8B5CF6" stroke-width="2" stroke-linecap="round" stroke-dasharray="5 4" opacity="0.4" marker-end="url(#arrow-auto)"/>
+
+          <!-- Connection: Automation -> Command -->
+          <path d="M510,291 C535,291 540,355 565,355" fill="none" stroke="#B8AD9E" stroke-width="2" stroke-linecap="round" opacity="0.5" marker-end="url(#arrow)"/>
+
+          <!-- Command: SendWelcomeEmail -->
+          <rect x="565" y="332" width="130" height="46" rx="10" fill="#3B82F6" stroke="#2563EB" stroke-width="1.5"/>
+          <text x="630" y="350" font-size="8.5" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="0.8">COMMAND</text>
+          <text x="630" y="366" font-size="10" font-weight="500" fill="#FFFFFF" text-anchor="middle">SendWelcomeEmail</text>
+
+          <!-- Connection: Command -> Event -->
+          <path d="M695,355 C715,355 715,291 735,291" fill="none" stroke="#B8AD9E" stroke-width="2" stroke-linecap="round" opacity="0.5" marker-end="url(#arrow)"/>
+
+          <!-- Event: WelcomeEmailSent -->
+          <rect x="695" y="268" width="118" height="46" rx="10" fill="#F97316" stroke="#EA580C" stroke-width="1.5"/>
+          <text x="754" y="286" font-size="8.5" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="0.8">EVENT</text>
+          <text x="754" y="302" font-size="10" font-weight="500" fill="#FFFFFF" text-anchor="middle">WelcomeEmailSent</text>
+        </svg>
+      </div>
+    </section>
+
+    <!-- ===== 5. Element Gallery ===== -->
+    <section class="section">
+      <h2 class="section-title">Element Gallery</h2>
+      <p class="section-desc">The six core element types used to construct an event model. Each type has a distinct semantic color for instant visual recognition.</p>
+      <div class="gallery-grid">
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:#3B82F6">C</div>
+          <div>
+            <div class="gallery-label">Command</div>
+            <div class="gallery-desc">An intent to change state. Represents a user or system action that may succeed or fail. Always imperative.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:#F97316">E</div>
+          <div>
+            <div class="gallery-label">Event</div>
+            <div class="gallery-desc">A fact that happened. Immutable past-tense record of a state change. The backbone of the model.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:#22C55E">V</div>
+          <div>
+            <div class="gallery-label">View</div>
+            <div class="gallery-desc">A read model projection. Shows data derived from events, optimized for display or query.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:#E5E7EB;color:#374151" class="gallery-icon--trigger">T</div>
+          <div>
+            <div class="gallery-label">Trigger</div>
+            <div class="gallery-desc">The initiating action: a button click, page load, or external webhook that starts a flow.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:#EF4444">X</div>
+          <div>
+            <div class="gallery-label">Exception</div>
+            <div class="gallery-desc">An error or alternate path. Captures validation failures, business rule violations, or edge cases.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:#8B5CF6">A</div>
+          <div>
+            <div class="gallery-label">Automation</div>
+            <div class="gallery-desc">A system process triggered by an event. Sagas, policies, or workflows that react automatically.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 6. CSS Variables Code Block ===== -->
+    <section class="section">
+      <h2 class="section-title">CSS Custom Properties</h2>
+      <p class="section-desc">Complete variable set for both light and dark themes. Copy into your stylesheet to adopt the Warm Canvas design system.</p>
+      <div class="code-block">
+<pre><span class="cc">/* Warm Canvas - Light Theme */</span>
+<span class="ck">:root</span> {
+  <span class="cv">--color-bg</span>: #FAF8F5;
+  <span class="cv">--color-surface</span>: #FFFFFF;
+  <span class="cv">--color-surface-alt</span>: #F5F0EA;
+  <span class="cv">--color-text</span>: #2D2419;
+  <span class="cv">--color-text-secondary</span>: #8A7D6F;
+  <span class="cv">--color-border</span>: #E5DDD2;
+  <span class="cv">--color-accent</span>: #D4956A;
+
+  <span class="cc">/* Canonical Element Colors */</span>
+  <span class="cv">--color-command</span>: #3B82F6;
+  <span class="cv">--color-command-stroke</span>: #2563EB;
+  <span class="cv">--color-event</span>: #F97316;
+  <span class="cv">--color-event-stroke</span>: #EA580C;
+  <span class="cv">--color-view</span>: #22C55E;
+  <span class="cv">--color-view-stroke</span>: #16A34A;
+  <span class="cv">--color-trigger</span>: #E5E7EB;
+  <span class="cv">--color-trigger-stroke</span>: #9CA3AF;
+  <span class="cv">--color-exception</span>: #EF4444;
+  <span class="cv">--color-exception-stroke</span>: #DC2626;
+  <span class="cv">--color-automation</span>: #8B5CF6;
+  <span class="cv">--color-automation-stroke</span>: #7C3AED;
+
+  <span class="cc">/* Swimlane Tints */</span>
+  <span class="cv">--color-swimlane-user</span>: rgba(212, 149, 106, 0.05);
+  <span class="cv">--color-swimlane-system</span>: rgba(138, 125, 111, 0.05);
+  <span class="cv">--color-swimlane-external</span>: rgba(139, 92, 246, 0.04);
+
+  <span class="cc">/* Effects */</span>
+  <span class="cv">--shadow-sm</span>: 0 2px 8px rgba(45, 36, 25, 0.06);
+  <span class="cv">--shadow-md</span>: 0 6px 20px rgba(45, 36, 25, 0.08);
+  <span class="cv">--radius-card</span>: 14px;
+  <span class="cv">--radius-element</span>: 10px;
+}
+
+<span class="cc">/* Warm Canvas - Dark Theme */</span>
+<span class="ck">[data-theme="dark"]</span> {
+  <span class="cv">--color-bg</span>: #1C1914;
+  <span class="cv">--color-surface</span>: #28241E;
+  <span class="cv">--color-surface-alt</span>: #322D26;
+  <span class="cv">--color-text</span>: #E8E0D6;
+  <span class="cv">--color-text-secondary</span>: #A09080;
+  <span class="cv">--color-border</span>: #3D362E;
+  <span class="cv">--color-accent</span>: #E0A576;
+
+  <span class="cv">--color-swimlane-user</span>: rgba(224, 165, 118, 0.05);
+  <span class="cv">--color-swimlane-system</span>: rgba(160, 144, 128, 0.05);
+  <span class="cv">--color-swimlane-external</span>: rgba(167, 139, 250, 0.04);
+
+  <span class="cv">--shadow-sm</span>: 0 2px 8px rgba(0, 0, 0, 0.2);
+  <span class="cv">--shadow-md</span>: 0 6px 20px rgba(0, 0, 0, 0.3);
+}</pre>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    function toggleTheme() {
+      const html = document.documentElement;
+      const isDark = html.getAttribute('data-theme') === 'dark';
+      if (isDark) {
+        html.removeAttribute('data-theme');
+        localStorage.setItem('warm-canvas-theme', 'light');
+      } else {
+        html.setAttribute('data-theme', 'dark');
+        localStorage.setItem('warm-canvas-theme', 'dark');
+      }
+    }
+
+    (function restoreTheme() {
+      const saved = localStorage.getItem('warm-canvas-theme');
+      if (saved === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
+</body>
+</html>

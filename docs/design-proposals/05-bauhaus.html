@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Design Proposal #5 — Bauhaus</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Work+Sans:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    /* ===== CSS Custom Properties ===== */
+    :root {
+      --color-command: #1A3F8F;
+      --color-event: #C13828;
+      --color-view: #E8A820;
+      --color-trigger: #707070;
+      --color-exception: #B03020;
+      --color-automation: #3A2890;
+      --color-bg: #F8F5F0;
+      --color-surface: #FFFFFF;
+      --color-text: #000000;
+      --color-text-secondary: #404040;
+      --color-border: #000000;
+      --color-border-light: #C0C0C0;
+      --color-swimlane-user: rgba(26, 63, 143, 0.06);
+      --color-swimlane-system: rgba(193, 56, 40, 0.06);
+      --color-swimlane-external: rgba(232, 168, 32, 0.06);
+      --border-width: 3px;
+      --radius: 0px;
+      --font-heading: 'Archivo Black', sans-serif;
+      --font-body: 'Work Sans', sans-serif;
+    }
+
+    [data-theme="dark"] {
+      --color-bg: #1A1A1A;
+      --color-surface: #2A2A2A;
+      --color-text: #F0F0F0;
+      --color-text-secondary: #B0B0B0;
+      --color-border: #FFFFFF;
+      --color-border-light: #555555;
+      --color-swimlane-user: rgba(26, 63, 143, 0.15);
+      --color-swimlane-system: rgba(193, 56, 40, 0.15);
+      --color-swimlane-external: rgba(232, 168, 32, 0.15);
+    }
+
+    /* ===== Reset & Base ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-body);
+      font-weight: 400;
+      font-size: 16px;
+      line-height: 1.6;
+      color: var(--color-text);
+      background: var(--color-bg);
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 40px 24px;
+    }
+
+    h1, h2, h3 {
+      font-family: var(--font-heading);
+      font-weight: 400;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      line-height: 1.2;
+    }
+
+    h2 {
+      font-size: 24px;
+      margin-bottom: 24px;
+      padding-bottom: 8px;
+      border-bottom: var(--border-width) solid var(--color-border);
+    }
+
+    section { margin-bottom: 56px; }
+
+    /* ===== Header ===== */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 24px 0;
+      border-bottom: var(--border-width) solid var(--color-border);
+      margin-bottom: 48px;
+    }
+
+    .header-title {
+      font-family: var(--font-heading);
+      font-size: 40px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .header-badge {
+      display: inline-flex;
+      gap: 4px;
+    }
+
+    .header-badge span {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--color-border);
+    }
+
+    .header-badge .badge-red { background: var(--color-event); }
+    .header-badge .badge-blue { background: var(--color-command); }
+    .header-badge .badge-yellow { background: var(--color-view); }
+
+    .header-sub {
+      font-family: var(--font-body);
+      font-weight: 400;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--color-text-secondary);
+      margin-top: 4px;
+    }
+
+    /* ===== Theme Toggle ===== */
+    .toggle-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-body);
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .toggle-track {
+      width: 56px;
+      height: 28px;
+      background: var(--color-border);
+      border: 2px solid var(--color-border);
+      cursor: pointer;
+      position: relative;
+      transition: background 0.2s;
+    }
+
+    .toggle-thumb {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background: var(--color-view);
+      transition: transform 0.2s;
+    }
+
+    [data-theme="dark"] .toggle-thumb {
+      transform: translateX(28px);
+      background: var(--color-command);
+    }
+
+    /* ===== Color Palette ===== */
+    .palette-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 16px;
+    }
+
+    .swatch {
+      border: var(--border-width) solid var(--color-border);
+      background: var(--color-surface);
+      text-align: center;
+    }
+
+    .swatch-color {
+      height: 72px;
+      border-bottom: var(--border-width) solid var(--color-border);
+    }
+
+    .swatch-info {
+      padding: 10px 8px;
+    }
+
+    .swatch-label {
+      font-family: var(--font-heading);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+
+    .swatch-hex {
+      font-family: var(--font-body);
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--color-text-secondary);
+    }
+
+    /* ===== Typography ===== */
+    .type-sample {
+      border: var(--border-width) solid var(--color-border);
+      background: var(--color-surface);
+      padding: 32px;
+      margin-bottom: 16px;
+    }
+
+    .type-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--color-border-light);
+    }
+
+    .type-row:last-child { border-bottom: none; }
+
+    .type-meta {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-text-secondary);
+      min-width: 180px;
+      text-align: right;
+    }
+
+    /* ===== Mock Board ===== */
+    .board-wrap {
+      border: var(--border-width) solid var(--color-border);
+      background: var(--color-surface);
+      overflow-x: auto;
+    }
+
+    .board-wrap svg text {
+      font-family: 'Work Sans', sans-serif;
+    }
+
+    /* ===== Element Gallery ===== */
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .gallery-card {
+      border: var(--border-width) solid var(--color-border);
+      background: var(--color-surface);
+      padding: 0;
+    }
+
+    .gallery-card-header {
+      padding: 16px;
+      color: #FFFFFF;
+      font-family: var(--font-heading);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: var(--border-width) solid var(--color-border);
+    }
+
+    .gallery-card-body {
+      padding: 16px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* ===== Code Block ===== */
+    .code-block {
+      border: var(--border-width) solid var(--color-border);
+      background: var(--color-surface);
+      padding: 24px;
+      overflow-x: auto;
+    }
+
+    .code-block pre {
+      margin: 0;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--color-text);
+      white-space: pre;
+    }
+
+    .code-block .comment { color: var(--color-trigger); }
+    .code-block .prop { color: var(--color-command); }
+    .code-block .val { color: var(--color-event); }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 640px) {
+      .gallery-grid { grid-template-columns: 1fr; }
+      .palette-grid { grid-template-columns: repeat(2, 1fr); }
+      .header { flex-direction: column; gap: 16px; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ===== 1. HEADER ===== -->
+    <header class="header">
+      <div>
+        <div class="header-title">
+          <span class="header-badge">
+            <span class="badge-red"></span>
+            <span class="badge-blue"></span>
+            <span class="badge-yellow"></span>
+          </span>
+          Bauhaus
+        </div>
+        <div class="header-sub">Design Proposal #5 &mdash; EventModeler Board</div>
+      </div>
+      <div class="toggle-wrap">
+        <span>Light</span>
+        <div class="toggle-track" id="themeToggle" role="switch" tabindex="0" aria-label="Toggle dark mode">
+          <div class="toggle-thumb"></div>
+        </div>
+        <span>Dark</span>
+      </div>
+    </header>
+
+    <!-- ===== 2. COLOR PALETTE ===== -->
+    <section>
+      <h2>Color Palette</h2>
+      <div class="palette-grid">
+        <div class="swatch"><div class="swatch-color" style="background:#1A3F8F"></div><div class="swatch-info"><div class="swatch-label">Command</div><div class="swatch-hex">#1A3F8F</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#C13828"></div><div class="swatch-info"><div class="swatch-label">Event</div><div class="swatch-hex">#C13828</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#E8A820"></div><div class="swatch-info"><div class="swatch-label">View</div><div class="swatch-hex">#E8A820</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#707070"></div><div class="swatch-info"><div class="swatch-label">Trigger</div><div class="swatch-hex">#707070</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#B03020"></div><div class="swatch-info"><div class="swatch-label">Exception</div><div class="swatch-hex">#B03020</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#3A2890"></div><div class="swatch-info"><div class="swatch-label">Automation</div><div class="swatch-hex">#3A2890</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#F8F5F0"></div><div class="swatch-info"><div class="swatch-label">Background</div><div class="swatch-hex">#F8F5F0</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#FFFFFF; border-bottom-color:#C0C0C0"></div><div class="swatch-info"><div class="swatch-label">Surface</div><div class="swatch-hex">#FFFFFF</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#000000"></div><div class="swatch-info"><div class="swatch-label">Text</div><div class="swatch-hex">#000000</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#000000"></div><div class="swatch-info"><div class="swatch-label">Border</div><div class="swatch-hex">#000000</div></div></div>
+      </div>
+    </section>
+
+    <!-- ===== 3. TYPOGRAPHY ===== -->
+    <section>
+      <h2>Typography</h2>
+      <div class="type-sample">
+        <div class="type-row">
+          <span style="font-family:var(--font-heading);font-size:32px;text-transform:uppercase;letter-spacing:0.04em">Board Heading</span>
+          <span class="type-meta">Archivo Black / 32px / 400 / 1.2</span>
+        </div>
+        <div class="type-row">
+          <span style="font-family:var(--font-heading);font-size:24px;text-transform:uppercase;letter-spacing:0.04em">Section Title</span>
+          <span class="type-meta">Archivo Black / 24px / 400 / 1.2</span>
+        </div>
+        <div class="type-row">
+          <span style="font-family:var(--font-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em">Slice Label</span>
+          <span class="type-meta">Archivo Black / 14px / 400 / 1.2</span>
+        </div>
+        <div class="type-row">
+          <span style="font-family:var(--font-body);font-size:16px;font-weight:400;line-height:1.6">Body text for descriptions, notes, and documentation within the event model canvas. Work Sans provides clean geometric readability.</span>
+          <span class="type-meta">Work Sans / 16px / 400 / 1.6</span>
+        </div>
+        <div class="type-row">
+          <span style="font-family:var(--font-body);font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em">Element Label</span>
+          <span class="type-meta">Work Sans / 14px / 600 / 1.4</span>
+        </div>
+        <div class="type-row">
+          <span style="font-family:var(--font-body);font-size:12px;font-weight:400;color:var(--color-text-secondary)">Caption or metadata text</span>
+          <span class="type-meta">Work Sans / 12px / 400 / 1.5</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 4. MOCK BOARD ===== -->
+    <section>
+      <h2>Mock Board</h2>
+      <div class="board-wrap">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420" width="800" height="420" style="display:block">
+          <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+              <path d="M0,0 L10,4 L0,8 Z" fill="var(--color-border, #000)"/>
+            </marker>
+          </defs>
+
+          <!-- Background -->
+          <rect width="800" height="420" fill="var(--color-surface, #FFF)"/>
+
+          <!-- Grid lines (vertical) -->
+          <line x1="0" y1="0" x2="0" y2="420" stroke="var(--color-border-light, #C0C0C0)" stroke-width="1"/>
+          <line x1="100" y1="0" x2="100" y2="420" stroke="var(--color-border-light, #C0C0C0)" stroke-width="0.5" stroke-dasharray="4,4"/>
+          <line x1="200" y1="0" x2="200" y2="420" stroke="var(--color-border-light, #C0C0C0)" stroke-width="0.5" stroke-dasharray="4,4"/>
+          <line x1="300" y1="0" x2="300" y2="420" stroke="var(--color-border-light, #C0C0C0)" stroke-width="0.5" stroke-dasharray="4,4"/>
+          <line x1="400" y1="0" x2="400" y2="420" stroke="var(--color-border-light, #C0C0C0)" stroke-width="0.5" stroke-dasharray="4,4"/>
+          <line x1="500" y1="0" x2="500" y2="420" stroke="var(--color-border-light, #C0C0C0)" stroke-width="0.5" stroke-dasharray="4,4"/>
+          <line x1="600" y1="0" x2="600" y2="420" stroke="var(--color-border-light, #C0C0C0)" stroke-width="0.5" stroke-dasharray="4,4"/>
+          <line x1="700" y1="0" x2="700" y2="420" stroke="var(--color-border-light, #C0C0C0)" stroke-width="0.5" stroke-dasharray="4,4"/>
+          <line x1="800" y1="0" x2="800" y2="420" stroke="var(--color-border-light, #C0C0C0)" stroke-width="1"/>
+
+          <!-- Swimlane bands -->
+          <rect x="0" y="40" width="800" height="120" fill="rgba(26,63,143,0.06)"/>
+          <rect x="0" y="160" width="800" height="120" fill="rgba(193,56,40,0.06)"/>
+          <rect x="0" y="280" width="800" height="120" fill="rgba(232,168,32,0.06)"/>
+
+          <!-- Swimlane dividers (thick) -->
+          <line x1="0" y1="40" x2="800" y2="40" stroke="#000" stroke-width="3"/>
+          <line x1="0" y1="160" x2="800" y2="160" stroke="#000" stroke-width="3"/>
+          <line x1="0" y1="280" x2="800" y2="280" stroke="#000" stroke-width="3"/>
+          <line x1="0" y1="400" x2="800" y2="400" stroke="#000" stroke-width="3"/>
+
+          <!-- Swimlane labels -->
+          <text x="14" y="105" font-size="13" font-weight="600" fill="#1A3F8F" text-anchor="start" transform="rotate(-90,14,105)" letter-spacing="0.1em" style="text-transform:uppercase">USER</text>
+          <text x="14" y="225" font-size="13" font-weight="600" fill="#C13828" text-anchor="start" transform="rotate(-90,14,225)" letter-spacing="0.1em" style="text-transform:uppercase">SYSTEM</text>
+          <text x="14" y="345" font-size="13" font-weight="600" fill="#E8A820" text-anchor="start" transform="rotate(-90,14,345)" letter-spacing="0.1em" style="text-transform:uppercase">EXTERNAL</text>
+
+          <!-- ===== SLICE 1: User Registration ===== -->
+          <!-- Slice label -->
+          <text x="225" y="26" font-family="'Archivo Black', sans-serif" font-size="12" fill="#000" letter-spacing="0.08em" text-anchor="middle">SLICE 1: USER REGISTRATION</text>
+
+          <!-- Trigger: "UserAction" -->
+          <rect x="60" y="70" width="120" height="50" fill="#707070" stroke="#000" stroke-width="3" rx="0"/>
+          <text x="120" y="100" font-size="12" font-weight="600" fill="#FFF" text-anchor="middle">UserAction</text>
+
+          <!-- Arrow: Trigger -> Command -->
+          <line x1="180" y1="95" x2="205" y2="95" stroke="#000" stroke-width="3" marker-end="url(#arrow)"/>
+
+          <!-- Command: "RegisterUser" -->
+          <rect x="210" y="70" width="130" height="50" fill="#1A3F8F" stroke="#000" stroke-width="3" rx="0"/>
+          <text x="275" y="100" font-size="12" font-weight="600" fill="#FFF" text-anchor="middle">RegisterUser</text>
+
+          <!-- Arrow: Command -> Event (vertical down) -->
+          <line x1="275" y1="120" x2="275" y2="145" stroke="#000" stroke-width="3"/>
+          <line x1="275" y1="145" x2="275" y2="145" stroke="#000" stroke-width="3"/>
+          <!-- Arrow: vertical then horizontal into System lane -->
+          <line x1="275" y1="145" x2="275" y2="195" stroke="#000" stroke-width="3"/>
+          <line x1="275" y1="195" x2="205" y2="195" stroke="#000" stroke-width="3"/>
+
+          <!-- Event: "UserRegistered" -->
+          <rect x="60" y="175" width="140" height="50" fill="#C13828" stroke="#000" stroke-width="3" rx="0"/>
+          <text x="130" y="205" font-size="12" font-weight="600" fill="#FFF" text-anchor="middle">UserRegistered</text>
+
+          <!-- Arrow: Event -> View (vertical down into External lane) -->
+          <line x1="130" y1="225" x2="130" y2="260" stroke="#000" stroke-width="3"/>
+          <line x1="130" y1="260" x2="130" y2="305" stroke="#000" stroke-width="3" marker-end="url(#arrow)"/>
+
+          <!-- View: "UserProfile" -->
+          <rect x="60" y="310" width="140" height="50" fill="#E8A820" stroke="#000" stroke-width="3" rx="0"/>
+          <text x="130" y="340" font-size="12" font-weight="600" fill="#000" text-anchor="middle">UserProfile</text>
+
+          <!-- ===== SLICE 2: Send Welcome Email ===== -->
+          <!-- Slice label -->
+          <text x="575" y="26" font-family="'Archivo Black', sans-serif" font-size="12" fill="#000" letter-spacing="0.08em" text-anchor="middle">SLICE 2: SEND WELCOME EMAIL</text>
+
+          <!-- Automation: "OnUserRegistered" -->
+          <rect x="430" y="175" width="155" height="50" fill="#3A2890" stroke="#000" stroke-width="3" rx="0"/>
+          <text x="507" y="205" font-size="12" font-weight="600" fill="#FFF" text-anchor="middle">OnUserRegistered</text>
+
+          <!-- Arrow: Event -> Automation (horizontal) -->
+          <line x1="200" y1="200" x2="425" y2="200" stroke="#000" stroke-width="3" marker-end="url(#arrow)"/>
+
+          <!-- Arrow: Automation -> Command (up into User lane) -->
+          <line x1="585" y1="200" x2="620" y2="200" stroke="#000" stroke-width="3"/>
+          <line x1="620" y1="200" x2="620" y2="95" stroke="#000" stroke-width="3"/>
+          <line x1="620" y1="95" x2="650" y2="95" stroke="#000" stroke-width="3" marker-end="url(#arrow)"/>
+
+          <!-- Command: "SendWelcomeEmail" -->
+          <rect x="655" y="70" width="130" height="50" fill="#1A3F8F" stroke="#000" stroke-width="3" rx="0"/>
+          <text x="720" y="100" font-size="11" font-weight="600" fill="#FFF" text-anchor="middle">SendWelcomeEmail</text>
+
+          <!-- Arrow: Command -> Event (down) -->
+          <line x1="720" y1="120" x2="720" y2="175" stroke="#000" stroke-width="3" marker-end="url(#arrow)"/>
+
+          <!-- Event: "WelcomeEmailSent" -->
+          <rect x="650" y="180" width="140" height="50" fill="#C13828" stroke="#000" stroke-width="3" rx="0"/>
+          <text x="720" y="210" font-size="11" font-weight="600" fill="#FFF" text-anchor="middle">WelcomeEmailSent</text>
+
+          <!-- ===== Exception Element ===== -->
+          <rect x="340" y="310" width="160" height="50" fill="#B03020" stroke="#000" stroke-width="3" rx="0"/>
+          <text x="420" y="340" font-size="12" font-weight="600" fill="#FFF" text-anchor="middle">RegistrationFailed</text>
+
+          <!-- Arrow: Command down to Exception -->
+          <line x1="275" y1="120" x2="275" y2="335" stroke="#000" stroke-width="1.5" stroke-dasharray="6,4"/>
+          <line x1="275" y1="335" x2="335" y2="335" stroke="#000" stroke-width="1.5" stroke-dasharray="6,4" marker-end="url(#arrow)"/>
+
+          <!-- Top border -->
+          <line x1="0" y1="0" x2="800" y2="0" stroke="#000" stroke-width="3"/>
+          <!-- Bottom border -->
+          <line x1="0" y1="420" x2="800" y2="420" stroke="#000" stroke-width="3"/>
+          <!-- Left border -->
+          <line x1="0" y1="0" x2="0" y2="420" stroke="#000" stroke-width="3"/>
+          <!-- Right border -->
+          <line x1="800" y1="0" x2="800" y2="420" stroke="#000" stroke-width="3"/>
+        </svg>
+      </div>
+    </section>
+
+    <!-- ===== 5. ELEMENT GALLERY ===== -->
+    <section>
+      <h2>Element Gallery</h2>
+      <div class="gallery-grid">
+        <div class="gallery-card">
+          <div class="gallery-card-header" style="background:#707070">Trigger</div>
+          <div class="gallery-card-body">User action or external stimulus that initiates a flow. Rendered as a gray rectangle with thick black border.</div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-card-header" style="background:#1A3F8F">Command</div>
+          <div class="gallery-card-body">An intent to change the system state. Bauhaus blue flat fill communicates authority and action.</div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-card-header" style="background:#C13828">Event</div>
+          <div class="gallery-card-body">An immutable fact that has occurred. Bauhaus red signals significance and finality.</div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-card-header" style="background:#E8A820;color:#000">View</div>
+          <div class="gallery-card-body">A read model or projection displayed to users. Bauhaus yellow/gold conveys output and visibility.</div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-card-header" style="background:#B03020">Exception</div>
+          <div class="gallery-card-body">An error or failure state in the flow. Deep red-orange differentiates from standard events.</div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-card-header" style="background:#3A2890">Automation</div>
+          <div class="gallery-card-body">A system process reacting to events automatically. Deep blue-violet conveys machine-driven logic.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 6. CSS VARIABLES CODE BLOCK ===== -->
+    <section>
+      <h2>CSS Variables</h2>
+      <div class="code-block">
+        <pre><span class="comment">/* Bauhaus Design Tokens — Light Mode */</span>
+<span class="prop">:root</span> {
+  <span class="comment">/* Element colors */</span>
+  <span class="prop">--color-command</span>: <span class="val">#1A3F8F</span>;
+  <span class="prop">--color-event</span>: <span class="val">#C13828</span>;
+  <span class="prop">--color-view</span>: <span class="val">#E8A820</span>;
+  <span class="prop">--color-trigger</span>: <span class="val">#707070</span>;
+  <span class="prop">--color-exception</span>: <span class="val">#B03020</span>;
+  <span class="prop">--color-automation</span>: <span class="val">#3A2890</span>;
+
+  <span class="comment">/* Surface & layout */</span>
+  <span class="prop">--color-bg</span>: <span class="val">#F8F5F0</span>;
+  <span class="prop">--color-surface</span>: <span class="val">#FFFFFF</span>;
+  <span class="prop">--color-text</span>: <span class="val">#000000</span>;
+  <span class="prop">--color-text-secondary</span>: <span class="val">#404040</span>;
+  <span class="prop">--color-border</span>: <span class="val">#000000</span>;
+  <span class="prop">--color-border-light</span>: <span class="val">#C0C0C0</span>;
+
+  <span class="comment">/* Swimlane tints */</span>
+  <span class="prop">--color-swimlane-user</span>: <span class="val">rgba(26, 63, 143, 0.06)</span>;
+  <span class="prop">--color-swimlane-system</span>: <span class="val">rgba(193, 56, 40, 0.06)</span>;
+  <span class="prop">--color-swimlane-external</span>: <span class="val">rgba(232, 168, 32, 0.06)</span>;
+
+  <span class="comment">/* Structure */</span>
+  <span class="prop">--border-width</span>: <span class="val">3px</span>;
+  <span class="prop">--radius</span>: <span class="val">0px</span>;
+  <span class="prop">--font-heading</span>: <span class="val">'Archivo Black', sans-serif</span>;
+  <span class="prop">--font-body</span>: <span class="val">'Work Sans', sans-serif</span>;
+}
+
+<span class="comment">/* Bauhaus Design Tokens — Dark Mode */</span>
+<span class="prop">[data-theme="dark"]</span> {
+  <span class="prop">--color-bg</span>: <span class="val">#1A1A1A</span>;
+  <span class="prop">--color-surface</span>: <span class="val">#2A2A2A</span>;
+  <span class="prop">--color-text</span>: <span class="val">#F0F0F0</span>;
+  <span class="prop">--color-text-secondary</span>: <span class="val">#B0B0B0</span>;
+  <span class="prop">--color-border</span>: <span class="val">#FFFFFF</span>;
+  <span class="prop">--color-border-light</span>: <span class="val">#555555</span>;
+  <span class="prop">--color-swimlane-user</span>: <span class="val">rgba(26, 63, 143, 0.15)</span>;
+  <span class="prop">--color-swimlane-system</span>: <span class="val">rgba(193, 56, 40, 0.15)</span>;
+  <span class="prop">--color-swimlane-external</span>: <span class="val">rgba(232, 168, 32, 0.15)</span>;
+}</pre>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ===== JS: Theme Toggle ===== -->
+  <script>
+    (function() {
+      var root = document.documentElement;
+      var toggle = document.getElementById('themeToggle');
+      var stored = localStorage.getItem('bauhaus-theme');
+      if (stored === 'dark') {
+        root.setAttribute('data-theme', 'dark');
+      } else {
+        root.setAttribute('data-theme', 'light');
+      }
+      function flip() {
+        var current = root.getAttribute('data-theme');
+        var next = current === 'dark' ? 'light' : 'dark';
+        root.setAttribute('data-theme', next);
+        localStorage.setItem('bauhaus-theme', next);
+      }
+      toggle.addEventListener('click', flip);
+      toggle.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); }
+      });
+    })();
+  </script>
+</body>
+</html>

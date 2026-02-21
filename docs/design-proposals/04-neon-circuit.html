@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design Proposal #4 — Neon Circuit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  /* ===== CSS Custom Properties ===== */
+  :root {
+    --bg: #F0F2F5;
+    --surface: #FFFFFF;
+    --text: #0A0E14;
+    --text-secondary: #4A5568;
+    --border: #D1D5DB;
+    --command: #00D4FF;
+    --event: #FF00AA;
+    --view: #00FF88;
+    --trigger: #6B7B8D;
+    --exception: #FF3366;
+    --automation: #AA44FF;
+    --accent: #00D4FF;
+    --glow-command: rgba(0, 212, 255, 0.5);
+    --glow-event: rgba(255, 0, 170, 0.5);
+    --glow-view: rgba(0, 255, 136, 0.5);
+    --glow-trigger: rgba(107, 123, 141, 0.4);
+    --glow-exception: rgba(255, 51, 102, 0.5);
+    --glow-automation: rgba(170, 68, 255, 0.5);
+    --grid-color: rgba(0, 212, 255, 0.08);
+    --radius: 4px;
+    --font: 'JetBrains Mono', monospace;
+  }
+
+  [data-theme="dark"] {
+    --bg: #0A0E14;
+    --surface: #12171F;
+    --text: #E8ECF0;
+    --text-secondary: #8899AA;
+    --border: #1E2A3A;
+    --grid-color: rgba(0, 212, 255, 0.06);
+  }
+
+  /* ===== Reset & Base ===== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    transition: background 0.3s, color 0.3s;
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+  }
+
+  section {
+    margin-bottom: 3rem;
+    padding: 2rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: background 0.3s, border-color 0.3s;
+  }
+
+  h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    text-shadow: 0 0 8px var(--glow-command);
+  }
+
+  /* ===== Header ===== */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .header h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    text-shadow: 0 0 20px var(--glow-command), 0 0 40px var(--glow-command), 0 0 80px rgba(0, 212, 255, 0.25);
+    animation: neon-flicker 4s ease-in-out infinite;
+  }
+
+  .header .subtitle {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-top: 0.25rem;
+  }
+
+  @keyframes neon-flicker {
+    0%, 100% { opacity: 1; }
+    92% { opacity: 1; }
+    93% { opacity: 0.8; }
+    94% { opacity: 1; }
+    96% { opacity: 0.9; }
+    97% { opacity: 1; }
+  }
+
+  /* ===== Theme Toggle ===== */
+  .toggle-wrap { display: flex; align-items: center; gap: 0.75rem; }
+  .toggle-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-secondary); }
+
+  .toggle {
+    position: relative;
+    width: 52px;
+    height: 28px;
+    cursor: pointer;
+  }
+  .toggle input { display: none; }
+  .toggle-track {
+    position: absolute;
+    inset: 0;
+    background: #1E2A3A;
+    border-radius: 14px;
+    border: 2px solid var(--accent);
+    box-shadow: 0 0 8px var(--glow-command), inset 0 0 6px rgba(0, 212, 255, 0.15);
+    transition: all 0.3s;
+  }
+  .toggle-thumb {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 20px;
+    height: 20px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--glow-command);
+    transition: transform 0.3s;
+  }
+  .toggle input:checked ~ .toggle-thumb { transform: translateX(24px); }
+
+  /* ===== Color Palette ===== */
+  .palette-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 1rem;
+  }
+
+  .swatch {
+    text-align: center;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    transition: transform 0.2s, box-shadow 0.3s;
+  }
+  .swatch:hover { transform: translateY(-2px); }
+
+  .swatch-color {
+    height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: box-shadow 0.3s;
+  }
+  .swatch:hover .swatch-color.glow-command { box-shadow: inset 0 0 20px var(--glow-command), 0 0 15px var(--glow-command); }
+  .swatch:hover .swatch-color.glow-event { box-shadow: inset 0 0 20px var(--glow-event), 0 0 15px var(--glow-event); }
+  .swatch:hover .swatch-color.glow-view { box-shadow: inset 0 0 20px var(--glow-view), 0 0 15px var(--glow-view); }
+  .swatch:hover .swatch-color.glow-trigger { box-shadow: inset 0 0 20px var(--glow-trigger), 0 0 15px var(--glow-trigger); }
+  .swatch:hover .swatch-color.glow-exception { box-shadow: inset 0 0 20px var(--glow-exception), 0 0 15px var(--glow-exception); }
+  .swatch:hover .swatch-color.glow-automation { box-shadow: inset 0 0 20px var(--glow-automation), 0 0 15px var(--glow-automation); }
+
+  .swatch-info { padding: 0.5rem; font-size: 0.7rem; }
+  .swatch-hex { font-weight: 700; color: var(--text); }
+  .swatch-label { color: var(--text-secondary); margin-top: 0.15rem; }
+
+  /* ===== Typography ===== */
+  .type-sample { margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1.5rem; }
+  .type-sample:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+  .type-meta { font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 0.35rem; text-transform: uppercase; letter-spacing: 0.1em; }
+  .type-heading { font-size: 2rem; font-weight: 700; line-height: 1.2; }
+  .type-subheading { font-size: 1.25rem; font-weight: 700; line-height: 1.3; }
+  .type-body { font-size: 0.95rem; font-weight: 400; line-height: 1.6; max-width: 60ch; }
+  .type-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; color: var(--accent); }
+
+  /* ===== Mock Board ===== */
+  .board-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    box-shadow: 0 0 12px var(--glow-command);
+  }
+  .board-wrap svg { display: block; width: 100%; height: auto; }
+
+  @keyframes dash-flow {
+    to { stroke-dashoffset: -24; }
+  }
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+
+  /* ===== Element Gallery ===== */
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.25rem;
+  }
+
+  .gallery-card {
+    padding: 1.25rem;
+    border-radius: var(--radius);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    transition: box-shadow 0.3s, border-color 0.3s;
+  }
+  .gallery-card:hover { border-color: var(--card-glow-color, var(--accent)); box-shadow: 0 0 14px var(--card-glow, var(--glow-command)); }
+  .gallery-card .card-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
+  .gallery-card .card-icon {
+    width: 36px; height: 36px; border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.65rem; font-weight: 700; color: #0A0E14;
+  }
+  .gallery-card .card-title { font-size: 0.85rem; font-weight: 700; }
+  .gallery-card .card-desc { font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5; }
+
+  /* ===== Code Block ===== */
+  .code-block {
+    background: #0D1117;
+    color: #C9D1D9;
+    padding: 1.5rem;
+    border-radius: var(--radius);
+    overflow-x: auto;
+    font-size: 0.75rem;
+    line-height: 1.7;
+    border: 1px solid #1E2A3A;
+  }
+  .code-block .comment { color: #6B7B8D; }
+  .code-block .prop { color: #00D4FF; }
+  .code-block .val { color: #FF00AA; }
+  .code-block .sel { color: #00FF88; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ===== 1. Header ===== -->
+  <header class="header">
+    <div>
+      <h1>Neon Circuit</h1>
+      <div class="subtitle">Design Proposal #4 &mdash; EventModeler Board</div>
+    </div>
+    <div class="toggle-wrap">
+      <span class="toggle-label">Light</span>
+      <label class="toggle">
+        <input type="checkbox" id="theme-toggle" checked>
+        <span class="toggle-track"></span>
+        <span class="toggle-thumb"></span>
+      </label>
+      <span class="toggle-label">Dark</span>
+    </div>
+  </header>
+
+  <!-- ===== 2. Color Palette ===== -->
+  <section>
+    <h2>// Color Palette</h2>
+    <div class="palette-grid">
+      <div class="swatch"><div class="swatch-color glow-command" style="background:#00D4FF"></div><div class="swatch-info"><div class="swatch-hex">#00D4FF</div><div class="swatch-label">Command</div></div></div>
+      <div class="swatch"><div class="swatch-color glow-event" style="background:#FF00AA"></div><div class="swatch-info"><div class="swatch-hex">#FF00AA</div><div class="swatch-label">Event</div></div></div>
+      <div class="swatch"><div class="swatch-color glow-view" style="background:#00FF88"></div><div class="swatch-info"><div class="swatch-hex">#00FF88</div><div class="swatch-label">View</div></div></div>
+      <div class="swatch"><div class="swatch-color glow-trigger" style="background:#6B7B8D"></div><div class="swatch-info"><div class="swatch-hex">#6B7B8D</div><div class="swatch-label">Trigger</div></div></div>
+      <div class="swatch"><div class="swatch-color glow-exception" style="background:#FF3366"></div><div class="swatch-info"><div class="swatch-hex">#FF3366</div><div class="swatch-label">Exception</div></div></div>
+      <div class="swatch"><div class="swatch-color glow-automation" style="background:#AA44FF"></div><div class="swatch-info"><div class="swatch-hex">#AA44FF</div><div class="swatch-label">Automation</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#0A0E14"></div><div class="swatch-info"><div class="swatch-hex">#0A0E14</div><div class="swatch-label">Background</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#12171F"></div><div class="swatch-info"><div class="swatch-hex">#12171F</div><div class="swatch-label">Surface</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#E8ECF0; border: 1px solid #ccc"></div><div class="swatch-info"><div class="swatch-hex">#E8ECF0</div><div class="swatch-label">Text</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#1E2A3A"></div><div class="swatch-info"><div class="swatch-hex">#1E2A3A</div><div class="swatch-label">Border</div></div></div>
+    </div>
+  </section>
+
+  <!-- ===== 3. Typography ===== -->
+  <section>
+    <h2>// Typography</h2>
+    <div class="type-sample">
+      <div class="type-meta">Heading &mdash; JetBrains Mono 700 / 2rem / 1.2</div>
+      <div class="type-heading">Event Modeling Canvas</div>
+    </div>
+    <div class="type-sample">
+      <div class="type-meta">Subheading &mdash; JetBrains Mono 700 / 1.25rem / 1.3</div>
+      <div class="type-subheading">Slice: User Registration Flow</div>
+    </div>
+    <div class="type-sample">
+      <div class="type-meta">Body &mdash; JetBrains Mono 400 / 0.95rem / 1.6</div>
+      <div class="type-body">Design systems around events that happen in the real world. Each slice captures a trigger, command, event, and view in a single deliverable unit.</div>
+    </div>
+    <div class="type-sample">
+      <div class="type-meta">Label &mdash; JetBrains Mono 700 / 0.75rem / uppercase / 0.15em tracking</div>
+      <div class="type-label">RegisterUser &middot; UserRegistered &middot; UserProfile</div>
+    </div>
+  </section>
+
+  <!-- ===== 4. Mock Board (SVG) ===== -->
+  <section>
+    <h2>// Mock Board</h2>
+    <div class="board-wrap">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" style="background:#0A0E14">
+        <defs>
+          <!-- Circuit grid pattern -->
+          <pattern id="circuit-grid" width="20" height="20" patternUnits="userSpaceOnUse">
+            <circle cx="0" cy="0" r="0.5" fill="rgba(0,212,255,0.12)"/>
+            <circle cx="20" cy="0" r="0.5" fill="rgba(0,212,255,0.12)"/>
+            <circle cx="0" cy="20" r="0.5" fill="rgba(0,212,255,0.12)"/>
+            <circle cx="20" cy="20" r="0.5" fill="rgba(0,212,255,0.12)"/>
+            <line x1="0" y1="0" x2="20" y2="0" stroke="rgba(0,212,255,0.04)" stroke-width="0.5"/>
+            <line x1="0" y1="0" x2="0" y2="20" stroke="rgba(0,212,255,0.04)" stroke-width="0.5"/>
+          </pattern>
+          <!-- Neon glow filters -->
+          <filter id="glow-cyan" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="glow-magenta" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="glow-green" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="glow-purple" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="glow-red" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="glow-gray" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="2.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="glow-line" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <!-- Grid background -->
+        <rect width="800" height="400" fill="url(#circuit-grid)"/>
+
+        <!-- Swimlane bands -->
+        <rect x="0" y="30" width="800" height="120" fill="rgba(0,212,255,0.02)" />
+        <rect x="0" y="150" width="800" height="120" fill="rgba(170,68,255,0.02)" />
+        <rect x="0" y="270" width="800" height="120" fill="rgba(0,255,136,0.02)" />
+        <!-- Swimlane dividers -->
+        <line x1="0" y1="150" x2="800" y2="150" stroke="rgba(0,212,255,0.1)" stroke-width="0.5" stroke-dasharray="4,4"/>
+        <line x1="0" y1="270" x2="800" y2="270" stroke="rgba(0,212,255,0.1)" stroke-width="0.5" stroke-dasharray="4,4"/>
+        <!-- Swimlane labels -->
+        <text x="12" y="95" font-family="JetBrains Mono, monospace" font-size="9" fill="rgba(0,212,255,0.3)" font-weight="700" transform="rotate(-90, 12, 95)">USER</text>
+        <text x="12" y="215" font-family="JetBrains Mono, monospace" font-size="9" fill="rgba(170,68,255,0.3)" font-weight="700" transform="rotate(-90, 12, 215)">SYSTEM</text>
+        <text x="12" y="335" font-family="JetBrains Mono, monospace" font-size="9" fill="rgba(0,255,136,0.3)" font-weight="700" transform="rotate(-90, 12, 335)">EXTERNAL</text>
+
+        <!-- Slice 1 label -->
+        <text x="170" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#00D4FF" font-weight="700" text-anchor="middle" opacity="0.7">SLICE: USER REGISTRATION</text>
+
+        <!-- Slice 1: Trigger -->
+        <rect x="45" y="65" width="100" height="38" rx="4" fill="#12171F" stroke="#6B7B8D" stroke-width="1.5" filter="url(#glow-gray)"/>
+        <text x="95" y="80" font-family="JetBrains Mono, monospace" font-size="7" fill="#6B7B8D" text-anchor="middle" font-weight="700">TRIGGER</text>
+        <text x="95" y="93" font-family="JetBrains Mono, monospace" font-size="8" fill="#E8ECF0" text-anchor="middle">SignUpClick</text>
+
+        <!-- Slice 1: Command -->
+        <rect x="185" y="65" width="110" height="38" rx="4" fill="#12171F" stroke="#00D4FF" stroke-width="1.5" filter="url(#glow-cyan)"/>
+        <text x="240" y="80" font-family="JetBrains Mono, monospace" font-size="7" fill="#00D4FF" text-anchor="middle" font-weight="700">COMMAND</text>
+        <text x="240" y="93" font-family="JetBrains Mono, monospace" font-size="8" fill="#E8ECF0" text-anchor="middle">RegisterUser</text>
+
+        <!-- Slice 1: Event -->
+        <rect x="185" y="180" width="110" height="38" rx="4" fill="#12171F" stroke="#FF00AA" stroke-width="1.5" filter="url(#glow-magenta)"/>
+        <text x="240" y="195" font-family="JetBrains Mono, monospace" font-size="7" fill="#FF00AA" text-anchor="middle" font-weight="700">EVENT</text>
+        <text x="240" y="208" font-family="JetBrains Mono, monospace" font-size="8" fill="#E8ECF0" text-anchor="middle">UserRegistered</text>
+
+        <!-- Slice 1: View -->
+        <rect x="185" y="295" width="110" height="38" rx="4" fill="#12171F" stroke="#00FF88" stroke-width="1.5" filter="url(#glow-green)"/>
+        <text x="240" y="310" font-family="JetBrains Mono, monospace" font-size="7" fill="#00FF88" text-anchor="middle" font-weight="700">VIEW</text>
+        <text x="240" y="323" font-family="JetBrains Mono, monospace" font-size="8" fill="#E8ECF0" text-anchor="middle">UserProfile</text>
+
+        <!-- Slice 1 connections: Trigger -> Command (horizontal) -->
+        <path d="M145,84 L185,84" fill="none" stroke="#6B7B8D" stroke-width="1.2" filter="url(#glow-line)" stroke-dasharray="6,3" style="animation: dash-flow 1.5s linear infinite"/>
+        <!-- Command -> Event (right-angle down) -->
+        <path d="M240,103 L240,130 Q240,135 240,140 L240,180" fill="none" stroke="#00D4FF" stroke-width="1.2" filter="url(#glow-line)" stroke-dasharray="6,3" style="animation: dash-flow 1.5s linear infinite"/>
+        <!-- Event -> View (right-angle down) -->
+        <path d="M240,218 L240,260 Q240,265 240,270 L240,295" fill="none" stroke="#FF00AA" stroke-width="1.2" filter="url(#glow-line)" stroke-dasharray="6,3" style="animation: dash-flow 1.5s linear infinite"/>
+
+        <!-- Exception element -->
+        <rect x="345" y="180" width="120" height="38" rx="4" fill="#12171F" stroke="#FF3366" stroke-width="1.5" filter="url(#glow-red)"/>
+        <text x="405" y="195" font-family="JetBrains Mono, monospace" font-size="7" fill="#FF3366" text-anchor="middle" font-weight="700">EXCEPTION</text>
+        <text x="405" y="208" font-family="JetBrains Mono, monospace" font-size="8" fill="#E8ECF0" text-anchor="middle">RegistrationFailed</text>
+        <!-- Branch line from Command to Exception -->
+        <path d="M295,84 L320,84 Q330,84 330,94 L330,199 Q330,199 345,199" fill="none" stroke="#FF3366" stroke-width="1" filter="url(#glow-line)" stroke-dasharray="4,4" opacity="0.7" style="animation: dash-flow 2s linear infinite"/>
+
+        <!-- Slice 2 label -->
+        <text x="610" y="22" font-family="JetBrains Mono, monospace" font-size="10" fill="#AA44FF" font-weight="700" text-anchor="middle" opacity="0.7">SLICE: SEND WELCOME EMAIL</text>
+
+        <!-- Slice 2: Automation -->
+        <rect x="510" y="180" width="120" height="38" rx="4" fill="#12171F" stroke="#AA44FF" stroke-width="1.5" filter="url(#glow-purple)"/>
+        <text x="570" y="195" font-family="JetBrains Mono, monospace" font-size="7" fill="#AA44FF" text-anchor="middle" font-weight="700">AUTOMATION</text>
+        <text x="570" y="208" font-family="JetBrains Mono, monospace" font-size="8" fill="#E8ECF0" text-anchor="middle">OnUserRegistered</text>
+
+        <!-- Slice 2: Command -->
+        <rect x="555" y="65" width="120" height="38" rx="4" fill="#12171F" stroke="#00D4FF" stroke-width="1.5" filter="url(#glow-cyan)"/>
+        <text x="615" y="80" font-family="JetBrains Mono, monospace" font-size="7" fill="#00D4FF" text-anchor="middle" font-weight="700">COMMAND</text>
+        <text x="615" y="93" font-family="JetBrains Mono, monospace" font-size="8" fill="#E8ECF0" text-anchor="middle">SendWelcomeEmail</text>
+
+        <!-- Slice 2: Event -->
+        <rect x="680" y="180" width="110" height="38" rx="4" fill="#12171F" stroke="#FF00AA" stroke-width="1.5" filter="url(#glow-magenta)"/>
+        <text x="735" y="195" font-family="JetBrains Mono, monospace" font-size="7" fill="#FF00AA" text-anchor="middle" font-weight="700">EVENT</text>
+        <text x="735" y="208" font-family="JetBrains Mono, monospace" font-size="8" fill="#E8ECF0" text-anchor="middle">WelcomeEmailSent</text>
+
+        <!-- Slice 2 connections: Automation -> Command (up right-angle) -->
+        <path d="M570,180 L570,140 Q570,130 580,130 L615,130 Q615,120 615,103" fill="none" stroke="#AA44FF" stroke-width="1.2" filter="url(#glow-line)" stroke-dasharray="6,3" style="animation: dash-flow 1.5s linear infinite"/>
+        <!-- Command -> Event (right-angle across and down) -->
+        <path d="M675,84 L700,84 Q710,84 710,94 L710,150 Q710,160 720,160 L735,160 Q735,170 735,180" fill="none" stroke="#00D4FF" stroke-width="1.2" filter="url(#glow-line)" stroke-dasharray="6,3" style="animation: dash-flow 1.5s linear infinite"/>
+
+        <!-- Cross-slice link: UserRegistered -> Automation -->
+        <path d="M295,199 L510,199" fill="none" stroke="rgba(170,68,255,0.4)" stroke-width="1" stroke-dasharray="3,6" filter="url(#glow-line)" style="animation: dash-flow 3s linear infinite"/>
+      </svg>
+    </div>
+  </section>
+
+  <!-- ===== 5. Element Gallery ===== -->
+  <section>
+    <h2>// Element Gallery</h2>
+    <div class="gallery-grid">
+      <div class="gallery-card" style="--card-glow-color:#00D4FF;--card-glow:rgba(0,212,255,0.4)">
+        <div class="card-header">
+          <div class="card-icon" style="background:#00D4FF; box-shadow:0 0 10px rgba(0,212,255,0.5)">CMD</div>
+          <div class="card-title" style="color:#00D4FF">Command</div>
+        </div>
+        <div class="card-desc">An intent to change the system state. Validated against business rules before producing events.</div>
+      </div>
+      <div class="gallery-card" style="--card-glow-color:#FF00AA;--card-glow:rgba(255,0,170,0.4)">
+        <div class="card-header">
+          <div class="card-icon" style="background:#FF00AA; box-shadow:0 0 10px rgba(255,0,170,0.5)">EVT</div>
+          <div class="card-title" style="color:#FF00AA">Event</div>
+        </div>
+        <div class="card-desc">An immutable fact that something happened. The single source of truth in the system.</div>
+      </div>
+      <div class="gallery-card" style="--card-glow-color:#00FF88;--card-glow:rgba(0,255,136,0.4)">
+        <div class="card-header">
+          <div class="card-icon" style="background:#00FF88; box-shadow:0 0 10px rgba(0,255,136,0.5)">VW</div>
+          <div class="card-title" style="color:#00FF88">View</div>
+        </div>
+        <div class="card-desc">A read-model projection built from events. Optimized for queries and display.</div>
+      </div>
+      <div class="gallery-card" style="--card-glow-color:#6B7B8D;--card-glow:rgba(107,123,141,0.4)">
+        <div class="card-header">
+          <div class="card-icon" style="background:#6B7B8D; box-shadow:0 0 10px rgba(107,123,141,0.5)">TRG</div>
+          <div class="card-title" style="color:#6B7B8D">Trigger</div>
+        </div>
+        <div class="card-desc">A user action or external input that initiates a command. The entry point of a slice.</div>
+      </div>
+      <div class="gallery-card" style="--card-glow-color:#FF3366;--card-glow:rgba(255,51,102,0.4)">
+        <div class="card-header">
+          <div class="card-icon" style="background:#FF3366; box-shadow:0 0 10px rgba(255,51,102,0.5)">EXC</div>
+          <div class="card-title" style="color:#FF3366">Exception</div>
+        </div>
+        <div class="card-desc">A failure or rejection path. Captures what happens when a command cannot be fulfilled.</div>
+      </div>
+      <div class="gallery-card" style="--card-glow-color:#AA44FF;--card-glow:rgba(170,68,255,0.4)">
+        <div class="card-header">
+          <div class="card-icon" style="background:#AA44FF; box-shadow:0 0 10px rgba(170,68,255,0.5)">AUT</div>
+          <div class="card-title" style="color:#AA44FF">Automation</div>
+        </div>
+        <div class="card-desc">A system reaction to an event. Automatically triggers a downstream command without user input.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 6. CSS Variables ===== -->
+  <section>
+    <h2>// CSS Variables</h2>
+    <pre class="code-block"><code><span class="comment">/* Neon Circuit — Design Tokens */</span>
+
+<span class="sel">:root</span> {
+  <span class="comment">/* Light mode */</span>
+  <span class="prop">--bg</span>: <span class="val">#F0F2F5</span>;
+  <span class="prop">--surface</span>: <span class="val">#FFFFFF</span>;
+  <span class="prop">--text</span>: <span class="val">#0A0E14</span>;
+  <span class="prop">--text-secondary</span>: <span class="val">#4A5568</span>;
+  <span class="prop">--border</span>: <span class="val">#D1D5DB</span>;
+
+  <span class="comment">/* Semantic element colors */</span>
+  <span class="prop">--command</span>: <span class="val">#00D4FF</span>;  <span class="comment">/* Electric Cyan */</span>
+  <span class="prop">--event</span>: <span class="val">#FF00AA</span>;    <span class="comment">/* Neon Magenta */</span>
+  <span class="prop">--view</span>: <span class="val">#00FF88</span>;     <span class="comment">/* Neon Green */</span>
+  <span class="prop">--trigger</span>: <span class="val">#6B7B8D</span>;  <span class="comment">/* Cool Gray */</span>
+  <span class="prop">--exception</span>: <span class="val">#FF3366</span>; <span class="comment">/* Neon Red */</span>
+  <span class="prop">--automation</span>: <span class="val">#AA44FF</span>;<span class="comment">/* Electric Purple */</span>
+  <span class="prop">--accent</span>: <span class="val">#00D4FF</span>;
+
+  <span class="comment">/* Glow tokens */</span>
+  <span class="prop">--glow-command</span>: <span class="val">rgba(0, 212, 255, 0.5)</span>;
+  <span class="prop">--glow-event</span>: <span class="val">rgba(255, 0, 170, 0.5)</span>;
+  <span class="prop">--glow-view</span>: <span class="val">rgba(0, 255, 136, 0.5)</span>;
+  <span class="prop">--glow-trigger</span>: <span class="val">rgba(107, 123, 141, 0.4)</span>;
+  <span class="prop">--glow-exception</span>: <span class="val">rgba(255, 51, 102, 0.5)</span>;
+  <span class="prop">--glow-automation</span>: <span class="val">rgba(170, 68, 255, 0.5)</span>;
+
+  <span class="comment">/* Layout */</span>
+  <span class="prop">--radius</span>: <span class="val">4px</span>;
+  <span class="prop">--font</span>: <span class="val">'JetBrains Mono', monospace</span>;
+}
+
+<span class="sel">[data-theme="dark"]</span> {
+  <span class="prop">--bg</span>: <span class="val">#0A0E14</span>;
+  <span class="prop">--surface</span>: <span class="val">#12171F</span>;
+  <span class="prop">--text</span>: <span class="val">#E8ECF0</span>;
+  <span class="prop">--text-secondary</span>: <span class="val">#8899AA</span>;
+  <span class="prop">--border</span>: <span class="val">#1E2A3A</span>;
+}</code></pre>
+  </section>
+
+</div>
+
+<script>
+  // Theme toggle with localStorage persistence
+  (function() {
+    var toggle = document.getElementById('theme-toggle');
+    var html = document.documentElement;
+    var stored = localStorage.getItem('neon-circuit-theme');
+
+    if (stored) {
+      html.setAttribute('data-theme', stored);
+      toggle.checked = (stored === 'dark');
+    } else {
+      html.setAttribute('data-theme', 'dark');
+      toggle.checked = true;
+    }
+
+    toggle.addEventListener('change', function() {
+      var theme = toggle.checked ? 'dark' : 'light';
+      html.setAttribute('data-theme', theme);
+      localStorage.setItem('neon-circuit-theme', theme);
+    });
+  })();
+</script>
+</body>
+</html>

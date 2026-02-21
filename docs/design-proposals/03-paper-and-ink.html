@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Design Proposal #3 — Paper &amp; Ink</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
+  <style>
+    /* ===== CSS Custom Properties ===== */
+    :root {
+      /* Element Colors */
+      --color-command: #2B4570;
+      --color-event: #A0784C;
+      --color-view: #5C7A4A;
+      --color-trigger: #4A4A4A;
+      --color-exception: #8B4040;
+      --color-automation: #6B4C6E;
+
+      /* Surface & Background */
+      --color-bg: #F5F0E8;
+      --color-surface: #FFFCF5;
+      --color-surface-alt: #EDE8DF;
+
+      /* Text */
+      --color-text: #1A1612;
+      --color-text-muted: #6B6358;
+      --color-text-on-element: #FFFCF5;
+
+      /* Borders & Accents */
+      --color-border: rgba(58, 53, 48, 0.25);
+      --color-border-strong: rgba(58, 53, 48, 0.55);
+      --color-accent: #8B6914;
+
+      /* Shadows */
+      --shadow-sm: 1px 1px 3px rgba(58, 53, 48, 0.1);
+      --shadow-md: 2px 2px 6px rgba(58, 53, 48, 0.12);
+      --shadow-stamp: inset 1px 1px 2px rgba(0,0,0,0.15), 1px 1px 2px rgba(58,53,48,0.1);
+
+      /* Swimlane fills */
+      --lane-user: rgba(160, 120, 76, 0.06);
+      --lane-system: rgba(43, 69, 112, 0.06);
+      --lane-external: rgba(107, 76, 110, 0.06);
+    }
+
+    [data-theme="dark"] {
+      --color-bg: #1E1C18;
+      --color-surface: #28251E;
+      --color-surface-alt: #332F27;
+
+      --color-text: #E8E2D8;
+      --color-text-muted: #9B9285;
+      --color-text-on-element: #E8E2D8;
+
+      --color-border: rgba(200, 190, 172, 0.18);
+      --color-border-strong: rgba(200, 190, 172, 0.35);
+      --color-accent: #C9A84C;
+
+      --shadow-sm: 1px 1px 3px rgba(0, 0, 0, 0.25);
+      --shadow-md: 2px 2px 6px rgba(0, 0, 0, 0.3);
+      --shadow-stamp: inset 1px 1px 2px rgba(0,0,0,0.3), 1px 1px 2px rgba(0,0,0,0.2);
+
+      --lane-user: rgba(160, 120, 76, 0.08);
+      --lane-system: rgba(43, 69, 112, 0.1);
+      --lane-external: rgba(107, 76, 110, 0.08);
+    }
+
+    /* ===== Reset & Base ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Lora', Georgia, 'Times New Roman', serif;
+      font-weight: 400;
+      line-height: 1.65;
+      color: var(--color-text);
+      background-color: var(--color-bg);
+      transition: background-color 0.35s ease, color 0.35s ease;
+    }
+
+    .container {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 4rem;
+    }
+
+    /* ===== Header ===== */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid var(--color-border-strong);
+      padding-bottom: 1.5rem;
+      margin-bottom: 2.5rem;
+    }
+
+    header h1 {
+      font-size: 2.4rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+    }
+
+    header h1 span {
+      display: block;
+      font-size: 0.55em;
+      font-weight: 400;
+      color: var(--color-text-muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 0.15rem;
+    }
+
+    /* Vintage toggle */
+    .toggle-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.82rem;
+      color: var(--color-text-muted);
+    }
+
+    .toggle {
+      position: relative;
+      width: 52px;
+      height: 28px;
+      cursor: pointer;
+    }
+
+    .toggle input { display: none; }
+
+    .toggle .track {
+      position: absolute;
+      inset: 0;
+      background: var(--color-surface-alt);
+      border: 2px solid var(--color-border-strong);
+      border-radius: 14px;
+      transition: background 0.3s ease;
+    }
+
+    .toggle .knob {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      width: 20px;
+      height: 20px;
+      background: var(--color-text);
+      border-radius: 50%;
+      transition: transform 0.3s ease, background 0.3s ease;
+      z-index: 1;
+    }
+
+    .toggle input:checked ~ .knob { transform: translateX(24px); }
+    .toggle input:checked ~ .track { background: var(--color-accent); }
+
+    /* ===== Sections ===== */
+    section { margin-bottom: 3rem; }
+
+    section h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.3rem;
+      border-bottom: 1px solid var(--color-border);
+      padding-bottom: 0.5rem;
+    }
+
+    section h2 + p {
+      color: var(--color-text-muted);
+      font-size: 0.92rem;
+      margin-bottom: 1.5rem;
+      font-style: italic;
+    }
+
+    /* ===== Color Palette ===== */
+    .palette-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));
+      gap: 1rem;
+    }
+
+    .swatch {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .swatch-color {
+      height: 58px;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .swatch-info {
+      padding: 0.5rem 0.6rem;
+    }
+
+    .swatch-info .label {
+      font-weight: 600;
+      font-size: 0.78rem;
+      display: block;
+      margin-bottom: 0.15rem;
+    }
+
+    .swatch-info .hex {
+      font-size: 0.72rem;
+      color: var(--color-text-muted);
+      font-family: 'Courier New', monospace;
+    }
+
+    /* ===== Typography ===== */
+    .type-sample {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 4px;
+      padding: 1.5rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .type-sample h3 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.3rem; }
+    .type-sample h4 { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.3rem; }
+    .type-sample p.body { font-size: 1rem; line-height: 1.65; margin-bottom: 0.8rem; }
+    .type-sample .label-sample {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--color-text-muted);
+    }
+
+    .type-meta {
+      margin-top: 1rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 0.5rem;
+      font-size: 0.82rem;
+      color: var(--color-text-muted);
+    }
+
+    .type-meta span { font-family: 'Courier New', monospace; font-size: 0.78rem; }
+
+    /* ===== Mock Board ===== */
+    .board-wrap {
+      background: var(--color-surface);
+      border: 2px solid var(--color-border-strong);
+      border-radius: 4px;
+      padding: 1rem;
+      overflow-x: auto;
+      box-shadow: var(--shadow-md);
+    }
+
+    .board-wrap svg { display: block; width: 100%; height: auto; }
+
+    /* ===== Element Gallery ===== */
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 1.2rem;
+    }
+
+    .elem-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 4px;
+      padding: 1.2rem;
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow 0.2s ease;
+    }
+
+    .elem-card:hover { box-shadow: var(--shadow-md); }
+
+    .elem-badge {
+      display: inline-block;
+      padding: 0.35rem 0.9rem;
+      border-radius: 3px;
+      color: var(--color-text-on-element);
+      font-weight: 600;
+      font-size: 0.82rem;
+      letter-spacing: 0.02em;
+      box-shadow: var(--shadow-stamp);
+      border: 2px solid rgba(255,255,255,0.15);
+      margin-bottom: 0.8rem;
+    }
+
+    .elem-badge.rotate-cw { transform: rotate(1.2deg); }
+    .elem-badge.rotate-ccw { transform: rotate(-1.5deg); }
+
+    .elem-card h4 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 0.3rem;
+    }
+
+    .elem-card p {
+      font-size: 0.85rem;
+      color: var(--color-text-muted);
+      line-height: 1.55;
+    }
+
+    /* ===== Code Block ===== */
+    .code-block {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 4px;
+      overflow-x: auto;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 1.2rem;
+      font-family: 'Courier New', Consolas, monospace;
+      font-size: 0.78rem;
+      line-height: 1.6;
+      color: var(--color-text);
+      white-space: pre;
+    }
+
+    .code-block .comment { color: var(--color-text-muted); }
+    .code-block .prop { color: var(--color-command); }
+    .code-block .val { color: var(--color-event); }
+
+    [data-theme="dark"] .code-block .prop { color: #7BA3D4; }
+    [data-theme="dark"] .code-block .val { color: #D4B078; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ===== 1. Header ===== -->
+    <header>
+      <h1><span>Design Proposal #3</span>Paper &amp; Ink</h1>
+      <div class="toggle-wrap">
+        <span>Light</span>
+        <label class="toggle" title="Toggle light/dark mode">
+          <input type="checkbox" id="themeToggle">
+          <span class="knob"></span>
+          <span class="track"></span>
+        </label>
+        <span>Dark</span>
+      </div>
+    </header>
+
+    <!-- ===== 2. Color Palette ===== -->
+    <section>
+      <h2>Color Palette</h2>
+      <p>Ink-stained tokens grounded in warm, natural tones.</p>
+      <div class="palette-grid">
+        <div class="swatch"><div class="swatch-color" style="background:#2B4570"></div><div class="swatch-info"><span class="label">Command</span><span class="hex">#2B4570</span></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#A0784C"></div><div class="swatch-info"><span class="label">Event</span><span class="hex">#A0784C</span></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#5C7A4A"></div><div class="swatch-info"><span class="label">View</span><span class="hex">#5C7A4A</span></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#4A4A4A"></div><div class="swatch-info"><span class="label">Trigger</span><span class="hex">#4A4A4A</span></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#8B4040"></div><div class="swatch-info"><span class="label">Exception</span><span class="hex">#8B4040</span></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#6B4C6E"></div><div class="swatch-info"><span class="label">Automation</span><span class="hex">#6B4C6E</span></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#F5F0E8"></div><div class="swatch-info"><span class="label">Background</span><span class="hex">#F5F0E8</span></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#FFFCF5"></div><div class="swatch-info"><span class="label">Surface</span><span class="hex">#FFFCF5</span></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#1A1612"></div><div class="swatch-info"><span class="label">Text (Ink)</span><span class="hex">#1A1612</span></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:rgba(58,53,48,0.55)"></div><div class="swatch-info"><span class="label">Border</span><span class="hex">rgba(58,53,48)</span></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#8B6914"></div><div class="swatch-info"><span class="label">Accent</span><span class="hex">#8B6914</span></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#EDE8DF"></div><div class="swatch-info"><span class="label">Surface Alt</span><span class="hex">#EDE8DF</span></div></div>
+      </div>
+    </section>
+
+    <!-- ===== 3. Typography ===== -->
+    <section>
+      <h2>Typography</h2>
+      <p>Lora from Google Fonts -- a balanced serif with editorial warmth.</p>
+      <div class="type-sample">
+        <h3>Heading One &mdash; 1.8 rem / 700</h3>
+        <h4>Heading Two &mdash; 1.25 rem / 600</h4>
+        <p class="body">Body text at 1 rem / 400. Event Modeling decomposes complex systems into a timeline of events, commands, views, and automations. Each slice is a thin vertical unit of work that can be independently tested and delivered.</p>
+        <p class="label-sample">Label &mdash; 0.75 rem / 600 / Uppercase</p>
+        <div class="type-meta">
+          <div>Font family: <span>Lora, Georgia, serif</span></div>
+          <div>Weights: <span>400, 600, 700</span></div>
+          <div>Body line-height: <span>1.65</span></div>
+          <div>Base size: <span>16px (1rem)</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 4. Mock Board ===== -->
+    <section>
+      <h2>Mock Board</h2>
+      <p>A representative Event Modeling canvas with hand-drawn connections.</p>
+      <div class="board-wrap">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 420" style="font-family:'Lora',Georgia,serif;">
+          <defs>
+            <!-- Ink-style arrowhead -->
+            <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+              <path d="M1,1 L9,4 L1,7" fill="none" stroke="var(--color-text)" stroke-width="1.5" stroke-linecap="round"/>
+            </marker>
+            <!-- Rough paper texture filter -->
+            <filter id="paper-grain" x="0" y="0" width="100%" height="100%">
+              <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" result="noise"/>
+              <feColorMatrix type="saturate" values="0" in="noise" result="gray"/>
+              <feBlend mode="multiply" in="SourceGraphic" in2="gray"/>
+            </filter>
+          </defs>
+
+          <!-- Swimlane backgrounds -->
+          <rect x="0" y="0" width="820" height="140" fill="var(--lane-user)" rx="2"/>
+          <rect x="0" y="140" width="820" height="140" fill="var(--lane-system)" rx="2"/>
+          <rect x="0" y="280" width="820" height="140" fill="var(--lane-external)" rx="2"/>
+
+          <!-- Swimlane dividers -->
+          <line x1="0" y1="140" x2="820" y2="140" stroke="var(--color-border)" stroke-width="1" stroke-dasharray="6,4"/>
+          <line x1="0" y1="280" x2="820" y2="280" stroke="var(--color-border)" stroke-width="1" stroke-dasharray="6,4"/>
+
+          <!-- Swimlane labels -->
+          <text x="14" y="24" font-size="11" font-weight="600" fill="var(--color-text-muted)" letter-spacing="0.08em" text-transform="uppercase">USER</text>
+          <text x="14" y="164" font-size="11" font-weight="600" fill="var(--color-text-muted)" letter-spacing="0.08em" text-transform="uppercase">SYSTEM</text>
+          <text x="14" y="304" font-size="11" font-weight="600" fill="var(--color-text-muted)" letter-spacing="0.08em" text-transform="uppercase">EXTERNAL</text>
+
+          <!-- ===== Slice 1: User Registration ===== -->
+          <text x="130" y="52" font-size="13" font-style="italic" fill="var(--color-text-muted)">User Registration</text>
+
+          <!-- Trigger -->
+          <g transform="translate(70, 66) rotate(-0.8)">
+            <rect width="100" height="42" rx="3" fill="var(--color-trigger)" stroke="var(--color-trigger)" stroke-width="2"/>
+            <rect x="2" y="2" width="96" height="38" rx="2" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+            <text x="50" y="18" text-anchor="middle" font-size="9" font-weight="600" fill="var(--color-text-on-element)" letter-spacing="0.04em">TRIGGER</text>
+            <text x="50" y="32" text-anchor="middle" font-size="10" fill="var(--color-text-on-element)">SignupForm</text>
+          </g>
+
+          <!-- Command -->
+          <g transform="translate(215, 165) rotate(0.5)">
+            <rect width="112" height="42" rx="3" fill="var(--color-command)" stroke="var(--color-command)" stroke-width="2"/>
+            <rect x="2" y="2" width="108" height="38" rx="2" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+            <text x="56" y="18" text-anchor="middle" font-size="9" font-weight="600" fill="var(--color-text-on-element)" letter-spacing="0.04em">COMMAND</text>
+            <text x="56" y="32" text-anchor="middle" font-size="10" fill="var(--color-text-on-element)">RegisterUser</text>
+          </g>
+
+          <!-- Event -->
+          <g transform="translate(375, 165) rotate(-0.6)">
+            <rect width="120" height="42" rx="3" fill="var(--color-event)" stroke="var(--color-event)" stroke-width="2"/>
+            <rect x="2" y="2" width="116" height="38" rx="2" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+            <text x="60" y="18" text-anchor="middle" font-size="9" font-weight="600" fill="var(--color-text-on-element)" letter-spacing="0.04em">EVENT</text>
+            <text x="60" y="32" text-anchor="middle" font-size="10" fill="var(--color-text-on-element)">UserRegistered</text>
+          </g>
+
+          <!-- View -->
+          <g transform="translate(390, 68) rotate(0.8)">
+            <rect width="100" height="42" rx="3" fill="var(--color-view)" stroke="var(--color-view)" stroke-width="2"/>
+            <rect x="2" y="2" width="96" height="38" rx="2" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+            <text x="50" y="18" text-anchor="middle" font-size="9" font-weight="600" fill="var(--color-text-on-element)" letter-spacing="0.04em">VIEW</text>
+            <text x="50" y="32" text-anchor="middle" font-size="10" fill="var(--color-text-on-element)">UserProfile</text>
+          </g>
+
+          <!-- Exception -->
+          <g transform="translate(375, 244) rotate(1.3)">
+            <rect width="130" height="42" rx="3" fill="var(--color-exception)" stroke="var(--color-exception)" stroke-width="2"/>
+            <rect x="2" y="2" width="126" height="38" rx="2" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+            <text x="65" y="18" text-anchor="middle" font-size="9" font-weight="600" fill="var(--color-text-on-element)" letter-spacing="0.04em">EXCEPTION</text>
+            <text x="65" y="32" text-anchor="middle" font-size="10" fill="var(--color-text-on-element)">RegistrationFailed</text>
+          </g>
+
+          <!-- Slice 1 connections (hand-drawn wobble) -->
+          <!-- Trigger -> Command -->
+          <path d="M168,100 C185,105 195,140 220,168" fill="none" stroke="var(--color-text)" stroke-width="1.4" stroke-linecap="round" marker-end="url(#arrow)"/>
+          <!-- Command -> Event -->
+          <path d="M327,188 C342,190 355,189 375,187" fill="none" stroke="var(--color-text)" stroke-width="1.4" stroke-linecap="round" marker-end="url(#arrow)"/>
+          <!-- Event -> View -->
+          <path d="M435,165 C438,142 441,128 440,112" fill="none" stroke="var(--color-text)" stroke-width="1.4" stroke-linecap="round" marker-end="url(#arrow)"/>
+          <!-- Command -> Exception (dashed) -->
+          <path d="M275,207 C290,225 340,250 375,260" fill="none" stroke="var(--color-exception)" stroke-width="1.2" stroke-dasharray="5,3" stroke-linecap="round" marker-end="url(#arrow)"/>
+
+          <!-- ===== Slice 2: Send Welcome Email ===== -->
+          <text x="590" y="52" font-size="13" font-style="italic" fill="var(--color-text-muted)">Send Welcome Email</text>
+
+          <!-- Automation -->
+          <g transform="translate(555, 66) rotate(-1.1)">
+            <rect width="128" height="42" rx="3" fill="var(--color-automation)" stroke="var(--color-automation)" stroke-width="2"/>
+            <rect x="2" y="2" width="124" height="38" rx="2" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+            <text x="64" y="18" text-anchor="middle" font-size="9" font-weight="600" fill="var(--color-text-on-element)" letter-spacing="0.04em">AUTOMATION</text>
+            <text x="64" y="32" text-anchor="middle" font-size="10" fill="var(--color-text-on-element)">OnUserRegistered</text>
+          </g>
+
+          <!-- Command 2 -->
+          <g transform="translate(565, 185) rotate(0.7)">
+            <rect width="130" height="42" rx="3" fill="var(--color-command)" stroke="var(--color-command)" stroke-width="2"/>
+            <rect x="2" y="2" width="126" height="38" rx="2" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+            <text x="65" y="18" text-anchor="middle" font-size="9" font-weight="600" fill="var(--color-text-on-element)" letter-spacing="0.04em">COMMAND</text>
+            <text x="65" y="32" text-anchor="middle" font-size="10" fill="var(--color-text-on-element)">SendWelcomeEmail</text>
+          </g>
+
+          <!-- Event 2 -->
+          <g transform="translate(575, 310) rotate(-0.9)">
+            <rect width="135" height="42" rx="3" fill="var(--color-event)" stroke="var(--color-event)" stroke-width="2"/>
+            <rect x="2" y="2" width="131" height="38" rx="2" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+            <text x="67" y="18" text-anchor="middle" font-size="9" font-weight="600" fill="var(--color-text-on-element)" letter-spacing="0.04em">EVENT</text>
+            <text x="67" y="32" text-anchor="middle" font-size="10" fill="var(--color-text-on-element)">WelcomeEmailSent</text>
+          </g>
+
+          <!-- Slice 2 connections -->
+          <!-- Event1 -> Automation (cross-slice) -->
+          <path d="M495,186 C510,160 530,120 558,108" fill="none" stroke="var(--color-text-muted)" stroke-width="1.1" stroke-dasharray="4,3" stroke-linecap="round" marker-end="url(#arrow)"/>
+          <!-- Automation -> Command2 -->
+          <path d="M620,108 C625,130 630,158 632,185" fill="none" stroke="var(--color-text)" stroke-width="1.4" stroke-linecap="round" marker-end="url(#arrow)"/>
+          <!-- Command2 -> Event2 -->
+          <path d="M635,227 C638,258 642,285 643,310" fill="none" stroke="var(--color-text)" stroke-width="1.4" stroke-linecap="round" marker-end="url(#arrow)"/>
+        </svg>
+      </div>
+    </section>
+
+    <!-- ===== 5. Element Gallery ===== -->
+    <section>
+      <h2>Element Gallery</h2>
+      <p>The six building blocks of every Event Model slice.</p>
+      <div class="gallery-grid">
+        <div class="elem-card">
+          <div class="elem-badge rotate-cw" style="background:var(--color-command)">COMMAND</div>
+          <h4>Command</h4>
+          <p>An intent to change state. Represents a user or system action that produces one or more events when accepted.</p>
+        </div>
+        <div class="elem-card">
+          <div class="elem-badge rotate-ccw" style="background:var(--color-event)">EVENT</div>
+          <h4>Event</h4>
+          <p>An immutable fact that something happened. The single source of truth in an event-sourced system.</p>
+        </div>
+        <div class="elem-card">
+          <div class="elem-badge" style="background:var(--color-view)">VIEW</div>
+          <h4>View / Read Model</h4>
+          <p>A projection of events into a shape optimized for querying. Drives the UI and informs decisions.</p>
+        </div>
+        <div class="elem-card">
+          <div class="elem-badge rotate-ccw" style="background:var(--color-trigger)">TRIGGER</div>
+          <h4>Trigger</h4>
+          <p>The user-facing entry point -- a form, button, or interaction that initiates a command.</p>
+        </div>
+        <div class="elem-card">
+          <div class="elem-badge rotate-cw" style="background:var(--color-exception)">EXCEPTION</div>
+          <h4>Exception</h4>
+          <p>A rejection or failure outcome. Represents business rule violations or error conditions.</p>
+        </div>
+        <div class="elem-card">
+          <div class="elem-badge rotate-ccw" style="background:var(--color-automation)">AUTOMATION</div>
+          <h4>Automation</h4>
+          <p>A process manager or policy that reacts to events and issues further commands without human input.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 6. CSS Variables Code Block ===== -->
+    <section>
+      <h2>CSS Variables</h2>
+      <p>Complete token set for both light and dark themes.</p>
+      <div class="code-block"><pre><span class="comment">/* ===== Light Theme (default) ===== */</span>
+<span class="prop">:root</span> {
+  <span class="comment">/* Element Colors */</span>
+  <span class="prop">--color-command</span>:      <span class="val">#2B4570</span>;
+  <span class="prop">--color-event</span>:        <span class="val">#A0784C</span>;
+  <span class="prop">--color-view</span>:         <span class="val">#5C7A4A</span>;
+  <span class="prop">--color-trigger</span>:      <span class="val">#4A4A4A</span>;
+  <span class="prop">--color-exception</span>:    <span class="val">#8B4040</span>;
+  <span class="prop">--color-automation</span>:   <span class="val">#6B4C6E</span>;
+
+  <span class="comment">/* Surfaces */</span>
+  <span class="prop">--color-bg</span>:           <span class="val">#F5F0E8</span>;
+  <span class="prop">--color-surface</span>:      <span class="val">#FFFCF5</span>;
+  <span class="prop">--color-surface-alt</span>:  <span class="val">#EDE8DF</span>;
+
+  <span class="comment">/* Text */</span>
+  <span class="prop">--color-text</span>:         <span class="val">#1A1612</span>;
+  <span class="prop">--color-text-muted</span>:   <span class="val">#6B6358</span>;
+  <span class="prop">--color-text-on-elem</span>: <span class="val">#FFFCF5</span>;
+
+  <span class="comment">/* Borders &amp; Accent */</span>
+  <span class="prop">--color-border</span>:       <span class="val">rgba(58, 53, 48, 0.25)</span>;
+  <span class="prop">--color-border-strong</span>:<span class="val"> rgba(58, 53, 48, 0.55)</span>;
+  <span class="prop">--color-accent</span>:       <span class="val">#8B6914</span>;
+}
+
+<span class="comment">/* ===== Dark Theme ===== */</span>
+<span class="prop">[data-theme="dark"]</span> {
+  <span class="prop">--color-bg</span>:           <span class="val">#1E1C18</span>;
+  <span class="prop">--color-surface</span>:      <span class="val">#28251E</span>;
+  <span class="prop">--color-surface-alt</span>:  <span class="val">#332F27</span>;
+
+  <span class="prop">--color-text</span>:         <span class="val">#E8E2D8</span>;
+  <span class="prop">--color-text-muted</span>:   <span class="val">#9B9285</span>;
+  <span class="prop">--color-text-on-elem</span>: <span class="val">#E8E2D8</span>;
+
+  <span class="prop">--color-border</span>:       <span class="val">rgba(200, 190, 172, 0.18)</span>;
+  <span class="prop">--color-border-strong</span>:<span class="val"> rgba(200, 190, 172, 0.35)</span>;
+  <span class="prop">--color-accent</span>:       <span class="val">#C9A84C</span>;
+}</pre></div>
+    </section>
+
+  </div>
+
+  <!-- ===== Theme Toggle Script ===== -->
+  <script>
+    (function() {
+      var toggle = document.getElementById('themeToggle');
+      var stored = localStorage.getItem('paper-ink-theme');
+      if (stored === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        toggle.checked = true;
+      }
+      toggle.addEventListener('change', function() {
+        if (this.checked) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+          localStorage.setItem('paper-ink-theme', 'dark');
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+          localStorage.setItem('paper-ink-theme', 'light');
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

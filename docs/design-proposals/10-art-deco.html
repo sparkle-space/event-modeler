@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Art Deco - EventModeler Design Proposal #10</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ===== CSS Custom Properties ===== */
+    :root {
+      --color-bg: #F5F0E6;
+      --color-surface: #FDFAF4;
+      --color-surface-alt: #F0EADB;
+      --color-text: #0E1118;
+      --color-text-secondary: #5C5447;
+      --color-border: #C9A84C;
+      --color-border-subtle: #D6C89A;
+      --color-accent: #C9A84C;
+
+      --color-command: #1A2744;
+      --color-command-bg: rgba(26, 39, 68, 0.10);
+      --color-event: #C9A84C;
+      --color-event-bg: rgba(201, 168, 76, 0.14);
+      --color-view: #2D7A4F;
+      --color-view-bg: rgba(45, 122, 79, 0.10);
+      --color-trigger: #8B7355;
+      --color-trigger-bg: rgba(139, 115, 85, 0.12);
+      --color-exception: #8B2252;
+      --color-exception-bg: rgba(139, 34, 82, 0.10);
+      --color-automation: #4A2D7A;
+      --color-automation-bg: rgba(74, 45, 122, 0.10);
+
+      --color-swimlane-user: rgba(201, 168, 76, 0.06);
+      --color-swimlane-system: rgba(26, 39, 68, 0.05);
+      --color-swimlane-external: rgba(74, 45, 122, 0.05);
+
+      --shadow-sm: 0 1px 4px rgba(14, 17, 24, 0.06);
+      --shadow-md: 0 4px 16px rgba(14, 17, 24, 0.08);
+      --shadow-lg: 0 8px 32px rgba(14, 17, 24, 0.10);
+      --radius-card: 3px;
+      --radius-element: 2px;
+      --font-family: 'Cormorant Garamond', 'Georgia', serif;
+    }
+
+    [data-theme="dark"] {
+      --color-bg: #0E1118;
+      --color-surface: #181C26;
+      --color-surface-alt: #141820;
+      --color-text: #F0EBE0;
+      --color-text-secondary: #A89E8C;
+      --color-border: #C9A84C;
+      --color-border-subtle: #3A3528;
+      --color-accent: #D4B65E;
+
+      --color-command: #6B8ABF;
+      --color-command-bg: rgba(107, 138, 191, 0.15);
+      --color-event: #D4B65E;
+      --color-event-bg: rgba(212, 182, 94, 0.15);
+      --color-view: #4DAF72;
+      --color-view-bg: rgba(77, 175, 114, 0.13);
+      --color-trigger: #B09A78;
+      --color-trigger-bg: rgba(176, 154, 120, 0.14);
+      --color-exception: #C04878;
+      --color-exception-bg: rgba(192, 72, 120, 0.14);
+      --color-automation: #8B6EC0;
+      --color-automation-bg: rgba(139, 110, 192, 0.14);
+
+      --color-swimlane-user: rgba(212, 182, 94, 0.06);
+      --color-swimlane-system: rgba(107, 138, 191, 0.06);
+      --color-swimlane-external: rgba(139, 110, 192, 0.06);
+
+      --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.20);
+      --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.28);
+      --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.36);
+    }
+
+    /* ===== Reset & Base ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-family);
+      background: var(--color-bg);
+      color: var(--color-text);
+      line-height: 1.6;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 48px 32px 80px;
+    }
+
+    /* ===== Decorative Horizontal Rule ===== */
+    .deco-rule {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 32px 0;
+      color: var(--color-accent);
+    }
+    .deco-rule::before, .deco-rule::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
+    }
+    .deco-rule .diamond {
+      width: 8px; height: 8px;
+      background: var(--color-accent);
+      transform: rotate(45deg);
+      flex-shrink: 0;
+    }
+
+    /* ===== Header ===== */
+    .header {
+      text-align: center;
+      margin-bottom: 56px;
+      padding: 40px 32px;
+      border: 2px solid var(--color-accent);
+      position: relative;
+      background: var(--color-surface);
+      box-shadow: var(--shadow-md);
+    }
+    /* Art Deco corner decorations */
+    .header::before, .header::after {
+      content: '';
+      position: absolute;
+      width: 24px; height: 24px;
+      border-color: var(--color-accent);
+      border-style: solid;
+    }
+    .header::before { top: 6px; left: 6px; border-width: 2px 0 0 2px; }
+    .header::after { top: 6px; right: 6px; border-width: 2px 2px 0 0; }
+    .header-corners-bottom { position: relative; }
+    .header-corners-bottom::before, .header-corners-bottom::after {
+      content: '';
+      position: absolute;
+      width: 24px; height: 24px;
+      border-color: var(--color-accent);
+      border-style: solid;
+    }
+    .header-corners-bottom::before { bottom: 6px; left: 6px; border-width: 0 0 2px 2px; }
+    .header-corners-bottom::after { bottom: 6px; right: 6px; border-width: 0 2px 2px 0; }
+
+    .header-title {
+      font-size: 3rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--color-accent);
+      line-height: 1.1;
+    }
+    .header-subtitle {
+      font-size: 1rem;
+      font-weight: 400;
+      color: var(--color-text-secondary);
+      margin-top: 8px;
+      letter-spacing: 0.05em;
+    }
+    .header-line {
+      width: 120px;
+      height: 2px;
+      background: var(--color-accent);
+      margin: 16px auto;
+    }
+
+    /* Toggle */
+    .theme-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      user-select: none;
+      margin-top: 20px;
+      letter-spacing: 0.04em;
+    }
+    .toggle-track {
+      width: 52px;
+      height: 26px;
+      background: var(--color-border-subtle);
+      border: 1px solid var(--color-accent);
+      border-radius: 3px;
+      position: relative;
+      transition: background 0.25s ease;
+    }
+    [data-theme="dark"] .toggle-track { background: var(--color-accent); }
+    .toggle-knob {
+      width: 20px;
+      height: 20px;
+      background: var(--color-accent);
+      border-radius: 2px;
+      position: absolute;
+      top: 2px;
+      left: 3px;
+      transition: transform 0.25s ease, background 0.25s ease;
+    }
+    [data-theme="dark"] .toggle-knob {
+      transform: translateX(24px);
+      background: var(--color-bg);
+    }
+
+    /* ===== Section ===== */
+    .section { margin-bottom: 64px; }
+
+    .section-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--color-accent);
+      margin-bottom: 4px;
+    }
+    .section-desc {
+      font-size: 1rem;
+      color: var(--color-text-secondary);
+      margin-bottom: 28px;
+      max-width: 640px;
+    }
+
+    /* ===== Color Palette ===== */
+    .palette-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 16px;
+    }
+    .swatch {
+      background: var(--color-surface);
+      border: 1px solid var(--color-accent);
+      border-radius: var(--radius-card);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow 0.2s ease, background 0.3s ease;
+      position: relative;
+    }
+    .swatch::before, .swatch::after {
+      content: '';
+      position: absolute;
+      width: 10px; height: 10px;
+      border-color: var(--color-accent);
+      border-style: solid;
+      z-index: 1;
+    }
+    .swatch::before { top: 3px; left: 3px; border-width: 1px 0 0 1px; }
+    .swatch::after { top: 3px; right: 3px; border-width: 1px 1px 0 0; }
+    .swatch:hover { box-shadow: var(--shadow-md); }
+    .swatch-color { height: 72px; transition: background 0.3s ease; }
+    .swatch-info { padding: 12px; }
+    .swatch-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 2px;
+      letter-spacing: 0.02em;
+    }
+    .swatch-hex {
+      font-size: 0.75rem;
+      color: var(--color-text-secondary);
+      font-family: 'Cormorant Garamond', monospace;
+    }
+
+    /* ===== Typography ===== */
+    .type-card {
+      background: var(--color-surface);
+      border: 2px solid var(--color-accent);
+      border-radius: var(--radius-card);
+      padding: 36px;
+      box-shadow: var(--shadow-sm);
+      transition: background 0.3s ease;
+    }
+    .type-sample { margin-bottom: 28px; }
+    .type-sample:last-child { margin-bottom: 0; }
+    .type-meta {
+      font-size: 0.75rem;
+      color: var(--color-text-secondary);
+      margin-bottom: 6px;
+      letter-spacing: 0.02em;
+    }
+    .type-h1 { font-size: 2.5rem; font-weight: 700; letter-spacing: 0.04em; line-height: 1.2; }
+    .type-h2 { font-size: 1.75rem; font-weight: 700; letter-spacing: 0.03em; line-height: 1.3; }
+    .type-h3 { font-size: 1.25rem; font-weight: 600; line-height: 1.4; }
+    .type-body { font-size: 1.0625rem; font-weight: 400; line-height: 1.7; color: var(--color-text-secondary); }
+    .type-label {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--color-accent);
+    }
+
+    /* ===== Mock Board ===== */
+    .board-wrapper {
+      background: var(--color-surface);
+      border: 2px solid var(--color-accent);
+      border-radius: var(--radius-card);
+      padding: 20px;
+      box-shadow: var(--shadow-md);
+      overflow-x: auto;
+      transition: background 0.3s ease;
+      position: relative;
+    }
+    .board-wrapper::before, .board-wrapper::after {
+      content: '';
+      position: absolute;
+      width: 16px; height: 16px;
+      border-color: var(--color-accent);
+      border-style: solid;
+      z-index: 2;
+    }
+    .board-wrapper::before { top: 6px; left: 6px; border-width: 2px 0 0 2px; }
+    .board-wrapper::after { top: 6px; right: 6px; border-width: 2px 2px 0 0; }
+    .board-svg text { font-family: var(--font-family); }
+
+    /* ===== Element Gallery ===== */
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+    .gallery-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-accent);
+      border-radius: var(--radius-card);
+      padding: 24px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      transition: box-shadow 0.2s ease, background 0.3s ease;
+      position: relative;
+    }
+    .gallery-card::before, .gallery-card::after {
+      content: '';
+      position: absolute;
+      width: 12px; height: 12px;
+      border-color: var(--color-accent);
+      border-style: solid;
+    }
+    .gallery-card::before { top: 4px; left: 4px; border-width: 1px 0 0 1px; }
+    .gallery-card::after { bottom: 4px; right: 4px; border-width: 0 1px 1px 0; }
+    .gallery-card:hover { box-shadow: var(--shadow-md); }
+    .gallery-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-element);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #fff;
+      border: 1px solid var(--color-accent);
+    }
+    .gallery-label {
+      font-size: 1.0625rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+      letter-spacing: 0.03em;
+    }
+    .gallery-desc {
+      font-size: 0.9375rem;
+      color: var(--color-text-secondary);
+      line-height: 1.6;
+    }
+
+    /* ===== Code Block ===== */
+    .code-block {
+      background: var(--color-surface-alt);
+      border: 2px solid var(--color-accent);
+      border-radius: var(--radius-card);
+      padding: 28px;
+      overflow-x: auto;
+      box-shadow: var(--shadow-sm);
+      transition: background 0.3s ease;
+    }
+    .code-block pre {
+      margin: 0;
+      font-family: 'Cormorant Garamond', 'Courier New', monospace;
+      font-size: 0.85rem;
+      line-height: 1.8;
+      color: var(--color-text-secondary);
+      white-space: pre;
+    }
+    .code-block .ck { color: var(--color-accent); }
+    .code-block .cv { color: var(--color-command); }
+    [data-theme="dark"] .code-block .cv { color: var(--color-event); }
+    .code-block .cc { color: var(--color-text-secondary); opacity: 0.7; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ===== 1. Header ===== -->
+    <header class="header header-corners-bottom">
+      <div class="header-line"></div>
+      <h1 class="header-title">Art Deco</h1>
+      <p class="header-subtitle">EventModeler Design Proposal #10 &mdash; Elegant Geometric</p>
+      <div class="header-line"></div>
+      <div class="theme-toggle" onclick="toggleTheme()" role="button" aria-label="Toggle dark mode">
+        <span>Light</span>
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span>Dark</span>
+      </div>
+    </header>
+
+    <!-- ===== 2. Color Palette ===== -->
+    <section class="section">
+      <h2 class="section-title">Color Palette</h2>
+      <p class="section-desc">Six semantic element colors and foundation tokens. Gold accents unify the palette with luxurious Art Deco warmth across both light and dark modes.</p>
+      <div class="deco-rule"><span class="diamond"></span></div>
+      <div class="palette-grid">
+        <div class="swatch"><div class="swatch-color" style="background:#1A2744"></div><div class="swatch-info"><div class="swatch-label">Command</div><div class="swatch-hex">#1A2744 &middot; Deep Navy</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#C9A84C"></div><div class="swatch-info"><div class="swatch-label">Event</div><div class="swatch-hex">#C9A84C &middot; Rich Gold</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#2D7A4F"></div><div class="swatch-info"><div class="swatch-label">View</div><div class="swatch-hex">#2D7A4F &middot; Emerald</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#8B7355"></div><div class="swatch-info"><div class="swatch-label">Trigger</div><div class="swatch-hex">#8B7355 &middot; Warm Bronze</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#8B2252"></div><div class="swatch-info"><div class="swatch-label">Exception</div><div class="swatch-hex">#8B2252 &middot; Deep Ruby</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#4A2D7A"></div><div class="swatch-info"><div class="swatch-label">Automation</div><div class="swatch-hex">#4A2D7A &middot; Royal Purple</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#F5F0E6"></div><div class="swatch-info"><div class="swatch-label">Background</div><div class="swatch-hex">#F5F0E6 &middot; Warm Off-White</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#FDFAF4;border-bottom:1px solid #D6C89A"></div><div class="swatch-info"><div class="swatch-label">Surface</div><div class="swatch-hex">#FDFAF4 &middot; Cream</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#0E1118"></div><div class="swatch-info"><div class="swatch-label">Text</div><div class="swatch-hex">#0E1118 &middot; Dark Navy</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#D6C89A"></div><div class="swatch-info"><div class="swatch-label">Border</div><div class="swatch-hex">#D6C89A &middot; Muted Gold</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#C9A84C"></div><div class="swatch-info"><div class="swatch-label">Gold Accent</div><div class="swatch-hex">#C9A84C &middot; Primary Accent</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#5C5447"></div><div class="swatch-info"><div class="swatch-label">Text Secondary</div><div class="swatch-hex">#5C5447 &middot; Warm Grey</div></div></div>
+      </div>
+    </section>
+
+    <!-- ===== 3. Typography ===== -->
+    <section class="section">
+      <h2 class="section-title">Typography</h2>
+      <p class="section-desc">Cormorant Garamond from Google Fonts brings old-world elegance with refined serifs. Weights 400, 600, and 700 cover body, emphasis, and display needs.</p>
+      <div class="deco-rule"><span class="diamond"></span></div>
+      <div class="type-card">
+        <div class="type-sample">
+          <div class="type-meta">Heading 1 &mdash; Cormorant Garamond 700 / 2.5rem / line-height 1.2 / tracking 0.04em</div>
+          <div class="type-h1">Event Modeling Canvas</div>
+        </div>
+        <div class="type-sample">
+          <div class="type-meta">Heading 2 &mdash; Cormorant Garamond 700 / 1.75rem / line-height 1.3 / tracking 0.03em</div>
+          <div class="type-h2">Slice: User Registration</div>
+        </div>
+        <div class="type-sample">
+          <div class="type-meta">Heading 3 &mdash; Cormorant Garamond 600 / 1.25rem / line-height 1.4</div>
+          <div class="type-h3">Command &amp; Event Definitions</div>
+        </div>
+        <div class="type-sample">
+          <div class="type-meta">Body &mdash; Cormorant Garamond 400 / 1.0625rem / line-height 1.7</div>
+          <div class="type-body">Each slice represents a vertical unit of work flowing from trigger through command and event to a read model view. Slices are independently testable and deliverable, forming the building blocks of an elegant system design.</div>
+        </div>
+        <div class="type-sample">
+          <div class="type-meta">Label &mdash; Cormorant Garamond 600 / 0.8125rem / uppercase / tracking 0.1em</div>
+          <div class="type-label">Swimlane &middot; User Interface</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 4. Mock Board ===== -->
+    <section class="section">
+      <h2 class="section-title">Mock Board</h2>
+      <p class="section-desc">A representative EventModeler canvas with two slices, three swimlanes, Art Deco geometric patterns, fan motifs, and gold-accented connections.</p>
+      <div class="deco-rule"><span class="diamond"></span></div>
+      <div class="board-wrapper">
+        <svg class="board-svg" viewBox="0 0 820 420" width="820" height="420" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <!-- Art Deco geometric pattern -->
+            <pattern id="deco-pattern" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+              <rect width="40" height="40" fill="none"/>
+              <path d="M20,0 L20,40 M0,20 L40,20" stroke="var(--color-accent)" stroke-width="0.3" opacity="0.12"/>
+              <rect x="16" y="16" width="8" height="8" fill="none" stroke="var(--color-accent)" stroke-width="0.3" opacity="0.10" transform="rotate(45,20,20)"/>
+            </pattern>
+            <!-- Chevron arrowhead -->
+            <marker id="chevron" viewBox="0 0 12 8" refX="11" refY="4" markerWidth="10" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L8,4 L0,8 L3,4 Z" fill="var(--color-accent)" opacity="0.7"/>
+            </marker>
+            <!-- Sunburst/fan motif -->
+            <g id="sunburst">
+              <line x1="0" y1="0" x2="0" y2="-20" stroke="var(--color-accent)" stroke-width="0.5" opacity="0.15"/>
+              <line x1="0" y1="0" x2="7" y2="-19" stroke="var(--color-accent)" stroke-width="0.5" opacity="0.15"/>
+              <line x1="0" y1="0" x2="13" y2="-15" stroke="var(--color-accent)" stroke-width="0.5" opacity="0.15"/>
+              <line x1="0" y1="0" x2="17" y2="-10" stroke="var(--color-accent)" stroke-width="0.5" opacity="0.15"/>
+              <line x1="0" y1="0" x2="20" y2="0" stroke="var(--color-accent)" stroke-width="0.5" opacity="0.15"/>
+              <line x1="0" y1="0" x2="-7" y2="-19" stroke="var(--color-accent)" stroke-width="0.5" opacity="0.15"/>
+              <line x1="0" y1="0" x2="-13" y2="-15" stroke="var(--color-accent)" stroke-width="0.5" opacity="0.15"/>
+              <line x1="0" y1="0" x2="-17" y2="-10" stroke="var(--color-accent)" stroke-width="0.5" opacity="0.15"/>
+              <line x1="0" y1="0" x2="-20" y2="0" stroke="var(--color-accent)" stroke-width="0.5" opacity="0.15"/>
+              <path d="M-20,0 A20,20 0 0,1 20,0" fill="none" stroke="var(--color-accent)" stroke-width="0.6" opacity="0.15"/>
+              <path d="M-14,0 A14,14 0 0,1 14,0" fill="none" stroke="var(--color-accent)" stroke-width="0.4" opacity="0.12"/>
+            </g>
+            <!-- Corner decoration for elements -->
+            <g id="corner-tl"><path d="M0,6 L0,0 L6,0" fill="none" stroke="var(--color-accent)" stroke-width="1.2"/></g>
+            <g id="corner-tr"><path d="M-6,0 L0,0 L0,6" fill="none" stroke="var(--color-accent)" stroke-width="1.2"/></g>
+            <g id="corner-bl"><path d="M0,-6 L0,0 L6,0" fill="none" stroke="var(--color-accent)" stroke-width="1.2"/></g>
+            <g id="corner-br"><path d="M-6,0 L0,0 L0,-6" fill="none" stroke="var(--color-accent)" stroke-width="1.2"/></g>
+          </defs>
+
+          <!-- Background pattern -->
+          <rect width="820" height="420" fill="var(--color-surface)"/>
+          <rect width="820" height="420" fill="url(#deco-pattern)"/>
+
+          <!-- Sunburst motifs in corners -->
+          <use href="#sunburst" x="40" y="420"/>
+          <use href="#sunburst" x="780" y="420"/>
+          <g transform="rotate(180,410,0)"><use href="#sunburst" x="370" y="-5"/></g>
+
+          <!-- Swimlane backgrounds -->
+          <rect x="0" y="0" width="820" height="140" fill="var(--color-swimlane-user)"/>
+          <rect x="0" y="140" width="820" height="140" fill="var(--color-swimlane-system)"/>
+          <rect x="0" y="280" width="820" height="140" fill="var(--color-swimlane-external)"/>
+
+          <!-- Swimlane dividers with decorative ends -->
+          <line x1="0" y1="140" x2="820" y2="140" stroke="var(--color-accent)" stroke-width="0.8" opacity="0.35"/>
+          <line x1="0" y1="280" x2="820" y2="280" stroke="var(--color-accent)" stroke-width="0.8" opacity="0.35"/>
+          <!-- Decorative diamonds at divider ends -->
+          <rect x="7" y="136" width="6" height="6" fill="var(--color-accent)" opacity="0.35" transform="rotate(45,10,139)"/>
+          <rect x="807" y="136" width="6" height="6" fill="var(--color-accent)" opacity="0.35" transform="rotate(45,810,139)"/>
+          <rect x="7" y="276" width="6" height="6" fill="var(--color-accent)" opacity="0.35" transform="rotate(45,10,279)"/>
+          <rect x="807" y="276" width="6" height="6" fill="var(--color-accent)" opacity="0.35" transform="rotate(45,810,279)"/>
+
+          <!-- Swimlane labels -->
+          <text x="16" y="24" font-size="11" font-weight="600" fill="var(--color-accent)" letter-spacing="0.12em" opacity="0.6">USER</text>
+          <text x="16" y="164" font-size="11" font-weight="600" fill="var(--color-accent)" letter-spacing="0.12em" opacity="0.6">SYSTEM</text>
+          <text x="16" y="304" font-size="11" font-weight="600" fill="var(--color-accent)" letter-spacing="0.12em" opacity="0.6">EXTERNAL</text>
+
+          <!-- ======= Slice 1: User Registration ======= -->
+          <!-- Slice label with decorative underline -->
+          <text x="175" y="50" font-size="12" font-weight="700" fill="var(--color-text)" letter-spacing="0.06em" opacity="0.65">Slice 1: User Registration</text>
+          <line x1="175" y1="54" x2="355" y2="54" stroke="var(--color-accent)" stroke-width="0.8" opacity="0.4"/>
+          <rect x="261" y="52" width="4" height="4" fill="var(--color-accent)" opacity="0.4" transform="rotate(45,263,54)"/>
+
+          <!-- Trigger: SignupClick -->
+          <rect x="50" y="68" width="110" height="46" rx="2" fill="var(--color-trigger-bg)" stroke="var(--color-trigger)" stroke-width="1.5"/>
+          <use href="#corner-tl" x="52" y="70"/><use href="#corner-tr" x="158" y="70"/>
+          <use href="#corner-bl" x="52" y="112"/><use href="#corner-br" x="158" y="112"/>
+          <text x="105" y="87" font-size="9" font-weight="600" fill="var(--color-trigger)" text-anchor="middle" letter-spacing="0.08em">TRIGGER</text>
+          <text x="105" y="103" font-size="11" font-weight="700" fill="var(--color-text)" text-anchor="middle">SignupClick</text>
+
+          <!-- Connection: Trigger -> Command -->
+          <path d="M160,91 C180,91 180,195 200,195" fill="none" stroke="var(--color-accent)" stroke-width="1" opacity="0.5" marker-end="url(#chevron)"/>
+
+          <!-- Command: RegisterUser -->
+          <rect x="200" y="173" width="130" height="46" rx="2" fill="var(--color-command-bg)" stroke="var(--color-command)" stroke-width="1.5"/>
+          <use href="#corner-tl" x="202" y="175"/><use href="#corner-tr" x="328" y="175"/>
+          <use href="#corner-bl" x="202" y="217"/><use href="#corner-br" x="328" y="217"/>
+          <text x="265" y="192" font-size="9" font-weight="600" fill="var(--color-command)" text-anchor="middle" letter-spacing="0.08em">COMMAND</text>
+          <text x="265" y="208" font-size="11" font-weight="700" fill="var(--color-text)" text-anchor="middle">RegisterUser</text>
+
+          <!-- Connection: Command -> Event -->
+          <path d="M330,196 C352,196 352,196 375,196" fill="none" stroke="var(--color-accent)" stroke-width="1" opacity="0.5" marker-end="url(#chevron)"/>
+
+          <!-- Event: UserRegistered -->
+          <rect x="375" y="173" width="130" height="46" rx="2" fill="var(--color-event-bg)" stroke="var(--color-event)" stroke-width="1.5"/>
+          <use href="#corner-tl" x="377" y="175"/><use href="#corner-tr" x="503" y="175"/>
+          <use href="#corner-bl" x="377" y="217"/><use href="#corner-br" x="503" y="217"/>
+          <text x="440" y="192" font-size="9" font-weight="600" fill="var(--color-event)" text-anchor="middle" letter-spacing="0.08em">EVENT</text>
+          <text x="440" y="208" font-size="11" font-weight="700" fill="var(--color-text)" text-anchor="middle">UserRegistered</text>
+
+          <!-- Connection: Event -> View -->
+          <path d="M505,196 C525,196 525,91 545,91" fill="none" stroke="var(--color-accent)" stroke-width="1" opacity="0.5" marker-end="url(#chevron)"/>
+
+          <!-- View: UserProfile -->
+          <rect x="545" y="68" width="110" height="46" rx="2" fill="var(--color-view-bg)" stroke="var(--color-view)" stroke-width="1.5"/>
+          <use href="#corner-tl" x="547" y="70"/><use href="#corner-tr" x="653" y="70"/>
+          <use href="#corner-bl" x="547" y="112"/><use href="#corner-br" x="653" y="112"/>
+          <text x="600" y="87" font-size="9" font-weight="600" fill="var(--color-view)" text-anchor="middle" letter-spacing="0.08em">VIEW</text>
+          <text x="600" y="103" font-size="11" font-weight="700" fill="var(--color-text)" text-anchor="middle">UserProfile</text>
+
+          <!-- ======= Slice 2: Send Welcome Email ======= -->
+          <text x="440" y="252" font-size="12" font-weight="700" fill="var(--color-text)" letter-spacing="0.06em" opacity="0.65">Slice 2: Send Welcome Email</text>
+          <line x1="440" y1="256" x2="640" y2="256" stroke="var(--color-accent)" stroke-width="0.8" opacity="0.4"/>
+          <rect x="536" y="254" width="4" height="4" fill="var(--color-accent)" opacity="0.4" transform="rotate(45,538,256)"/>
+
+          <!-- Automation: OnUserRegistered -->
+          <rect x="380" y="268" width="140" height="46" rx="2" fill="var(--color-automation-bg)" stroke="var(--color-automation)" stroke-width="1.5"/>
+          <use href="#corner-tl" x="382" y="270"/><use href="#corner-tr" x="518" y="270"/>
+          <use href="#corner-bl" x="382" y="312"/><use href="#corner-br" x="518" y="312"/>
+          <text x="450" y="287" font-size="9" font-weight="600" fill="var(--color-automation)" text-anchor="middle" letter-spacing="0.08em">AUTOMATION</text>
+          <text x="450" y="303" font-size="10.5" font-weight="700" fill="var(--color-text)" text-anchor="middle">OnUserRegistered</text>
+
+          <!-- Connection from Event to Automation (dashed) -->
+          <path d="M440,219 C440,240 450,255 450,268" fill="none" stroke="var(--color-automation)" stroke-width="1" stroke-dasharray="4 3" opacity="0.5" marker-end="url(#chevron)"/>
+
+          <!-- Connection: Automation -> Command -->
+          <path d="M520,291 C545,291 545,355 570,355" fill="none" stroke="var(--color-accent)" stroke-width="1" opacity="0.5" marker-end="url(#chevron)"/>
+
+          <!-- Command: SendWelcomeEmail -->
+          <rect x="570" y="333" width="140" height="46" rx="2" fill="var(--color-command-bg)" stroke="var(--color-command)" stroke-width="1.5"/>
+          <use href="#corner-tl" x="572" y="335"/><use href="#corner-tr" x="708" y="335"/>
+          <use href="#corner-bl" x="572" y="377"/><use href="#corner-br" x="708" y="377"/>
+          <text x="640" y="352" font-size="9" font-weight="600" fill="var(--color-command)" text-anchor="middle" letter-spacing="0.08em">COMMAND</text>
+          <text x="640" y="368" font-size="10.5" font-weight="700" fill="var(--color-text)" text-anchor="middle">SendWelcomeEmail</text>
+
+          <!-- Connection: Command -> Event -->
+          <path d="M710,356 C730,356 730,291 750,291" fill="none" stroke="var(--color-accent)" stroke-width="1" opacity="0.5" marker-end="url(#chevron)"/>
+
+          <!-- Event: WelcomeEmailSent -->
+          <rect x="700" y="268" width="110" height="46" rx="2" fill="var(--color-event-bg)" stroke="var(--color-event)" stroke-width="1.5"/>
+          <use href="#corner-tl" x="702" y="270"/><use href="#corner-tr" x="808" y="270"/>
+          <use href="#corner-bl" x="702" y="312"/><use href="#corner-br" x="808" y="312"/>
+          <text x="755" y="287" font-size="9" font-weight="600" fill="var(--color-event)" text-anchor="middle" letter-spacing="0.08em">EVENT</text>
+          <text x="755" y="303" font-size="10" font-weight="700" fill="var(--color-text)" text-anchor="middle">WelcomeEmailSent</text>
+
+          <!-- ======= Exception Element ======= -->
+          <rect x="195" y="333" width="140" height="46" rx="2" fill="var(--color-exception-bg)" stroke="var(--color-exception)" stroke-width="1.5"/>
+          <use href="#corner-tl" x="197" y="335"/><use href="#corner-tr" x="333" y="335"/>
+          <use href="#corner-bl" x="197" y="377"/><use href="#corner-br" x="333" y="377"/>
+          <text x="265" y="352" font-size="9" font-weight="600" fill="var(--color-exception)" text-anchor="middle" letter-spacing="0.08em">EXCEPTION</text>
+          <text x="265" y="368" font-size="10.5" font-weight="700" fill="var(--color-text)" text-anchor="middle">RegistrationFailed</text>
+
+          <!-- Connection: Command -> Exception (dashed) -->
+          <path d="M265,219 C265,265 265,305 265,333" fill="none" stroke="var(--color-exception)" stroke-width="1" stroke-dasharray="4 3" opacity="0.45" marker-end="url(#chevron)"/>
+
+          <!-- Decorative border frame around entire board -->
+          <rect x="2" y="2" width="816" height="416" fill="none" stroke="var(--color-accent)" stroke-width="0.5" opacity="0.2" rx="1"/>
+        </svg>
+      </div>
+    </section>
+
+    <!-- ===== 5. Element Gallery ===== -->
+    <section class="section">
+      <h2 class="section-title">Element Gallery</h2>
+      <p class="section-desc">The six core element types used to construct an event model. Each carries a distinct semantic color with Art Deco geometric styling for instant visual recognition.</p>
+      <div class="deco-rule"><span class="diamond"></span></div>
+      <div class="gallery-grid">
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:var(--color-command)">C</div>
+          <div>
+            <div class="gallery-label">Command</div>
+            <div class="gallery-desc">An intent to change state. Represents a user or system action that may succeed or fail. Always imperative.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:var(--color-event)">E</div>
+          <div>
+            <div class="gallery-label">Event</div>
+            <div class="gallery-desc">A fact that happened. Immutable past-tense record of a state change. The golden backbone of the model.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:var(--color-view)">V</div>
+          <div>
+            <div class="gallery-label">View</div>
+            <div class="gallery-desc">A read model projection. Shows data derived from events, optimized for display or query purposes.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:var(--color-trigger)">T</div>
+          <div>
+            <div class="gallery-label">Trigger</div>
+            <div class="gallery-desc">The initiating action: a button click, page load, or external webhook that starts a flow.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:var(--color-exception)">X</div>
+          <div>
+            <div class="gallery-label">Exception</div>
+            <div class="gallery-desc">An error or alternate path. Captures validation failures, business rule violations, or edge cases.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:var(--color-automation)">A</div>
+          <div>
+            <div class="gallery-label">Automation</div>
+            <div class="gallery-desc">A system process triggered by an event. Sagas, policies, or workflows that react automatically.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 6. CSS Variables Code Block ===== -->
+    <section class="section">
+      <h2 class="section-title">CSS Custom Properties</h2>
+      <p class="section-desc">Complete variable set for both light and dark themes. Copy into your stylesheet to adopt the Art Deco design system.</p>
+      <div class="deco-rule"><span class="diamond"></span></div>
+      <div class="code-block">
+<pre><span class="cc">/* Art Deco - Light Theme */</span>
+<span class="ck">:root</span> {
+  <span class="cv">--color-bg</span>: #F5F0E6;
+  <span class="cv">--color-surface</span>: #FDFAF4;
+  <span class="cv">--color-surface-alt</span>: #F0EADB;
+  <span class="cv">--color-text</span>: #0E1118;
+  <span class="cv">--color-text-secondary</span>: #5C5447;
+  <span class="cv">--color-border</span>: #C9A84C;
+  <span class="cv">--color-border-subtle</span>: #D6C89A;
+  <span class="cv">--color-accent</span>: #C9A84C;
+
+  <span class="cc">/* Element Colors */</span>
+  <span class="cv">--color-command</span>: #1A2744;
+  <span class="cv">--color-command-bg</span>: rgba(26, 39, 68, 0.10);
+  <span class="cv">--color-event</span>: #C9A84C;
+  <span class="cv">--color-event-bg</span>: rgba(201, 168, 76, 0.14);
+  <span class="cv">--color-view</span>: #2D7A4F;
+  <span class="cv">--color-view-bg</span>: rgba(45, 122, 79, 0.10);
+  <span class="cv">--color-trigger</span>: #8B7355;
+  <span class="cv">--color-trigger-bg</span>: rgba(139, 115, 85, 0.12);
+  <span class="cv">--color-exception</span>: #8B2252;
+  <span class="cv">--color-exception-bg</span>: rgba(139, 34, 82, 0.10);
+  <span class="cv">--color-automation</span>: #4A2D7A;
+  <span class="cv">--color-automation-bg</span>: rgba(74, 45, 122, 0.10);
+
+  <span class="cc">/* Swimlane Tints */</span>
+  <span class="cv">--color-swimlane-user</span>: rgba(201, 168, 76, 0.06);
+  <span class="cv">--color-swimlane-system</span>: rgba(26, 39, 68, 0.05);
+  <span class="cv">--color-swimlane-external</span>: rgba(74, 45, 122, 0.05);
+
+  <span class="cc">/* Effects */</span>
+  <span class="cv">--shadow-sm</span>: 0 1px 4px rgba(14, 17, 24, 0.06);
+  <span class="cv">--shadow-md</span>: 0 4px 16px rgba(14, 17, 24, 0.08);
+  <span class="cv">--shadow-lg</span>: 0 8px 32px rgba(14, 17, 24, 0.10);
+  <span class="cv">--radius-card</span>: 3px;
+  <span class="cv">--radius-element</span>: 2px;
+}
+
+<span class="cc">/* Art Deco - Dark Theme */</span>
+<span class="ck">[data-theme="dark"]</span> {
+  <span class="cv">--color-bg</span>: #0E1118;
+  <span class="cv">--color-surface</span>: #181C26;
+  <span class="cv">--color-surface-alt</span>: #141820;
+  <span class="cv">--color-text</span>: #F0EBE0;
+  <span class="cv">--color-text-secondary</span>: #A89E8C;
+  <span class="cv">--color-border</span>: #C9A84C;
+  <span class="cv">--color-border-subtle</span>: #3A3528;
+  <span class="cv">--color-accent</span>: #D4B65E;
+
+  <span class="cv">--color-command</span>: #6B8ABF;
+  <span class="cv">--color-command-bg</span>: rgba(107, 138, 191, 0.15);
+  <span class="cv">--color-event</span>: #D4B65E;
+  <span class="cv">--color-event-bg</span>: rgba(212, 182, 94, 0.15);
+  <span class="cv">--color-view</span>: #4DAF72;
+  <span class="cv">--color-view-bg</span>: rgba(77, 175, 114, 0.13);
+  <span class="cv">--color-trigger</span>: #B09A78;
+  <span class="cv">--color-trigger-bg</span>: rgba(176, 154, 120, 0.14);
+  <span class="cv">--color-exception</span>: #C04878;
+  <span class="cv">--color-exception-bg</span>: rgba(192, 72, 120, 0.14);
+  <span class="cv">--color-automation</span>: #8B6EC0;
+  <span class="cv">--color-automation-bg</span>: rgba(139, 110, 192, 0.14);
+
+  <span class="cv">--color-swimlane-user</span>: rgba(212, 182, 94, 0.06);
+  <span class="cv">--color-swimlane-system</span>: rgba(107, 138, 191, 0.06);
+  <span class="cv">--color-swimlane-external</span>: rgba(139, 110, 192, 0.06);
+
+  <span class="cv">--shadow-sm</span>: 0 1px 4px rgba(0, 0, 0, 0.20);
+  <span class="cv">--shadow-md</span>: 0 4px 16px rgba(0, 0, 0, 0.28);
+  <span class="cv">--shadow-lg</span>: 0 8px 32px rgba(0, 0, 0, 0.36);
+}</pre>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    function toggleTheme() {
+      var html = document.documentElement;
+      var isDark = html.getAttribute('data-theme') === 'dark';
+      if (isDark) {
+        html.removeAttribute('data-theme');
+        localStorage.setItem('art-deco-theme', 'light');
+      } else {
+        html.setAttribute('data-theme', 'dark');
+        localStorage.setItem('art-deco-theme', 'dark');
+      }
+    }
+
+    (function restoreTheme() {
+      var saved = localStorage.getItem('art-deco-theme');
+      if (saved === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -32,3 +32,7 @@ Thumbs.db
 
 # Claude Code session
 .session-info
+.playwright-cli/*
+
+#PRDs
+priv/prds/*

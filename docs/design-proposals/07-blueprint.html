@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design Proposal #7 — Blueprint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  /* ------------------------------------------------------------------ */
+  /* CSS Custom Properties                                              */
+  /* ------------------------------------------------------------------ */
+  :root {
+    --color-command:    #4DC9F6;
+    --color-event:      #F7E652;
+    --color-view:       #51E898;
+    --color-trigger:    #8CA0B3;
+    --color-exception:  #FF6B6B;
+    --color-automation: #B68FFF;
+
+    --bg:          #F0F4F8;
+    --bg-surface:  #FFFFFF;
+    --bg-grid:     #D0D8E0;
+    --bg-grid-major: #B8C4D0;
+    --text:        #1B3A5C;
+    --text-muted:  #5A7A99;
+    --border:      #B0C0D0;
+    --code-bg:     #E4ECF2;
+
+    --radius: 2px;
+    --font: 'IBM Plex Mono', monospace;
+  }
+
+  [data-theme="dark"] {
+    --bg:          #1B3A5C;
+    --bg-surface:  #213F62;
+    --bg-grid:     #2A4F73;
+    --bg-grid-major: #345D82;
+    --text:        #E0F0FF;
+    --text-muted:  #8CB8D8;
+    --border:      #3A6A90;
+    --code-bg:     #162F4A;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Reset & Base                                                       */
+  /* ------------------------------------------------------------------ */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text);
+    background-color: var(--bg);
+    transition: background-color .25s, color .25s;
+  }
+
+  .page { max-width: 900px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  h1, h2, h3 { font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+  h1 { font-size: 28px; margin-bottom: 4px; }
+  h2 { font-size: 16px; margin: 48px 0 20px; border-bottom: 1px dashed var(--border); padding-bottom: 8px; }
+  h3 { font-size: 13px; margin-bottom: 8px; }
+
+  p, li { font-size: 13px; line-height: 1.65; }
+  a { color: var(--color-command); }
+
+  /* ------------------------------------------------------------------ */
+  /* Header                                                             */
+  /* ------------------------------------------------------------------ */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 24px;
+    border-bottom: 2px solid var(--border);
+  }
+
+  .header-left .subtitle {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+  }
+
+  .header-left h1 { color: var(--color-command); }
+
+  /* Toggle switch */
+  .toggle {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted);
+    cursor: pointer; user-select: none;
+  }
+
+  .toggle-track {
+    width: 42px; height: 22px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    position: relative;
+    transition: border-color .25s;
+  }
+
+  .toggle-thumb {
+    width: 14px; height: 14px;
+    border: 1.5px solid var(--color-command);
+    border-radius: var(--radius);
+    position: absolute; top: 2.5px; left: 3px;
+    transition: transform .25s, border-color .25s;
+  }
+
+  [data-theme="dark"] .toggle-thumb { transform: translateX(19px); }
+
+  /* ------------------------------------------------------------------ */
+  /* Color Palette                                                      */
+  /* ------------------------------------------------------------------ */
+  .palette {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 12px;
+  }
+
+  .swatch {
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    text-align: center;
+  }
+
+  .swatch-color {
+    height: 52px;
+    border-bottom: 1px dashed var(--border);
+  }
+
+  .swatch-info {
+    padding: 6px 4px;
+    font-size: 10px;
+    line-height: 1.4;
+    letter-spacing: 0.04em;
+  }
+
+  .swatch-hex { font-weight: 600; }
+  .swatch-label { color: var(--text-muted); text-transform: uppercase; font-size: 9px; letter-spacing: 0.1em; }
+
+  /* ------------------------------------------------------------------ */
+  /* Typography                                                         */
+  /* ------------------------------------------------------------------ */
+  .type-sample {
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    background: var(--bg-surface);
+    display: flex; flex-direction: column; gap: 16px;
+  }
+
+  .type-row {
+    display: flex; align-items: baseline; gap: 16px;
+    border-bottom: 1px dashed var(--border);
+    padding-bottom: 12px;
+  }
+  .type-row:last-child { border-bottom: none; padding-bottom: 0; }
+
+  .type-meta {
+    flex-shrink: 0; width: 140px;
+    font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* SVG Canvas                                                         */
+  /* ------------------------------------------------------------------ */
+  .canvas-wrap {
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--bg-surface);
+  }
+
+  .canvas-wrap svg { display: block; width: 100%; height: auto; }
+
+  /* ------------------------------------------------------------------ */
+  /* Element Gallery                                                    */
+  /* ------------------------------------------------------------------ */
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 14px;
+  }
+
+  .gallery-card {
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 12px;
+    text-align: center;
+    background: var(--bg-surface);
+    transition: border-color .2s;
+  }
+  .gallery-card:hover { border-color: var(--color-command); }
+
+  .gallery-card svg { display: block; margin: 0 auto 10px; }
+
+  .gallery-card .label {
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 4px;
+  }
+
+  .gallery-card .desc {
+    font-size: 10px; color: var(--text-muted); line-height: 1.45;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Code Block                                                         */
+  /* ------------------------------------------------------------------ */
+  .code-block {
+    background: var(--code-bg);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    overflow-x: auto;
+    font-size: 11px;
+    line-height: 1.65;
+    color: var(--text);
+  }
+
+  .code-block code { font-family: var(--font); }
+  .code-comment { color: var(--text-muted); }
+  .code-prop { color: var(--color-command); }
+  .code-val { color: var(--color-event); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ================================================================ -->
+  <!-- 1. HEADER                                                        -->
+  <!-- ================================================================ -->
+  <header class="header">
+    <div class="header-left">
+      <div class="subtitle">Design Proposal #7</div>
+      <h1>Blueprint</h1>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:2px;">Technical drawing aesthetic &mdash; line art, monospace, precision</p>
+    </div>
+    <div class="toggle" onclick="toggleTheme()" title="Toggle light / dark">
+      <span>Light</span>
+      <div class="toggle-track"><div class="toggle-thumb"></div></div>
+      <span>Dark</span>
+    </div>
+  </header>
+
+  <!-- ================================================================ -->
+  <!-- 2. COLOR PALETTE                                                 -->
+  <!-- ================================================================ -->
+  <h2>Color Palette</h2>
+  <div class="palette">
+    <div class="swatch"><div class="swatch-color" style="background:#4DC9F6"></div><div class="swatch-info"><div class="swatch-hex">#4DC9F6</div><div class="swatch-label">Command</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#F7E652"></div><div class="swatch-info"><div class="swatch-hex">#F7E652</div><div class="swatch-label">Event</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#51E898"></div><div class="swatch-info"><div class="swatch-hex">#51E898</div><div class="swatch-label">View</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#8CA0B3"></div><div class="swatch-info"><div class="swatch-hex">#8CA0B3</div><div class="swatch-label">Trigger</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#FF6B6B"></div><div class="swatch-info"><div class="swatch-hex">#FF6B6B</div><div class="swatch-label">Exception</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#B68FFF"></div><div class="swatch-info"><div class="swatch-hex">#B68FFF</div><div class="swatch-label">Automation</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#1B3A5C"></div><div class="swatch-info"><div class="swatch-hex">#1B3A5C</div><div class="swatch-label">BG Dark</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#213F62"></div><div class="swatch-info"><div class="swatch-hex">#213F62</div><div class="swatch-label">Surface Dark</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#2A4F73"></div><div class="swatch-info"><div class="swatch-hex">#2A4F73</div><div class="swatch-label">Grid Line</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#E0F0FF"></div><div class="swatch-info"><div class="swatch-hex">#E0F0FF</div><div class="swatch-label">Text Dark</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#F0F4F8;border:1px solid #B0C0D0"></div><div class="swatch-info"><div class="swatch-hex">#F0F4F8</div><div class="swatch-label">BG Light</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#3A6A90"></div><div class="swatch-info"><div class="swatch-hex">#3A6A90</div><div class="swatch-label">Border</div></div></div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- 3. TYPOGRAPHY                                                    -->
+  <!-- ================================================================ -->
+  <h2>Typography</h2>
+  <div class="type-sample">
+    <div class="type-row">
+      <div class="type-meta">Heading 1<br>28px / 600</div>
+      <div style="font-size:28px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">Event Model Board</div>
+    </div>
+    <div class="type-row">
+      <div class="type-meta">Heading 2<br>16px / 600</div>
+      <div style="font-size:16px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">Swimlane: User Actions</div>
+    </div>
+    <div class="type-row">
+      <div class="type-meta">Body<br>14px / 400</div>
+      <div style="font-size:14px;">Slices define vertical units of work from trigger through command, event, and view.</div>
+    </div>
+    <div class="type-row">
+      <div class="type-meta">Label<br>11px / 600</div>
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.10em;">RegisterUser &middot; UserRegistered &middot; UserProfile</div>
+    </div>
+    <div class="type-row">
+      <div class="type-meta">Caption<br>10px / 400</div>
+      <div style="font-size:10px;color:var(--text-muted);letter-spacing:0.06em;">Line height: 1.6 &mdash; Letter spacing: 0.04em &mdash; Font: IBM Plex Mono</div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- 4. MOCK BOARD (SVG CANVAS)                                       -->
+  <!-- ================================================================ -->
+  <h2>Mock Board</h2>
+  <div class="canvas-wrap">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" style="background:var(--bg-surface);">
+      <defs>
+        <!-- Fine grid (20px) -->
+        <pattern id="gridFine" width="20" height="20" patternUnits="userSpaceOnUse">
+          <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--bg-grid)" stroke-width="0.5"/>
+        </pattern>
+        <!-- Major grid (100px = every 5 fine lines) -->
+        <pattern id="gridMajor" width="100" height="100" patternUnits="userSpaceOnUse">
+          <rect width="100" height="100" fill="url(#gridFine)"/>
+          <path d="M 100 0 L 0 0 0 100" fill="none" stroke="var(--bg-grid-major)" stroke-width="1"/>
+        </pattern>
+        <!-- Open triangle arrowhead -->
+        <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L10,4 L0,8" fill="none" stroke="var(--text-muted)" stroke-width="1"/>
+        </marker>
+        <marker id="arrowCyan" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L10,4 L0,8" fill="none" stroke="#4DC9F6" stroke-width="1"/>
+        </marker>
+        <marker id="arrowViolet" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L10,4 L0,8" fill="none" stroke="#B68FFF" stroke-width="1"/>
+        </marker>
+      </defs>
+
+      <!-- Grid background -->
+      <rect width="800" height="400" fill="url(#gridMajor)"/>
+
+      <!-- Swimlane dashed lines & labels -->
+      <line x1="0" y1="100" x2="800" y2="100" stroke="var(--text-muted)" stroke-width="0.75" stroke-dasharray="6,4"/>
+      <line x1="0" y1="220" x2="800" y2="220" stroke="var(--text-muted)" stroke-width="0.75" stroke-dasharray="6,4"/>
+      <line x1="0" y1="340" x2="800" y2="340" stroke="var(--text-muted)" stroke-width="0.75" stroke-dasharray="6,4"/>
+
+      <text x="12" y="60" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="600" fill="var(--text-muted)" letter-spacing="0.12em" text-anchor="start" transform="rotate(-90,12,60)">USER</text>
+      <text x="12" y="170" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="600" fill="var(--text-muted)" letter-spacing="0.12em" text-anchor="start" transform="rotate(-90,12,170)">SYSTEM</text>
+      <text x="12" y="290" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="600" fill="var(--text-muted)" letter-spacing="0.12em" text-anchor="start" transform="rotate(-90,12,290)">EXTERNAL</text>
+
+      <!-- ========== SLICE 1: USER REGISTRATION ========== -->
+      <!-- Slice label (dimension-line style) -->
+      <line x1="80" y1="18" x2="430" y2="18" stroke="var(--color-command)" stroke-width="0.75" stroke-dasharray="3,3"/>
+      <line x1="80" y1="14" x2="80" y2="22" stroke="var(--color-command)" stroke-width="0.75"/>
+      <line x1="430" y1="14" x2="430" y2="22" stroke="var(--color-command)" stroke-width="0.75"/>
+      <text x="255" y="14" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="600" fill="var(--color-command)" text-anchor="middle" letter-spacing="0.12em">SLICE 1: USER REGISTRATION</text>
+
+      <!-- Trigger: "SignupForm" in User lane -->
+      <rect x="80" y="45" width="90" height="40" rx="2" fill="none" stroke="#8CA0B3" stroke-width="1.5"/>
+      <text x="125" y="69" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="600" fill="#8CA0B3" text-anchor="middle">SignupForm</text>
+
+      <!-- Arrow: Trigger -> Command -->
+      <line x1="170" y1="65" x2="195" y2="65" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+
+      <!-- Command: "RegisterUser" in User/System boundary -->
+      <rect x="200" y="45" width="110" height="40" rx="2" fill="none" stroke="#4DC9F6" stroke-width="2"/>
+      <text x="255" y="69" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="600" fill="#4DC9F6" text-anchor="middle">RegisterUser</text>
+
+      <!-- Arrow: Command -> Event (drops down into System lane) -->
+      <polyline points="310,65 330,65 330,155" fill="none" stroke="#4DC9F6" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrowCyan)"/>
+
+      <!-- Event: "UserRegistered" in System lane -->
+      <rect x="295" y="130" width="130" height="40" rx="2" fill="none" stroke="#F7E652" stroke-width="2"/>
+      <text x="360" y="154" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="600" fill="#F7E652" text-anchor="middle">UserRegistered</text>
+
+      <!-- Arrow: Event -> View (goes back up to User lane) -->
+      <polyline points="360,130 360,115 420,115 420,55" fill="none" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+
+      <!-- View: "UserProfile" in User lane -->
+      <rect x="385" y="32" width="100" height="40" rx="2" fill="none" stroke="#51E898" stroke-width="1.5"/>
+      <text x="435" y="56" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="600" fill="#51E898" text-anchor="middle">UserProfile</text>
+
+      <!-- ========== SLICE 2: SEND WELCOME EMAIL ========== -->
+      <!-- Slice label -->
+      <line x1="460" y1="18" x2="740" y2="18" stroke="var(--color-automation)" stroke-width="0.75" stroke-dasharray="3,3"/>
+      <line x1="460" y1="14" x2="460" y2="22" stroke="var(--color-automation)" stroke-width="0.75"/>
+      <line x1="740" y1="14" x2="740" y2="22" stroke="var(--color-automation)" stroke-width="0.75"/>
+      <text x="600" y="14" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="600" fill="var(--color-automation)" text-anchor="middle" letter-spacing="0.12em">SLICE 2: SEND WELCOME EMAIL</text>
+
+      <!-- Automation: "OnUserRegistered" in System lane -->
+      <rect x="470" y="130" width="140" height="40" rx="2" fill="none" stroke="#B68FFF" stroke-width="2" stroke-dasharray="6,3"/>
+      <text x="540" y="154" font-family="'IBM Plex Mono',monospace" font-size="8" font-weight="600" fill="#B68FFF" text-anchor="middle">OnUserRegistered</text>
+
+      <!-- Dashed link from UserRegistered event to Automation -->
+      <line x1="425" y1="150" x2="465" y2="150" stroke="var(--text-muted)" stroke-width="0.75" stroke-dasharray="3,2" marker-end="url(#arrow)"/>
+
+      <!-- Arrow: Automation -> Command -->
+      <polyline points="610,150 640,150 640,280" fill="none" stroke="#B68FFF" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrowViolet)"/>
+
+      <!-- Command: "SendWelcomeEmail" in External lane -->
+      <rect x="590" y="260" width="150" height="40" rx="2" fill="none" stroke="#4DC9F6" stroke-width="2"/>
+      <text x="665" y="284" font-family="'IBM Plex Mono',monospace" font-size="8" font-weight="600" fill="#4DC9F6" text-anchor="middle">SendWelcomeEmail</text>
+
+      <!-- Arrow: Command -> Event -->
+      <polyline points="665,300 665,325 540,325 540,310" fill="none" stroke="#4DC9F6" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrowCyan)"/>
+
+      <!-- Event: "WelcomeEmailSent" in External lane -->
+      <rect x="480" y="270" width="140" height="40" rx="2" fill="none" stroke="#F7E652" stroke-width="2"/>
+      <text x="550" y="294" font-family="'IBM Plex Mono',monospace" font-size="8" font-weight="600" fill="#F7E652" text-anchor="middle">WelcomeEmailSent</text>
+
+      <!-- ========== EXCEPTION ========== -->
+      <!-- Exception: "RegistrationFailed" in System lane, off to the side -->
+      <rect x="170" y="185" width="140" height="36" rx="2" fill="none" stroke="#FF6B6B" stroke-width="2"/>
+      <line x1="170" y1="185" x2="310" y2="221" stroke="#FF6B6B" stroke-width="0.75" opacity="0.4"/>
+      <line x1="310" y1="185" x2="170" y2="221" stroke="#FF6B6B" stroke-width="0.75" opacity="0.4"/>
+      <text x="240" y="207" font-family="'IBM Plex Mono',monospace" font-size="8" font-weight="600" fill="#FF6B6B" text-anchor="middle">RegistrationFailed</text>
+
+      <!-- Dashed link from Command to Exception -->
+      <polyline points="255,85 255,108 240,108 240,182" fill="none" stroke="#FF6B6B" stroke-width="0.75" stroke-dasharray="3,3"/>
+
+      <!-- Dimension annotation marks (bottom right corner decoration) -->
+      <line x1="760" y1="375" x2="790" y2="375" stroke="var(--text-muted)" stroke-width="0.5"/>
+      <line x1="760" y1="371" x2="760" y2="379" stroke="var(--text-muted)" stroke-width="0.5"/>
+      <line x1="790" y1="371" x2="790" y2="379" stroke="var(--text-muted)" stroke-width="0.5"/>
+      <text x="775" y="388" font-family="'IBM Plex Mono',monospace" font-size="7" fill="var(--text-muted)" text-anchor="middle">30px</text>
+
+      <!-- Scale indicator -->
+      <text x="790" y="396" font-family="'IBM Plex Mono',monospace" font-size="7" fill="var(--text-muted)" text-anchor="end">GRID: 20px</text>
+    </svg>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- 5. ELEMENT GALLERY                                               -->
+  <!-- ================================================================ -->
+  <h2>Element Gallery</h2>
+  <div class="gallery">
+    <!-- Command -->
+    <div class="gallery-card">
+      <svg width="80" height="44" viewBox="0 0 80 44"><rect x="1" y="1" width="78" height="42" rx="2" fill="none" stroke="#4DC9F6" stroke-width="2"/><text x="40" y="26" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="600" fill="#4DC9F6" text-anchor="middle">CMD</text></svg>
+      <div class="label" style="color:#4DC9F6;">Command</div>
+      <div class="desc">Intent to change state. Solid cyan border.</div>
+    </div>
+    <!-- Event -->
+    <div class="gallery-card">
+      <svg width="80" height="44" viewBox="0 0 80 44"><rect x="1" y="1" width="78" height="42" rx="2" fill="none" stroke="#F7E652" stroke-width="2"/><text x="40" y="26" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="600" fill="#F7E652" text-anchor="middle">EVT</text></svg>
+      <div class="label" style="color:#F7E652;">Event</div>
+      <div class="desc">Fact that occurred. Solid yellow border.</div>
+    </div>
+    <!-- View -->
+    <div class="gallery-card">
+      <svg width="80" height="44" viewBox="0 0 80 44"><rect x="1" y="1" width="78" height="42" rx="2" fill="none" stroke="#51E898" stroke-width="1.5"/><text x="40" y="26" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="600" fill="#51E898" text-anchor="middle">VIEW</text></svg>
+      <div class="label" style="color:#51E898;">View</div>
+      <div class="desc">Read model / projection. Green border.</div>
+    </div>
+    <!-- Trigger -->
+    <div class="gallery-card">
+      <svg width="80" height="44" viewBox="0 0 80 44"><rect x="1" y="1" width="78" height="42" rx="2" fill="none" stroke="#8CA0B3" stroke-width="1.5"/><text x="40" y="26" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="600" fill="#8CA0B3" text-anchor="middle">TRIG</text></svg>
+      <div class="label" style="color:#8CA0B3;">Trigger</div>
+      <div class="desc">UI or external input that initiates a flow.</div>
+    </div>
+    <!-- Exception -->
+    <div class="gallery-card">
+      <svg width="80" height="44" viewBox="0 0 80 44"><rect x="1" y="1" width="78" height="42" rx="2" fill="none" stroke="#FF6B6B" stroke-width="2"/><line x1="1" y1="1" x2="79" y2="43" stroke="#FF6B6B" stroke-width="0.75" opacity="0.4"/><line x1="79" y1="1" x2="1" y2="43" stroke="#FF6B6B" stroke-width="0.75" opacity="0.4"/><text x="40" y="26" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="600" fill="#FF6B6B" text-anchor="middle">ERR</text></svg>
+      <div class="label" style="color:#FF6B6B;">Exception</div>
+      <div class="desc">Error / failure path. Red border with X.</div>
+    </div>
+    <!-- Automation -->
+    <div class="gallery-card">
+      <svg width="80" height="44" viewBox="0 0 80 44"><rect x="1" y="1" width="78" height="42" rx="2" fill="none" stroke="#B68FFF" stroke-width="2" stroke-dasharray="6,3"/><text x="40" y="26" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="600" fill="#B68FFF" text-anchor="middle">AUTO</text></svg>
+      <div class="label" style="color:#B68FFF;">Automation</div>
+      <div class="desc">System-triggered process. Dashed violet border.</div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- 6. CSS VARIABLES CODE BLOCK                                      -->
+  <!-- ================================================================ -->
+  <h2>CSS Variables</h2>
+  <pre class="code-block"><code><span class="code-comment">/* --------------------------------------------------------- */</span>
+<span class="code-comment">/* Blueprint Design Tokens                                   */</span>
+<span class="code-comment">/* --------------------------------------------------------- */</span>
+
+<span class="code-comment">/* Light theme (default root) */</span>
+:root {
+  <span class="code-prop">--color-command</span>:    <span class="code-val">#4DC9F6</span>;
+  <span class="code-prop">--color-event</span>:      <span class="code-val">#F7E652</span>;
+  <span class="code-prop">--color-view</span>:       <span class="code-val">#51E898</span>;
+  <span class="code-prop">--color-trigger</span>:    <span class="code-val">#8CA0B3</span>;
+  <span class="code-prop">--color-exception</span>:  <span class="code-val">#FF6B6B</span>;
+  <span class="code-prop">--color-automation</span>: <span class="code-val">#B68FFF</span>;
+
+  <span class="code-prop">--bg</span>:              <span class="code-val">#F0F4F8</span>;
+  <span class="code-prop">--bg-surface</span>:      <span class="code-val">#FFFFFF</span>;
+  <span class="code-prop">--bg-grid</span>:         <span class="code-val">#D0D8E0</span>;
+  <span class="code-prop">--bg-grid-major</span>:   <span class="code-val">#B8C4D0</span>;
+  <span class="code-prop">--text</span>:            <span class="code-val">#1B3A5C</span>;
+  <span class="code-prop">--text-muted</span>:      <span class="code-val">#5A7A99</span>;
+  <span class="code-prop">--border</span>:          <span class="code-val">#B0C0D0</span>;
+  <span class="code-prop">--code-bg</span>:         <span class="code-val">#E4ECF2</span>;
+  <span class="code-prop">--radius</span>:          <span class="code-val">2px</span>;
+  <span class="code-prop">--font</span>:            <span class="code-val">'IBM Plex Mono', monospace</span>;
+}
+
+<span class="code-comment">/* Dark theme (blueprint blue) */</span>
+[data-theme="dark"] {
+  <span class="code-prop">--bg</span>:              <span class="code-val">#1B3A5C</span>;
+  <span class="code-prop">--bg-surface</span>:      <span class="code-val">#213F62</span>;
+  <span class="code-prop">--bg-grid</span>:         <span class="code-val">#2A4F73</span>;
+  <span class="code-prop">--bg-grid-major</span>:   <span class="code-val">#345D82</span>;
+  <span class="code-prop">--text</span>:            <span class="code-val">#E0F0FF</span>;
+  <span class="code-prop">--text-muted</span>:      <span class="code-val">#8CB8D8</span>;
+  <span class="code-prop">--border</span>:          <span class="code-val">#3A6A90</span>;
+  <span class="code-prop">--code-bg</span>:         <span class="code-val">#162F4A</span>;
+}</code></pre>
+
+</div><!-- .page -->
+
+<!-- ================================================================== -->
+<!-- Theme Toggle Script                                                -->
+<!-- ================================================================== -->
+<script>
+(function () {
+  var root = document.documentElement;
+  var saved = localStorage.getItem('blueprint-theme');
+  if (saved) {
+    root.setAttribute('data-theme', saved);
+  }
+  // default is dark (set in HTML attribute), so no else needed
+
+  window.toggleTheme = function () {
+    var current = root.getAttribute('data-theme');
+    var next = current === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    localStorage.setItem('blueprint-theme', next);
+  };
+})();
+</script>
+</body>
+</html>

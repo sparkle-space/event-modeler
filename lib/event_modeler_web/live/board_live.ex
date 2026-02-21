@@ -264,11 +264,11 @@ defmodule EventModelerWeb.BoardLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="min-h-screen bg-gray-50">
+    <div class="min-h-screen bg-[var(--color-bg)]">
       <div :if={assigns[:error]} class="max-w-4xl mx-auto px-4 py-6">
-        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p class="text-red-700">{@error}</p>
-          <.link navigate={~p"/boards"} class="text-blue-600 hover:underline mt-2 block">
+        <div class="bg-error/10 border border-error/20 rounded-[var(--radius-card)] p-4">
+          <p class="text-error">{@error}</p>
+          <.link navigate={~p"/boards"} class="text-primary hover:underline mt-2 block">
             Back to boards
           </.link>
         </div>
@@ -276,34 +276,38 @@ defmodule EventModelerWeb.BoardLive do
 
       <div :if={assigns[:svg_data]} class="h-screen flex flex-col">
         <%!-- Header --%>
-        <div class="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shrink-0">
+        <div class="bg-[var(--color-surface)] border-b border-[var(--color-border)] px-4 py-3 flex items-center justify-between shrink-0">
           <div class="flex items-center gap-4">
-            <.link navigate={~p"/boards"} class="text-gray-400 hover:text-gray-600">
+            <.link
+              navigate={~p"/boards"}
+              class="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+            >
               &larr; Boards
             </.link>
-            <h1 class="font-semibold text-gray-900">{@prd.title || "Untitled"}</h1>
+            <h1 class="font-semibold text-[var(--color-text-primary)]">{@prd.title || "Untitled"}</h1>
             <span
               :if={@prd.status}
-              class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600"
+              class="text-xs px-2.5 py-0.5 rounded-full font-medium bg-[var(--color-surface-alt)] text-[var(--color-text-secondary)]"
             >
               {@prd.status}
             </span>
-            <span :if={@dirty} class="text-xs text-amber-600 font-medium">Unsaved changes</span>
+            <span :if={@dirty} class="text-xs text-warning font-medium">Unsaved changes</span>
           </div>
           <div class="flex items-center gap-2">
-            <span :if={@prd.updated} class="text-xs text-gray-400">
+            <span :if={@prd.updated} class="text-xs text-[var(--color-text-secondary)]">
               Updated: {String.slice(@prd.updated || "", 0..18)}
             </span>
-            <p :if={@save_message} class="text-sm text-green-600">{@save_message}</p>
+            <p :if={@save_message} class="text-sm text-success">{@save_message}</p>
+            <Layouts.theme_toggle />
             <a
               href={~p"/boards/#{Base.url_encode64(@file_path, padding: false)}/export"}
-              class="bg-gray-100 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-200 border border-gray-300"
+              class="bg-[var(--color-surface-alt)] text-[var(--color-text-primary)] px-3 py-1.5 rounded-[var(--radius-element)] text-sm hover:opacity-80 transition-opacity border border-[var(--color-border)]"
             >
               Export
             </a>
             <button
               phx-click="save"
-              class="bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700"
+              class="bg-primary text-primary-content px-3 py-1.5 rounded-[var(--radius-element)] text-sm hover:opacity-90 transition-opacity"
             >
               Save
             </button>
@@ -313,10 +317,13 @@ defmodule EventModelerWeb.BoardLive do
         <%!-- Flash message --%>
         <div
           :if={@flash_message}
-          class="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center justify-between"
+          class="bg-warning/10 border-b border-warning/20 px-4 py-2 flex items-center justify-between"
         >
-          <p class="text-sm text-amber-700">{@flash_message}</p>
-          <button phx-click="dismiss_flash" class="text-amber-400 hover:text-amber-600 text-sm">
+          <p class="text-sm text-warning">{@flash_message}</p>
+          <button
+            phx-click="dismiss_flash"
+            class="text-warning/60 hover:text-warning text-sm transition-colors"
+          >
             Dismiss
           </button>
         </div>
@@ -324,45 +331,49 @@ defmodule EventModelerWeb.BoardLive do
         <%!-- Main content --%>
         <div class="flex-1 flex overflow-hidden">
           <%!-- Left sidebar: Element palette --%>
-          <div class="w-48 bg-white border-r border-gray-200 p-3 shrink-0 overflow-y-auto">
-            <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+          <div class="w-48 bg-[var(--color-surface)] border-r border-[var(--color-border)] p-3 shrink-0 overflow-y-auto">
+            <h2 class="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-2">
               Add Element
             </h2>
             <div class="space-y-1">
               <button
                 :for={
-                  {type, label, color} <- [
-                    {:event, "Event", "bg-orange-500"},
-                    {:command, "Command", "bg-blue-500"},
-                    {:view, "View", "bg-green-500"},
-                    {:trigger, "Wireframe", "bg-gray-400"},
-                    {:automation, "Automation", "bg-purple-500"}
+                  {type, label, color, shadow_var} <- [
+                    {:event, "Event", "bg-[#F97316]", "--shadow-event"},
+                    {:command, "Command", "bg-[#3B82F6]", "--shadow-command"},
+                    {:view, "View", "bg-[#22C55E]", "--shadow-view"},
+                    {:trigger, "Wireframe", "bg-[#9CA3AF]", "--shadow-trigger"},
+                    {:automation, "Automation", "bg-[#8B5CF6]", "--shadow-automation"}
                   ]
                 }
                 phx-click="select_palette"
                 phx-value-type={type}
                 class={[
-                  "w-full text-left px-3 py-2 rounded text-sm flex items-center gap-2",
+                  "w-full text-left px-3 py-2 rounded-[var(--radius-element)] text-sm flex items-center gap-2 transition-colors",
                   if(@palette_type == type,
-                    do: "bg-gray-100 ring-2 ring-blue-500",
-                    else: "hover:bg-gray-50"
+                    do: "bg-[var(--color-surface-alt)] ring-2 ring-primary",
+                    else: "hover:bg-[var(--color-surface-alt)]"
                   )
                 ]}
               >
-                <span class={"w-3 h-3 rounded-sm #{color}"}></span>
-                {label}
+                <span
+                  class={"w-3 h-3 rounded-sm #{color}"}
+                  style={"box-shadow: var(#{shadow_var})"}
+                >
+                </span>
+                <span class="text-[var(--color-text-primary)]">{label}</span>
               </button>
             </div>
 
             <button
               :if={@palette_type}
               phx-click="clear_palette"
-              class="mt-2 w-full text-xs text-gray-400 hover:text-gray-600"
+              class="mt-2 w-full text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
             >
               Cancel placement
             </button>
 
-            <div class="mt-6 text-xs text-gray-400 space-y-1">
+            <div class="mt-6 text-xs text-[var(--color-text-secondary)] space-y-1">
               <p>Click canvas to place</p>
               <p>Shift+click to connect</p>
               <p>Double-click to edit</p>
@@ -384,7 +395,7 @@ defmodule EventModelerWeb.BoardLive do
               width={@svg_data.width}
               height={@svg_data.height}
               class={[
-                "border border-gray-200 rounded bg-white",
+                "border border-[var(--color-border)] rounded-[var(--radius-card)] bg-[var(--color-surface)]",
                 if(@palette_type, do: "cursor-crosshair", else: "")
               ]}
               xmlns="http://www.w3.org/2000/svg"
@@ -506,33 +517,36 @@ defmodule EventModelerWeb.BoardLive do
           </div>
 
           <%!-- Right sidebar --%>
-          <div class="w-64 bg-white border-l border-gray-200 p-4 overflow-y-auto shrink-0">
+          <div class="w-64 bg-[var(--color-surface)] border-l border-[var(--color-border)] p-4 overflow-y-auto shrink-0">
             <%!-- Define Slice mode --%>
-            <div :if={@defining_slice} class="mb-4 bg-blue-50 border border-blue-200 rounded p-3">
-              <h3 class="text-xs font-semibold text-blue-700 mb-2">Define New Slice</h3>
+            <div
+              :if={@defining_slice}
+              class="mb-4 bg-primary/10 border border-primary/20 rounded-[var(--radius-element)] p-3"
+            >
+              <h3 class="text-xs font-semibold text-primary mb-2">Define New Slice</h3>
               <form phx-change="set_slice_name">
                 <input
                   type="text"
                   name="name"
                   placeholder="Slice name"
                   value={@new_slice_name}
-                  class="w-full text-sm border border-blue-300 rounded px-2 py-1 mb-2"
+                  class="w-full text-sm border border-primary/30 rounded-[8px] px-2 py-1 mb-2 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
                 />
               </form>
-              <p class="text-xs text-blue-600 mb-2">
+              <p class="text-xs text-primary/80 mb-2">
                 Click elements on the canvas to select them.
                 Selected: {length(@slice_selection)}
               </p>
               <div class="flex gap-2">
                 <button
                   phx-click="confirm_define_slice"
-                  class="flex-1 bg-blue-600 text-white px-2 py-1 rounded text-xs"
+                  class="flex-1 bg-primary text-primary-content px-2 py-1 rounded-[8px] text-xs"
                 >
                   Create
                 </button>
                 <button
                   phx-click="cancel_define_slice"
-                  class="flex-1 bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs"
+                  class="flex-1 bg-[var(--color-surface-alt)] text-[var(--color-text-primary)] px-2 py-1 rounded-[8px] text-xs"
                 >
                   Cancel
                 </button>
@@ -541,17 +555,19 @@ defmodule EventModelerWeb.BoardLive do
 
             <%!-- Slices list --%>
             <div class="flex items-center justify-between mb-3">
-              <h2 class="text-sm font-semibold text-gray-700">Slices</h2>
+              <h2 class="text-sm font-semibold text-[var(--color-text-primary)]">Slices</h2>
               <button
                 :if={!@defining_slice}
                 phx-click="start_define_slice"
-                class="text-xs text-blue-600 hover:text-blue-800"
+                class="text-xs text-primary hover:text-primary/80 transition-colors"
               >
                 + Define
               </button>
             </div>
 
-            <div :if={@slice_names == []} class="text-sm text-gray-400 mb-4">No slices defined.</div>
+            <div :if={@slice_names == []} class="text-sm text-[var(--color-text-secondary)] mb-4">
+              No slices defined.
+            </div>
 
             <ul class="space-y-1 mb-4">
               <li
@@ -559,14 +575,14 @@ defmodule EventModelerWeb.BoardLive do
                 phx-click="select_slice"
                 phx-value-name={name}
                 class={[
-                  "text-sm text-gray-600 flex items-center gap-2 px-2 py-1 rounded cursor-pointer",
+                  "text-sm text-[var(--color-text-primary)] flex items-center gap-2 px-2 py-1 rounded-[8px] cursor-pointer transition-colors",
                   if(@selected_slice == name,
-                    do: "bg-blue-50 ring-1 ring-blue-200",
-                    else: "hover:bg-gray-50"
+                    do: "bg-primary/10 ring-1 ring-primary/20",
+                    else: "hover:bg-[var(--color-surface-alt)]"
                   )
                 ]}
               >
-                <span class="w-2 h-2 bg-blue-500 rounded-full shrink-0"></span>
+                <span class="w-2 h-2 bg-primary rounded-full shrink-0"></span>
                 <span class="truncate">{name}</span>
               </li>
             </ul>
@@ -574,41 +590,48 @@ defmodule EventModelerWeb.BoardLive do
             <%!-- Selected slice details --%>
             <div :if={@selected_slice} class="mb-4">
               <% slice = Enum.find(@slices, &(&1.name == @selected_slice)) %>
-              <div :if={slice} class="bg-gray-50 rounded p-3">
+              <div
+                :if={slice}
+                class="bg-[var(--color-surface-alt)] rounded-[var(--radius-element)] p-3"
+              >
                 <div class="flex items-center justify-between mb-2">
-                  <h3 class="text-xs font-semibold text-gray-700">{slice.name}</h3>
-                  <span class="text-xs text-gray-400">{length(slice.steps)} elements</span>
+                  <h3 class="text-xs font-semibold text-[var(--color-text-primary)]">{slice.name}</h3>
+                  <span class="text-xs text-[var(--color-text-secondary)]">
+                    {length(slice.steps)} elements
+                  </span>
                 </div>
 
                 <button
                   phx-click="generate_scenarios"
                   phx-value-slice={slice.name}
-                  class="w-full bg-green-600 text-white px-2 py-1 rounded text-xs mb-2 hover:bg-green-700"
+                  class="w-full bg-success text-success-content px-2 py-1 rounded-[8px] text-xs mb-2 hover:opacity-90 transition-opacity"
                 >
                   Generate Scenarios
                 </button>
 
                 <%!-- Scenarios list --%>
                 <div :if={slice.tests != nil and slice.tests != []}>
-                  <h4 class="text-xs font-semibold text-gray-500 mb-1">Scenarios</h4>
+                  <h4 class="text-xs font-semibold text-[var(--color-text-secondary)] mb-1">
+                    Scenarios
+                  </h4>
                   <div
                     :for={scenario <- slice.tests}
-                    class="text-xs bg-white rounded p-2 mb-1 border border-gray-200"
+                    class="text-xs bg-[var(--color-surface)] rounded-[8px] p-2 mb-1 border border-[var(--color-border)]"
                   >
-                    <p class="font-medium text-gray-700">{scenario.name}</p>
+                    <p class="font-medium text-[var(--color-text-primary)]">{scenario.name}</p>
                     <div :if={scenario.given != []} class="mt-1">
-                      <span class="text-gray-400">Given:</span>
-                      <span :for={g <- scenario.given} class="ml-1 text-orange-600">{g.label}</span>
+                      <span class="text-[var(--color-text-secondary)]">Given:</span>
+                      <span :for={g <- scenario.given} class="ml-1 text-warning">{g.label}</span>
                     </div>
                     <div class="mt-0.5">
-                      <span class="text-gray-400">When:</span>
-                      <span :for={w <- scenario.when_clause} class="ml-1 text-blue-600">
+                      <span class="text-[var(--color-text-secondary)]">When:</span>
+                      <span :for={w <- scenario.when_clause} class="ml-1 text-info">
                         {w.label}
                       </span>
                     </div>
                     <div :if={scenario.then_clause != []} class="mt-0.5">
-                      <span class="text-gray-400">Then:</span>
-                      <span :for={t <- scenario.then_clause} class="ml-1 text-green-600">
+                      <span class="text-[var(--color-text-secondary)]">Then:</span>
+                      <span :for={t <- scenario.then_clause} class="ml-1 text-success">
                         {t.label}
                       </span>
                     </div>
@@ -616,25 +639,30 @@ defmodule EventModelerWeb.BoardLive do
                 </div>
 
                 <div :if={slice.tests == nil or slice.tests == []}>
-                  <p class="text-xs text-gray-400 italic">No scenarios yet.</p>
+                  <p class="text-xs text-[var(--color-text-secondary)] italic">No scenarios yet.</p>
                 </div>
               </div>
             </div>
 
             <%!-- Inline label editor --%>
-            <div :if={@editing_element} class="mt-4 bg-gray-50 rounded p-3">
-              <h3 class="text-xs font-semibold text-gray-500 mb-2">Edit Label</h3>
+            <div
+              :if={@editing_element}
+              class="mt-4 bg-[var(--color-surface-alt)] rounded-[var(--radius-element)] p-3"
+            >
+              <h3 class="text-xs font-semibold text-[var(--color-text-secondary)] mb-2">
+                Edit Label
+              </h3>
               <form phx-submit="edit_label">
                 <input type="hidden" name="element_id" value={@editing_element} />
                 <input
                   type="text"
                   name="label"
-                  class="w-full text-sm border border-gray-300 rounded px-2 py-1"
+                  class="w-full text-sm border border-[var(--color-border)] rounded-[8px] px-2 py-1 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
                   autofocus
                 />
                 <button
                   type="submit"
-                  class="mt-2 w-full bg-blue-600 text-white px-2 py-1 rounded text-sm"
+                  class="mt-2 w-full bg-primary text-primary-content px-2 py-1 rounded-[8px] text-sm"
                 >
                   Update
                 </button>
@@ -642,8 +670,10 @@ defmodule EventModelerWeb.BoardLive do
             </div>
 
             <div :if={@prd.overview} class="mt-6">
-              <h2 class="text-sm font-semibold text-gray-700 mb-2">Overview</h2>
-              <p class="text-xs text-gray-500">{String.slice(@prd.overview || "", 0..200)}</p>
+              <h2 class="text-sm font-semibold text-[var(--color-text-primary)] mb-2">Overview</h2>
+              <p class="text-xs text-[var(--color-text-secondary)]">
+                {String.slice(@prd.overview || "", 0..200)}
+              </p>
             </div>
           </div>
         </div>
