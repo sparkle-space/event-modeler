@@ -1,0 +1,69 @@
+name: Setup Branch Protection
+
+on:
+  workflow_dispatch:
+    inputs:
+      require_up_to_date:
+        description: "Require branches to be up to date before merging"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+env:
+  RULESET_NAME: Protect main
+
+jobs:
+  configure:
+    name: Configure Branch Ruleset
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create or update ruleset
+        env:
+          GH_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          REQUIRE_UP_TO_DATE: ${{ inputs.require_up_to_date }}
+          REPO: ${{ github.repository }}
+        run: |
+          RULESET_JSON=$(jq -n \
+            --arg name "$RULESET_NAME" \
+            --argjson up_to_date "$REQUIRE_UP_TO_DATE" \
+            '{
+              name: $name,
+              target: "branch",
+              enforcement: "active",
+              conditions: {
+                ref_name: {
+                  include: ["refs/heads/main"],
+                  exclude: []
+                }
+              },
+              rules: [
+                { type: "deletion" },
+                { type: "non_fast_forward" },
+                {
+                  type: "required_status_checks",
+                  parameters: {
+                    strict_required_status_checks_policy: $up_to_date,
+                    required_status_checks: [
+                      { context: "Compile" },
+                      { context: "Format" },
+                      { context: "Unused Deps" },
+                      { context: "Test" }
+                    ]
+                  }
+                }
+              ]
+            }')
+
+          EXISTING_ID=$(gh api "repos/${REPO}/rulesets" --jq ".[] | select(.name == \"${RULESET_NAME}\") | .id" 2>/dev/null || true)
+
+          if [ -n "$EXISTING_ID" ]; then
+            echo "Updating existing ruleset (ID: $EXISTING_ID)"
+            echo "$RULESET_JSON" | gh api "repos/${REPO}/rulesets/${EXISTING_ID}" --method PUT --input -
+          else
+            echo "Creating new ruleset"
+            echo "$RULESET_JSON" | gh api "repos/${REPO}/rulesets" --method POST --input -
+          fi
