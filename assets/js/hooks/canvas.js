@@ -2,171 +2,120 @@
  * EventModelerCanvas hook - handles canvas interactions
  *
  * Provides:
- * - Pan: mousedown+mousemove on background -> viewBox transform
- * - Zoom: wheel -> viewBox scale
- * - Drag: mousedown on element -> track -> pushEvent on mouseup
- * - Select: click element -> pushEvent
+ * - Pan: mousedown+mousemove on background -> CSS transform translate
+ * - Zoom: wheel -> CSS transform scale (cursor-centered)
+ * - Select: click element -> pushEvent (handled by phx-click)
  * - Connect: shift+click source, shift+click target -> pushEvent
+ * - Delete: Delete/Backspace -> pushEvent for selected element
  */
 const EventModelerCanvas = {
   mounted() {
-    this.svg = this.el
-    this.isPanning = false
-    this.isDragging = false
-    this.panStart = null
-    this.dragTarget = null
-    this.dragStartPos = null
-    this.connectSource = null
-    this.scale = 1
+    this.viewport = this.el
+    this.world = this.el.querySelector("#canvas-world")
+
     this.translateX = 0
     this.translateY = 0
+    this.scale = 1
 
-    // Parse initial viewBox
-    const vb = this.svg.getAttribute("viewBox").split(" ").map(Number)
-    this.viewBox = { x: vb[0], y: vb[1], w: vb[2], h: vb[3] }
+    this.isPanning = false
+    this.panStart = null
+    this.connectSource = null
 
-    this.svg.addEventListener("mousedown", (e) => this.handleMouseDown(e))
-    this.svg.addEventListener("mousemove", (e) => this.handleMouseMove(e))
-    this.svg.addEventListener("mouseup", (e) => this.handleMouseUp(e))
-    this.svg.addEventListener("wheel", (e) => this.handleWheel(e), { passive: false })
-    this.svg.addEventListener("dblclick", (e) => this.handleDblClick(e))
+    this.viewport.addEventListener("mousedown", (e) => this.onMouseDown(e))
+    this.viewport.addEventListener("mousemove", (e) => this.onMouseMove(e))
+    this.viewport.addEventListener("mouseup", () => this.onMouseUp())
+    this.viewport.addEventListener("wheel", (e) => this.onWheel(e), {
+      passive: false,
+    })
+
+    // Double-click on element to edit label
+    this.viewport.addEventListener("dblclick", (e) => {
+      const elem = e.target.closest("[data-element-id]")
+      if (elem) {
+        this.pushEvent("element_dblclick", {
+          element_id: elem.dataset.elementId,
+        })
+      }
+    })
 
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Delete" || e.key === "Backspace") {
-        this.handleDelete(e)
+      if (
+        (e.key === "Delete" || e.key === "Backspace") &&
+        e.target.tagName !== "INPUT" &&
+        e.target.tagName !== "TEXTAREA"
+      ) {
+        this.handleDelete()
       }
     })
   },
 
-  handleMouseDown(e) {
-    const element = e.target.closest("[data-element-id]")
+  applyTransform() {
+    this.world.style.transform = `translate(${this.translateX}px, ${this.translateY}px) scale(${this.scale})`
+  },
 
-    if (element) {
-      if (e.shiftKey) {
-        // Connection mode
-        const elementId = element.dataset.elementId
-        if (this.connectSource) {
-          // Second click - complete connection
-          this.pushEvent("connect_elements", {
-            from_id: this.connectSource,
-            to_id: elementId
-          })
-          this.connectSource = null
-        } else {
-          // First click - start connection
-          this.connectSource = elementId
-        }
-      } else {
-        // Drag mode
-        this.isDragging = true
-        this.dragTarget = element
-        this.dragStartPos = this.getSVGPoint(e)
+  onMouseDown(e) {
+    const elem = e.target.closest("[data-element-id]")
+
+    if (elem && e.shiftKey) {
+      // Connection mode
+      const id = elem.dataset.elementId
+      if (this.connectSource) {
+        this.pushEvent("connect_elements", {
+          from_id: this.connectSource,
+          to_id: id,
+        })
         this.connectSource = null
+      } else {
+        this.connectSource = id
       }
-    } else {
+    } else if (!elem) {
       // Pan mode
       this.isPanning = true
       this.panStart = { x: e.clientX, y: e.clientY }
       this.connectSource = null
+      this.viewport.style.cursor = "grabbing"
     }
   },
 
-  handleMouseMove(e) {
-    if (this.isPanning && this.panStart) {
-      const dx = (e.clientX - this.panStart.x) / this.scale
-      const dy = (e.clientY - this.panStart.y) / this.scale
-      this.viewBox.x -= dx
-      this.viewBox.y -= dy
-      this.updateViewBox()
-      this.panStart = { x: e.clientX, y: e.clientY }
-    }
+  onMouseMove(e) {
+    if (!this.isPanning || !this.panStart) return
 
-    if (this.isDragging && this.dragTarget) {
-      const pos = this.getSVGPoint(e)
-      const dx = pos.x - this.dragStartPos.x
-      const dy = pos.y - this.dragStartPos.y
+    this.translateX += e.clientX - this.panStart.x
+    this.translateY += e.clientY - this.panStart.y
+    this.panStart = { x: e.clientX, y: e.clientY }
+    this.applyTransform()
+  },
 
-      // Move the element group visually
-      const group = this.dragTarget.closest("g")
-      if (group) {
-        const currentTransform = group.getAttribute("transform") || ""
-        const match = currentTransform.match(/translate\(([-\d.]+),\s*([-\d.]+)\)/)
-        const cx = match ? parseFloat(match[1]) : 0
-        const cy = match ? parseFloat(match[2]) : 0
-        group.setAttribute("transform", `translate(${cx + dx}, ${cy + dy})`)
-      }
-
-      this.dragStartPos = pos
+  onMouseUp() {
+    if (this.isPanning) {
+      this.isPanning = false
+      this.panStart = null
+      this.viewport.style.cursor = ""
     }
   },
 
-  handleMouseUp(e) {
-    if (this.isDragging && this.dragTarget) {
-      const elementId = this.dragTarget.dataset.elementId
-      const pos = this.getSVGPoint(e)
-      if (elementId) {
-        this.pushEvent("move_element", {
-          element_id: elementId,
-          x: Math.round(pos.x),
-          y: Math.round(pos.y)
-        })
-      }
-    }
-
-    this.isPanning = false
-    this.isDragging = false
-    this.dragTarget = null
-    this.panStart = null
-  },
-
-  handleWheel(e) {
+  onWheel(e) {
     e.preventDefault()
-    const scaleFactor = e.deltaY > 0 ? 1.1 : 0.9
-    const point = this.getSVGPoint(e)
+    const factor = e.deltaY > 0 ? 0.9 : 1.1
+    const rect = this.viewport.getBoundingClientRect()
 
-    this.viewBox.x = point.x - (point.x - this.viewBox.x) * scaleFactor
-    this.viewBox.y = point.y - (point.y - this.viewBox.y) * scaleFactor
-    this.viewBox.w *= scaleFactor
-    this.viewBox.h *= scaleFactor
-    this.scale /= scaleFactor
-
-    this.updateViewBox()
+    // Zoom toward the cursor position
+    const px = e.clientX - rect.left
+    const py = e.clientY - rect.top
+    this.translateX = px - factor * (px - this.translateX)
+    this.translateY = py - factor * (py - this.translateY)
+    this.scale *= factor
+    this.applyTransform()
   },
 
-  handleDblClick(e) {
-    const element = e.target.closest("[data-element-id]")
-    if (element) {
-      this.pushEvent("element_dblclick", {
-        element_id: element.dataset.elementId
+  handleDelete() {
+    const selected = this.viewport.querySelector("[data-selected='true']")
+    if (selected) {
+      this.pushEvent("remove_element", {
+        element_id: selected.dataset.elementId,
       })
     }
   },
-
-  handleDelete(e) {
-    // Only handle if not in an input/textarea
-    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return
-
-    const selected = this.svg.querySelector("[data-selected='true']")
-    if (selected) {
-      const elementId = selected.dataset.elementId
-      if (elementId) {
-        this.pushEvent("remove_element", { element_id: elementId })
-      }
-    }
-  },
-
-  getSVGPoint(e) {
-    const pt = this.svg.createSVGPoint()
-    pt.x = e.clientX
-    pt.y = e.clientY
-    return pt.matrixTransform(this.svg.getScreenCTM().inverse())
-  },
-
-  updateViewBox() {
-    this.svg.setAttribute("viewBox",
-      `${this.viewBox.x} ${this.viewBox.y} ${this.viewBox.w} ${this.viewBox.h}`
-    )
-  }
 }
 
 export default EventModelerCanvas

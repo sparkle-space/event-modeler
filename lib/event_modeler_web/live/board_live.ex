@@ -16,7 +16,7 @@ defmodule EventModelerWeb.BoardLive do
                    page_title: state.prd.title || "Board",
                    file_path: file_path,
                    prd: state.prd,
-                   svg_data: state.svg_data,
+                   canvas_data: state.canvas_data,
                    dirty: state.dirty,
                    slice_names: Enum.map(state.prd.slices, & &1.name),
                    slices: state.prd.slices,
@@ -242,7 +242,7 @@ defmodule EventModelerWeb.BoardLive do
       {:ok, state} ->
         assign(socket,
           prd: state.prd,
-          svg_data: state.svg_data,
+          canvas_data: state.canvas_data,
           dirty: state.dirty,
           slice_names: Enum.map(state.prd.slices, & &1.name),
           slices: state.prd.slices
@@ -274,7 +274,7 @@ defmodule EventModelerWeb.BoardLive do
         </div>
       </div>
 
-      <div :if={assigns[:svg_data]} class="h-screen flex flex-col">
+      <div :if={assigns[:canvas_data]} class="h-screen flex flex-col">
         <%!-- Header --%>
         <div class="bg-[var(--color-surface)] border-b border-[var(--color-border)] px-4 py-3 flex items-center justify-between shrink-0">
           <div class="flex items-center gap-4">
@@ -381,139 +381,95 @@ defmodule EventModelerWeb.BoardLive do
             </div>
           </div>
 
-          <%!-- SVG Canvas --%>
+          <%!-- HTML Canvas --%>
           <div
-            class="flex-1 overflow-auto p-4"
+            id="canvas-viewport"
+            class={[
+              "flex-1 overflow-hidden relative select-none bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-card)]",
+              if(@palette_type, do: "cursor-crosshair", else: "cursor-grab")
+            ]}
+            phx-hook="EventModelerCanvas"
             phx-click={if(@palette_type, do: "place_element")}
             phx-value-x="100"
             phx-value-y="100"
           >
-            <svg
-              id="event-modeler-canvas"
-              phx-hook="EventModelerCanvas"
-              viewBox={@svg_data.viewbox}
-              width={@svg_data.width}
-              height={@svg_data.height}
-              class={[
-                "border border-[var(--color-border)] rounded-[var(--radius-card)] bg-[var(--color-surface)]",
-                if(@palette_type, do: "cursor-crosshair", else: "")
-              ]}
-              xmlns="http://www.w3.org/2000/svg"
+            <div
+              id="canvas-world"
+              style={"width: #{@canvas_data.canvas_width}px; height: #{@canvas_data.canvas_height}px; position: relative; transform-origin: 0 0;"}
             >
-              <defs>
-                <marker
-                  id="arrowhead"
-                  markerWidth="10"
-                  markerHeight="7"
-                  refX="10"
-                  refY="3.5"
-                  orient="auto"
-                >
-                  <polygon points="0 0, 10 3.5, 0 7" fill="#6B7280" />
-                </marker>
-              </defs>
-
-              <%!-- Swimlane backgrounds --%>
-              <rect
-                :for={sl <- @svg_data.swimlanes}
-                x="0"
-                y={sl.y}
-                width={sl.width}
-                height={sl.height}
-                fill="#F9FAFB"
-                stroke="#E5E7EB"
-                stroke-width="1"
-              />
-
-              <%!-- Swimlane labels --%>
-              <text
-                :for={sl <- @svg_data.swimlanes}
-                x="10"
-                y={sl.y + div(sl.height, 2) + 4}
-                font-size="12"
-                font-weight="600"
-                fill="#6B7280"
+              <%!-- Swimlane bands --%>
+              <div
+                :for={sl <- @canvas_data.swimlanes}
+                style={"position: absolute; left: 0; top: #{sl.y}px; width: #{sl.width}px; height: #{sl.height}px;"}
+                class="bg-[var(--swimlane-bg)] border-y border-[var(--swimlane-border)]"
               >
-                {sl.name}
-              </text>
+                <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-[var(--color-text-secondary)]">
+                  {sl.name}
+                </span>
+              </div>
 
-              <%!-- Connection arrows --%>
-              <path
-                :for={conn <- @svg_data.connections}
-                d={conn.path}
-                fill="none"
-                stroke="#9CA3AF"
-                stroke-width="2"
-                marker-end="url(#arrowhead)"
-              />
+              <%!-- Connection SVG overlay --%>
+              <svg
+                style={"position: absolute; top: 0; left: 0; width: #{@canvas_data.canvas_width}px; height: #{@canvas_data.canvas_height}px; pointer-events: none; overflow: visible;"}
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <defs>
+                  <marker
+                    id="arrowhead"
+                    markerWidth="10"
+                    markerHeight="7"
+                    refX="10"
+                    refY="3.5"
+                    orient="auto"
+                  >
+                    <polygon points="0 0, 10 3.5, 0 7" fill="var(--color-connection)" />
+                  </marker>
+                </defs>
+                <path
+                  :for={conn <- @canvas_data.connections}
+                  d={conn.path}
+                  fill="none"
+                  stroke="var(--color-connection)"
+                  stroke-width="2"
+                  marker-end="url(#arrowhead)"
+                />
+              </svg>
 
-              <%!-- Elements --%>
-              <g
-                :for={elem <- @svg_data.elements}
+              <%!-- Element divs --%>
+              <div
+                :for={elem <- @canvas_data.elements}
+                id={"elem-#{elem.id}"}
                 data-element-id={elem.id}
                 data-selected={to_string(@selected_element == elem.id)}
                 phx-click="element_selected"
                 phx-value-element_id={elem.id}
-                class="cursor-pointer"
+                style={"position: absolute; left: #{elem.x}px; top: #{elem.y}px; width: #{elem.width}px; height: #{elem.height}px;"}
+                class={[
+                  "rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all select-none",
+                  elem.bg_class,
+                  elem.text_class,
+                  if(@selected_element == elem.id,
+                    do: "ring-3 ring-offset-1 " <> elem.ring_class,
+                    else: ""
+                  ),
+                  if(elem.id in @slice_selection, do: "ring-dashed-selection", else: "")
+                ]}
               >
-                <rect
-                  x={elem.x}
-                  y={elem.y}
-                  width={elem.width}
-                  height={elem.height}
-                  rx={elem.rx}
-                  fill={elem.fill}
-                  stroke={
-                    cond do
-                      elem.id in @slice_selection -> "#7C3AED"
-                      @selected_element == elem.id -> "#1D4ED8"
-                      true -> elem.stroke
-                    end
-                  }
-                  stroke-width={
-                    cond do
-                      elem.id in @slice_selection -> "3"
-                      @selected_element == elem.id -> "3"
-                      true -> "2"
-                    end
-                  }
-                  stroke-dasharray={if(elem.id in @slice_selection, do: "6 3", else: nil)}
-                />
-                <text
-                  x={elem.x + div(elem.width, 2)}
-                  y={elem.y + div(elem.height, 2) - 4}
-                  text-anchor="middle"
-                  font-size="12"
-                  font-weight="600"
-                  fill={elem.text_color}
-                >
+                <span class="text-xs font-semibold px-2 text-center leading-tight">
                   {elem.label}
-                </text>
-                <text
-                  x={elem.x + div(elem.width, 2)}
-                  y={elem.y + div(elem.height, 2) + 12}
-                  text-anchor="middle"
-                  font-size="10"
-                  fill={elem.text_color}
-                  opacity="0.8"
-                >
-                  {type_label(elem.type)}
-                </text>
-              </g>
+                </span>
+                <span class="text-[10px] opacity-75 mt-0.5">{type_label(elem.type)}</span>
+              </div>
 
               <%!-- Slice labels --%>
-              <text
-                :for={sl <- @svg_data.slice_labels}
-                x={sl.x + div(sl.width, 2)}
-                y="20"
-                text-anchor="middle"
-                font-size="11"
-                font-weight="500"
-                fill="#6B7280"
+              <div
+                :for={sl <- @canvas_data.slice_labels}
+                style={"position: absolute; left: #{sl.x}px; top: 4px; width: #{sl.width}px;"}
+                class="text-center text-[11px] font-medium text-[var(--color-text-secondary)] pointer-events-none"
               >
                 {sl.name}
-              </text>
-            </svg>
+              </div>
+            </div>
           </div>
 
           <%!-- Right sidebar --%>
