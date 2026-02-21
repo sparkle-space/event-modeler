@@ -11,8 +11,8 @@ defmodule EventModeler.Application do
       EventModelerWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:event_modeler, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: EventModeler.PubSub},
-      # Start a worker by calling: EventModeler.Worker.start_link(arg)
-      # {EventModeler.Worker, arg},
+      {Registry, keys: :unique, name: EventModeler.Board.Registry},
+      {DynamicSupervisor, name: EventModeler.Board.Supervisor, strategy: :one_for_one},
       # Start to serve requests, typically the last entry
       EventModelerWeb.Endpoint
     ]

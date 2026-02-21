@@ -19,6 +19,8 @@ defmodule EventModelerWeb.Router do
 
     get "/", PageController, :home
     live "/visualize", VisualizeLive
+    live "/boards", BoardsLive
+    live "/boards/:path", BoardLive
   end
 
   # Other scopes may use custom stacks.
