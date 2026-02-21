@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Midnight Studio - EventModeler Design Proposal #2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  /* ============================================
+     CSS Custom Properties - Light Theme (root)
+     ============================================ */
+  :root {
+    --color-bg: #F5F3F0;
+    --color-surface: #FFFFFF;
+    --color-surface-raised: #FAFAF8;
+    --color-border: #E0DCD6;
+    --color-border-subtle: #EBE8E3;
+    --color-text: #1A1816;
+    --color-text-secondary: #5A5550;
+    --color-text-muted: #8A8580;
+    --color-accent: #D4A44C;
+    --color-accent-dim: rgba(212,164,76,0.15);
+    --color-command: #2E5090;
+    --color-command-text: #FFFFFF;
+    --color-event: #D4A44C;
+    --color-event-text: #1A1816;
+    --color-view: #3D7A5A;
+    --color-view-text: #FFFFFF;
+    --color-trigger: #8A8078;
+    --color-trigger-text: #FFFFFF;
+    --color-exception: #8B3A3A;
+    --color-exception-text: #FFFFFF;
+    --color-automation: #6B5B95;
+    --color-automation-text: #FFFFFF;
+    --color-swimlane-user: rgba(212,164,76,0.06);
+    --color-swimlane-system: rgba(46,80,144,0.06);
+    --color-swimlane-external: rgba(61,122,90,0.06);
+    --shadow-card: 0 2px 8px rgba(0,0,0,0.06);
+    --shadow-glow: none;
+    --font-heading: 'Playfair Display', Georgia, serif;
+    --font-body: 'Source Sans 3', 'Source Sans Pro', system-ui, sans-serif;
+    --radius: 8px;
+  }
+
+  /* ============================================
+     CSS Custom Properties - Dark Theme
+     ============================================ */
+  [data-theme="dark"] {
+    --color-bg: #0D0F12;
+    --color-surface: #1A1C22;
+    --color-surface-raised: #22242B;
+    --color-border: #2A2830;
+    --color-border-subtle: #1F1D26;
+    --color-text: #E8E4DE;
+    --color-text-secondary: #A8A49E;
+    --color-text-muted: #6E6A64;
+    --color-accent: #D4A44C;
+    --color-accent-dim: rgba(212,164,76,0.12);
+    --color-command: #2E5090;
+    --color-command-text: #E0E8F5;
+    --color-event: #D4A44C;
+    --color-event-text: #1A1816;
+    --color-view: #3D7A5A;
+    --color-view-text: #E0F0E8;
+    --color-trigger: #8A8078;
+    --color-trigger-text: #F0EDE8;
+    --color-exception: #8B3A3A;
+    --color-exception-text: #F5E0E0;
+    --color-automation: #6B5B95;
+    --color-automation-text: #E8E0F5;
+    --color-swimlane-user: rgba(212,164,76,0.04);
+    --color-swimlane-system: rgba(46,80,144,0.05);
+    --color-swimlane-external: rgba(61,122,90,0.04);
+    --shadow-card: 0 2px 12px rgba(0,0,0,0.3);
+    --shadow-glow: 0 0 20px rgba(212,164,76,0.06);
+    --font-heading: 'Playfair Display', Georgia, serif;
+    --font-body: 'Source Sans 3', 'Source Sans Pro', system-ui, sans-serif;
+    --radius: 8px;
+  }
+
+  /* ============================================
+     Base Styles
+     ============================================ */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-body);
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--color-text);
+    background: var(--color-bg);
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* ============================================
+     Header
+     ============================================ */
+  .site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 32px 0 24px;
+    border-bottom: 1px solid var(--color-border);
+    margin-bottom: 48px;
+  }
+
+  .site-header h1 {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 32px;
+    letter-spacing: 0.02em;
+    background: linear-gradient(135deg, var(--color-accent), #E8C56A);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .site-header .subtitle {
+    font-size: 13px;
+    color: var(--color-text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  /* Theme Toggle */
+  .theme-toggle {
+    position: relative;
+    width: 56px;
+    height: 28px;
+    border-radius: 14px;
+    background: var(--color-border);
+    border: 1px solid var(--color-accent-dim);
+    cursor: pointer;
+    transition: background 0.3s;
+    flex-shrink: 0;
+  }
+
+  .theme-toggle::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    transition: transform 0.3s ease;
+  }
+
+  [data-theme="dark"] .theme-toggle::after {
+    transform: translateX(28px);
+  }
+
+  .theme-toggle-label {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+    text-align: center;
+  }
+
+  /* ============================================
+     Section Titles
+     ============================================ */
+  .section { margin-bottom: 56px; }
+
+  .section-title {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 24px;
+    margin-bottom: 8px;
+    color: var(--color-text);
+  }
+
+  .section-desc {
+    font-size: 15px;
+    color: var(--color-text-secondary);
+    margin-bottom: 28px;
+    max-width: 640px;
+  }
+
+  /* ============================================
+     Color Palette
+     ============================================ */
+  .palette-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 16px;
+  }
+
+  .swatch {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-card);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .swatch:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card), var(--shadow-glow);
+  }
+
+  .swatch-color {
+    height: 64px;
+    display: flex;
+    align-items: flex-end;
+    padding: 6px 10px;
+  }
+
+  .swatch-hex {
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  .swatch-info {
+    padding: 10px 12px;
+  }
+
+  .swatch-label {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--color-text);
+  }
+
+  .swatch-purpose {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    margin-top: 2px;
+  }
+
+  /* ============================================
+     Typography
+     ============================================ */
+  .type-sample {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 32px;
+    box-shadow: var(--shadow-card);
+  }
+
+  .type-row {
+    display: flex;
+    gap: 24px;
+    align-items: baseline;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .type-row:last-child { border-bottom: none; }
+
+  .type-meta {
+    min-width: 160px;
+    flex-shrink: 0;
+  }
+
+  .type-meta-name { font-weight: 600; font-size: 13px; color: var(--color-accent); }
+  .type-meta-spec { font-size: 11px; color: var(--color-text-muted); margin-top: 2px; }
+
+  .type-preview-h1 { font-family: var(--font-heading); font-size: 32px; font-weight: 700; line-height: 1.2; }
+  .type-preview-h2 { font-family: var(--font-heading); font-size: 24px; font-weight: 700; line-height: 1.3; }
+  .type-preview-body { font-family: var(--font-body); font-size: 16px; font-weight: 400; line-height: 1.6; }
+  .type-preview-label { font-family: var(--font-body); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-secondary); }
+
+  /* ============================================
+     SVG Board
+     ============================================ */
+  .board-container {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow-card);
+    overflow-x: auto;
+  }
+
+  .board-container svg { display: block; width: 100%; height: auto; }
+
+  /* ============================================
+     Element Gallery
+     ============================================ */
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 20px;
+  }
+
+  .gallery-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: var(--shadow-card);
+    transition: transform 0.2s, box-shadow 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .gallery-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card), var(--shadow-glow);
+  }
+
+  .gallery-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+  }
+
+  .gallery-card.command::before { background: var(--color-command); }
+  .gallery-card.event::before { background: var(--color-event); }
+  .gallery-card.view::before { background: var(--color-view); }
+  .gallery-card.trigger::before { background: var(--color-trigger); }
+  .gallery-card.exception::before { background: var(--color-exception); }
+  .gallery-card.automation::before { background: var(--color-automation); }
+
+  .gallery-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 16px;
+    margin-bottom: 14px;
+  }
+
+  .gallery-card.command .gallery-icon { background: var(--color-command); color: var(--color-command-text); }
+  .gallery-card.event .gallery-icon { background: var(--color-event); color: var(--color-event-text); }
+  .gallery-card.view .gallery-icon { background: var(--color-view); color: var(--color-view-text); }
+  .gallery-card.trigger .gallery-icon { background: var(--color-trigger); color: var(--color-trigger-text); }
+  .gallery-card.exception .gallery-icon { background: var(--color-exception); color: var(--color-exception-text); }
+  .gallery-card.automation .gallery-icon { background: var(--color-automation); color: var(--color-automation-text); }
+
+  .gallery-name { font-weight: 600; font-size: 16px; margin-bottom: 6px; }
+  .gallery-desc { font-size: 14px; color: var(--color-text-secondary); line-height: 1.5; }
+
+  /* ============================================
+     Code Block
+     ============================================ */
+  .code-block {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-card);
+  }
+
+  .code-header {
+    background: var(--color-accent-dim);
+    padding: 10px 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-accent);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .code-block pre {
+    padding: 20px;
+    overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--color-text-secondary);
+    margin: 0;
+  }
+
+  .code-block code { color: inherit; }
+
+  footer {
+    text-align: center;
+    padding: 40px 0;
+    color: var(--color-text-muted);
+    font-size: 13px;
+    border-top: 1px solid var(--color-border);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ==================== HEADER ==================== -->
+  <header class="site-header">
+    <div>
+      <h1>Midnight Studio</h1>
+      <div class="subtitle">EventModeler Design Proposal #2</div>
+    </div>
+    <div>
+      <div class="theme-toggle-label" id="toggleLabel">Dark</div>
+      <div class="theme-toggle" id="themeToggle" role="button" tabindex="0" aria-label="Toggle light and dark mode"></div>
+    </div>
+  </header>
+
+  <!-- ==================== COLOR PALETTE ==================== -->
+  <section class="section">
+    <h2 class="section-title">Color Palette</h2>
+    <p class="section-desc">A refined dark-first palette. Element colors are bold enough to read on dark surfaces while remaining elegant on light backgrounds.</p>
+    <div class="palette-grid">
+      <div class="swatch"><div class="swatch-color" style="background:#2E5090"><span class="swatch-hex">#2E5090</span></div><div class="swatch-info"><div class="swatch-label">Command</div><div class="swatch-purpose">Deep sapphire</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#D4A44C"><span class="swatch-hex">#D4A44C</span></div><div class="swatch-info"><div class="swatch-label">Event</div><div class="swatch-purpose">Warm amber / gold</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#3D7A5A"><span class="swatch-hex">#3D7A5A</span></div><div class="swatch-info"><div class="swatch-label">View</div><div class="swatch-purpose">Forest emerald</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#8A8078"><span class="swatch-hex">#8A8078</span></div><div class="swatch-info"><div class="swatch-label">Trigger</div><div class="swatch-purpose">Warm gray</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#8B3A3A"><span class="swatch-hex">#8B3A3A</span></div><div class="swatch-info"><div class="swatch-label">Exception</div><div class="swatch-purpose">Burgundy</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#6B5B95"><span class="swatch-hex">#6B5B95</span></div><div class="swatch-info"><div class="swatch-label">Automation</div><div class="swatch-purpose">Amethyst</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#0D0F12"><span class="swatch-hex">#0D0F12</span></div><div class="swatch-info"><div class="swatch-label">Background</div><div class="swatch-purpose">Dark charcoal</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#1A1C22"><span class="swatch-hex">#1A1C22</span></div><div class="swatch-info"><div class="swatch-label">Surface</div><div class="swatch-purpose">Raised dark panel</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#E8E4DE"><span class="swatch-hex">#E8E4DE</span></div><div class="swatch-info"><div class="swatch-label">Text</div><div class="swatch-purpose">Warm off-white</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#2A2830"><span class="swatch-hex">#2A2830</span></div><div class="swatch-info"><div class="swatch-label">Border</div><div class="swatch-purpose">Gold-tinted dark</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#D4A44C"><span class="swatch-hex">#D4A44C</span></div><div class="swatch-info"><div class="swatch-label">Accent</div><div class="swatch-purpose">Gold highlight</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#22242B"><span class="swatch-hex">#22242B</span></div><div class="swatch-info"><div class="swatch-label">Surface Raised</div><div class="swatch-purpose">Elevated panel</div></div></div>
+    </div>
+  </section>
+
+  <!-- ==================== TYPOGRAPHY ==================== -->
+  <section class="section">
+    <h2 class="section-title">Typography</h2>
+    <p class="section-desc">Playfair Display brings editorial gravitas to headings. Source Sans 3 provides clean, readable body text optimized for UI contexts.</p>
+    <div class="type-sample">
+      <div class="type-row">
+        <div class="type-meta"><div class="type-meta-name">Heading 1</div><div class="type-meta-spec">Playfair Display 700 / 32px / 1.2</div></div>
+        <div class="type-preview-h1">Event Modeling Canvas</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta"><div class="type-meta-name">Heading 2</div><div class="type-meta-spec">Playfair Display 700 / 24px / 1.3</div></div>
+        <div class="type-preview-h2">Slice: User Registration</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta"><div class="type-meta-name">Body</div><div class="type-meta-spec">Source Sans 3, 400 / 16px / 1.6</div></div>
+        <div class="type-preview-body">Event Modeling is a method of describing systems using an example of how information changes within them over time. Each slice represents a vertical unit of deliverable work.</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta"><div class="type-meta-name">Label</div><div class="type-meta-spec">Source Sans 3, 600 / 12px / uppercase</div></div>
+        <div class="type-preview-label">Command &middot; Event &middot; Read Model &middot; Automation</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== MOCK BOARD ==================== -->
+  <section class="section">
+    <h2 class="section-title">Mock Board</h2>
+    <p class="section-desc">A realistic EventModeler canvas showing two slices with swimlanes, connections, and an exception element.</p>
+    <div class="board-container">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 420" font-family="Source Sans 3, system-ui, sans-serif">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="var(--color-accent)" stroke="none"/>
+          </marker>
+          <linearGradient id="gradCommand" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#3868A8"/>
+            <stop offset="100%" stop-color="#2E5090"/>
+          </linearGradient>
+          <linearGradient id="gradEvent" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#E0B65C"/>
+            <stop offset="100%" stop-color="#D4A44C"/>
+          </linearGradient>
+          <linearGradient id="gradView" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#4A8E6A"/>
+            <stop offset="100%" stop-color="#3D7A5A"/>
+          </linearGradient>
+          <linearGradient id="gradTrigger" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#9A9088"/>
+            <stop offset="100%" stop-color="#8A8078"/>
+          </linearGradient>
+          <linearGradient id="gradException" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#A04848"/>
+            <stop offset="100%" stop-color="#8B3A3A"/>
+          </linearGradient>
+          <linearGradient id="gradAutomation" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#7D6DA8"/>
+            <stop offset="100%" stop-color="#6B5B95"/>
+          </linearGradient>
+        </defs>
+
+        <!-- Swimlane Bands -->
+        <rect x="0" y="30" width="820" height="120" rx="4" fill="var(--color-swimlane-user)" stroke="var(--color-border)" stroke-width="0.5"/>
+        <rect x="0" y="155" width="820" height="120" rx="4" fill="var(--color-swimlane-system)" stroke="var(--color-border)" stroke-width="0.5"/>
+        <rect x="0" y="280" width="820" height="120" rx="4" fill="var(--color-swimlane-external)" stroke="var(--color-border)" stroke-width="0.5"/>
+
+        <!-- Swimlane Labels -->
+        <text x="12" y="50" font-size="11" font-weight="600" fill="var(--color-text-muted)" letter-spacing="0.08em" text-transform="uppercase">USER</text>
+        <text x="12" y="175" font-size="11" font-weight="600" fill="var(--color-text-muted)" letter-spacing="0.08em" text-transform="uppercase">SYSTEM</text>
+        <text x="12" y="300" font-size="11" font-weight="600" fill="var(--color-text-muted)" letter-spacing="0.08em" text-transform="uppercase">EXTERNAL</text>
+
+        <!-- Slice 1 Label -->
+        <text x="175" y="18" font-size="13" font-weight="600" fill="var(--color-accent)" font-family="Playfair Display, serif" text-anchor="middle">User Registration</text>
+
+        <!-- Slice 1: Trigger -->
+        <rect x="50" y="65" width="110" height="44" rx="8" fill="url(#gradTrigger)" stroke="var(--color-accent)" stroke-width="0.5"/>
+        <text x="105" y="84" font-size="10" fill="var(--color-trigger-text)" text-anchor="middle" opacity="0.7" font-weight="600">TRIGGER</text>
+        <text x="105" y="99" font-size="12" fill="var(--color-trigger-text)" text-anchor="middle" font-weight="600">SignUpClick</text>
+
+        <!-- Slice 1: Command -->
+        <rect x="195" y="65" width="120" height="44" rx="8" fill="url(#gradCommand)" stroke="var(--color-accent)" stroke-width="0.5"/>
+        <text x="255" y="84" font-size="10" fill="var(--color-command-text)" text-anchor="middle" opacity="0.7" font-weight="600">COMMAND</text>
+        <text x="255" y="99" font-size="12" fill="var(--color-command-text)" text-anchor="middle" font-weight="600">RegisterUser</text>
+
+        <!-- Slice 1: Event -->
+        <rect x="195" y="190" width="120" height="44" rx="8" fill="url(#gradEvent)" stroke="var(--color-accent)" stroke-width="0.5"/>
+        <text x="255" y="209" font-size="10" fill="var(--color-event-text)" text-anchor="middle" opacity="0.7" font-weight="600">EVENT</text>
+        <text x="255" y="224" font-size="12" fill="var(--color-event-text)" text-anchor="middle" font-weight="600">UserRegistered</text>
+
+        <!-- Slice 1: View -->
+        <rect x="350" y="190" width="110" height="44" rx="8" fill="url(#gradView)" stroke="var(--color-accent)" stroke-width="0.5"/>
+        <text x="405" y="209" font-size="10" fill="var(--color-view-text)" text-anchor="middle" opacity="0.7" font-weight="600">VIEW</text>
+        <text x="405" y="224" font-size="12" fill="var(--color-view-text)" text-anchor="middle" font-weight="600">UserProfile</text>
+
+        <!-- Slice 1: Exception -->
+        <rect x="350" y="310" width="130" height="44" rx="8" fill="url(#gradException)" stroke="var(--color-accent)" stroke-width="0.5"/>
+        <text x="415" y="329" font-size="10" fill="var(--color-exception-text)" text-anchor="middle" opacity="0.7" font-weight="600">EXCEPTION</text>
+        <text x="415" y="344" font-size="12" fill="var(--color-exception-text)" text-anchor="middle" font-weight="600">RegistrationFailed</text>
+
+        <!-- Slice 1 Connections -->
+        <!-- Trigger -> Command -->
+        <path d="M160,87 C178,87 177,87 195,87" fill="none" stroke="var(--color-accent)" stroke-width="1.5" marker-end="url(#arrow)" opacity="0.7"/>
+        <!-- Command -> Event (curved down) -->
+        <path d="M255,109 C255,140 255,160 255,190" fill="none" stroke="var(--color-accent)" stroke-width="1.5" marker-end="url(#arrow)" opacity="0.7"/>
+        <!-- Event -> View -->
+        <path d="M315,212 C330,212 335,212 350,212" fill="none" stroke="var(--color-accent)" stroke-width="1.5" marker-end="url(#arrow)" opacity="0.7"/>
+        <!-- Command -> Exception (curved down-right) -->
+        <path d="M275,109 C280,180 340,270 380,310" fill="none" stroke="var(--color-exception)" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)" opacity="0.5"/>
+
+        <!-- Slice 2 Label -->
+        <text x="640" y="18" font-size="13" font-weight="600" fill="var(--color-accent)" font-family="Playfair Display, serif" text-anchor="middle">Send Welcome Email</text>
+
+        <!-- Slice 2: Automation -->
+        <rect x="520" y="190" width="130" height="44" rx="8" fill="url(#gradAutomation)" stroke="var(--color-accent)" stroke-width="0.5"/>
+        <text x="585" y="209" font-size="10" fill="var(--color-automation-text)" text-anchor="middle" opacity="0.7" font-weight="600">AUTOMATION</text>
+        <text x="585" y="224" font-size="11" fill="var(--color-automation-text)" text-anchor="middle" font-weight="600">OnUserRegistered</text>
+
+        <!-- Slice 2: Command -->
+        <rect x="680" y="190" width="125" height="44" rx="8" fill="url(#gradCommand)" stroke="var(--color-accent)" stroke-width="0.5"/>
+        <text x="742" y="209" font-size="10" fill="var(--color-command-text)" text-anchor="middle" opacity="0.7" font-weight="600">COMMAND</text>
+        <text x="742" y="224" font-size="11" fill="var(--color-command-text)" text-anchor="middle" font-weight="600">SendWelcomeEmail</text>
+
+        <!-- Slice 2: Event -->
+        <rect x="680" y="310" width="125" height="44" rx="8" fill="url(#gradEvent)" stroke="var(--color-accent)" stroke-width="0.5"/>
+        <text x="742" y="329" font-size="10" fill="var(--color-event-text)" text-anchor="middle" opacity="0.7" font-weight="600">EVENT</text>
+        <text x="742" y="344" font-size="11" fill="var(--color-event-text)" text-anchor="middle" font-weight="600">WelcomeEmailSent</text>
+
+        <!-- Slice 2 Connections -->
+        <!-- Event1 -> Automation (curved right) -->
+        <path d="M315,218 C420,225 460,215 520,212" fill="none" stroke="var(--color-accent)" stroke-width="1.5" marker-end="url(#arrow)" opacity="0.7"/>
+        <!-- Automation -> Command2 -->
+        <path d="M650,212 C662,212 668,212 680,212" fill="none" stroke="var(--color-accent)" stroke-width="1.5" marker-end="url(#arrow)" opacity="0.7"/>
+        <!-- Command2 -> Event2 (curved down) -->
+        <path d="M742,234 C742,265 742,285 742,310" fill="none" stroke="var(--color-accent)" stroke-width="1.5" marker-end="url(#arrow)" opacity="0.7"/>
+      </svg>
+    </div>
+  </section>
+
+  <!-- ==================== ELEMENT GALLERY ==================== -->
+  <section class="section">
+    <h2 class="section-title">Element Gallery</h2>
+    <p class="section-desc">The six core element types used on the EventModeler canvas. Each serves a distinct role in the event model.</p>
+    <div class="gallery-grid">
+      <div class="gallery-card command">
+        <div class="gallery-icon">C</div>
+        <div class="gallery-name">Command</div>
+        <div class="gallery-desc">An intent to change state. Commands are validated, then either accepted (producing an event) or rejected (producing an exception).</div>
+      </div>
+      <div class="gallery-card event">
+        <div class="gallery-icon">E</div>
+        <div class="gallery-name">Event</div>
+        <div class="gallery-desc">An immutable fact that something happened. Events are the single source of truth in the system and drive all downstream projections.</div>
+      </div>
+      <div class="gallery-card view">
+        <div class="gallery-icon">V</div>
+        <div class="gallery-name">View</div>
+        <div class="gallery-desc">A read model or projection built from one or more events. Views provide the data users and systems query for display or decisions.</div>
+      </div>
+      <div class="gallery-card trigger">
+        <div class="gallery-icon">T</div>
+        <div class="gallery-name">Trigger</div>
+        <div class="gallery-desc">A user action or external signal that initiates a command. Triggers represent the starting point of a workflow slice.</div>
+      </div>
+      <div class="gallery-card exception">
+        <div class="gallery-icon">!</div>
+        <div class="gallery-name">Exception</div>
+        <div class="gallery-desc">A failure or rejection path. Exceptions represent what happens when a command cannot be fulfilled due to business rule violations.</div>
+      </div>
+      <div class="gallery-card automation">
+        <div class="gallery-icon">A</div>
+        <div class="gallery-name">Automation</div>
+        <div class="gallery-desc">A process manager or policy that reacts to events and issues commands automatically. Automations connect slices into larger workflows.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== CSS VARIABLES CODE BLOCK ==================== -->
+  <section class="section">
+    <h2 class="section-title">CSS Variables</h2>
+    <p class="section-desc">Complete design token definitions for both light and dark themes. Copy these into your project stylesheet.</p>
+    <div class="code-block">
+      <div class="code-header">Design Tokens - CSS Custom Properties</div>
+<pre><code>/* Light theme (default root) */
+:root {
+  --color-bg: #F5F3F0;
+  --color-surface: #FFFFFF;
+  --color-surface-raised: #FAFAF8;
+  --color-border: #E0DCD6;
+  --color-border-subtle: #EBE8E3;
+  --color-text: #1A1816;
+  --color-text-secondary: #5A5550;
+  --color-text-muted: #8A8580;
+  --color-accent: #D4A44C;
+  --color-accent-dim: rgba(212, 164, 76, 0.15);
+
+  --color-command: #2E5090;
+  --color-event: #D4A44C;
+  --color-view: #3D7A5A;
+  --color-trigger: #8A8078;
+  --color-exception: #8B3A3A;
+  --color-automation: #6B5B95;
+
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-glow: none;
+  --radius: 8px;
+
+  --font-heading: 'Playfair Display', Georgia, serif;
+  --font-body: 'Source Sans 3', system-ui, sans-serif;
+}
+
+/* Dark theme */
+[data-theme="dark"] {
+  --color-bg: #0D0F12;
+  --color-surface: #1A1C22;
+  --color-surface-raised: #22242B;
+  --color-border: #2A2830;
+  --color-border-subtle: #1F1D26;
+  --color-text: #E8E4DE;
+  --color-text-secondary: #A8A49E;
+  --color-text-muted: #6E6A64;
+  --color-accent: #D4A44C;
+  --color-accent-dim: rgba(212, 164, 76, 0.12);
+
+  --color-command: #2E5090;
+  --color-event: #D4A44C;
+  --color-view: #3D7A5A;
+  --color-trigger: #8A8078;
+  --color-exception: #8B3A3A;
+  --color-automation: #6B5B95;
+
+  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.3);
+  --shadow-glow: 0 0 20px rgba(212, 164, 76, 0.06);
+  --radius: 8px;
+}</code></pre>
+    </div>
+  </section>
+
+  <footer>Midnight Studio &mdash; EventModeler Design Proposal #2</footer>
+</div>
+
+<!-- ==================== THEME TOGGLE JS ==================== -->
+<script>
+(function() {
+  var html = document.documentElement;
+  var toggle = document.getElementById('themeToggle');
+  var label = document.getElementById('toggleLabel');
+
+  function setTheme(theme) {
+    html.setAttribute('data-theme', theme);
+    label.textContent = theme === 'dark' ? 'Dark' : 'Light';
+    try { localStorage.setItem('midnight-studio-theme', theme); } catch(e) {}
+  }
+
+  // Restore saved preference, default to dark
+  var saved = null;
+  try { saved = localStorage.getItem('midnight-studio-theme'); } catch(e) {}
+  setTheme(saved || 'dark');
+
+  toggle.addEventListener('click', function() {
+    var current = html.getAttribute('data-theme');
+    setTheme(current === 'dark' ? 'light' : 'dark');
+  });
+
+  toggle.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      toggle.click();
+    }
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Brutalist Mono - EventModeler Design Proposal #9</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    /* ===== CSS Custom Properties ===== */
+    :root {
+      --color-bg: #FFFFFF;
+      --color-surface: #FFFFFF;
+      --color-surface-alt: #F0F0F0;
+      --color-text: #000000;
+      --color-text-secondary: #333333;
+      --color-border: #000000;
+
+      --color-command: #0000FF;
+      --color-command-text: #FFFFFF;
+      --color-event: #FF0000;
+      --color-event-text: #FFFFFF;
+      --color-view: #00AA00;
+      --color-view-text: #FFFFFF;
+      --color-trigger: #808080;
+      --color-trigger-text: #FFFFFF;
+      --color-exception: #FFFF00;
+      --color-exception-text: #000000;
+      --color-automation: #FF00FF;
+      --color-automation-text: #FFFFFF;
+
+      --color-swimlane-user: #FFFFFF;
+      --color-swimlane-system: #F5F5F5;
+      --color-swimlane-external: #EBEBEB;
+
+      --border-width: 3px;
+      --border: 3px solid #000000;
+      --font-family: 'Space Mono', monospace;
+    }
+
+    [data-theme="dark"] {
+      --color-bg: #000000;
+      --color-surface: #111111;
+      --color-surface-alt: #1A1A1A;
+      --color-text: #FFFFFF;
+      --color-text-secondary: #CCCCCC;
+      --color-border: #FFFFFF;
+
+      --color-command: #0000FF;
+      --color-command-text: #FFFFFF;
+      --color-event: #FF0000;
+      --color-event-text: #FFFFFF;
+      --color-view: #00AA00;
+      --color-view-text: #FFFFFF;
+      --color-trigger: #808080;
+      --color-trigger-text: #FFFFFF;
+      --color-exception: #FFFF00;
+      --color-exception-text: #000000;
+      --color-automation: #FF00FF;
+      --color-automation-text: #FFFFFF;
+
+      --color-swimlane-user: #0A0A0A;
+      --color-swimlane-system: #111111;
+      --color-swimlane-external: #181818;
+
+      --border: 3px solid #FFFFFF;
+    }
+
+    /* ===== Reset & Base ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-family);
+      background: var(--color-bg);
+      color: var(--color-text);
+      line-height: 1.6;
+      text-transform: uppercase;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 48px 32px 80px;
+    }
+
+    /* ===== Header ===== */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 64px;
+      padding-bottom: 24px;
+      border-bottom: var(--border);
+    }
+
+    .header-title {
+      font-size: 2.5rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--color-text);
+    }
+
+    .header-subtitle {
+      font-size: 0.75rem;
+      font-weight: 400;
+      color: var(--color-text-secondary);
+      margin-top: 8px;
+      letter-spacing: 0.04em;
+    }
+
+    /* Toggle - raw checkbox style */
+    .theme-toggle {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--color-text);
+      cursor: pointer;
+      user-select: none;
+      letter-spacing: 0.04em;
+    }
+
+    .toggle-box {
+      width: 28px;
+      height: 28px;
+      border: var(--border);
+      background: var(--color-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      font-weight: 700;
+      transition: background 0.15s;
+    }
+
+    [data-theme="dark"] .toggle-box {
+      background: var(--color-text);
+      color: var(--color-bg);
+    }
+
+    .toggle-box::after {
+      content: '';
+    }
+
+    [data-theme="dark"] .toggle-box::after {
+      content: 'X';
+    }
+
+    /* ===== Section ===== */
+    .section {
+      margin-bottom: 64px;
+    }
+
+    .section-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: 0.06em;
+      border-bottom: var(--border);
+      padding-bottom: 8px;
+      display: inline-block;
+    }
+
+    .section-desc {
+      font-size: 0.75rem;
+      color: var(--color-text-secondary);
+      margin-bottom: 28px;
+      margin-top: 12px;
+      max-width: 700px;
+      letter-spacing: 0.02em;
+      line-height: 1.8;
+    }
+
+    /* ===== Color Palette ===== */
+    .palette-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0;
+    }
+
+    .swatch {
+      border: var(--border);
+      margin-right: -3px;
+      margin-bottom: -3px;
+      transition: background 0.15s;
+    }
+
+    .swatch-color {
+      height: 72px;
+      border-bottom: var(--border);
+    }
+
+    .swatch-info {
+      padding: 12px;
+      background: var(--color-surface);
+    }
+
+    .swatch-label {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+      letter-spacing: 0.06em;
+    }
+
+    .swatch-hex {
+      font-size: 0.625rem;
+      color: var(--color-text-secondary);
+      letter-spacing: 0.04em;
+    }
+
+    /* ===== Typography ===== */
+    .type-card {
+      background: var(--color-surface);
+      border: var(--border);
+      padding: 32px;
+      transition: background 0.15s;
+    }
+
+    .type-sample {
+      margin-bottom: 28px;
+      padding-bottom: 28px;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .type-sample:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+
+    .type-meta {
+      font-size: 0.625rem;
+      color: var(--color-text-secondary);
+      margin-bottom: 8px;
+      letter-spacing: 0.04em;
+    }
+
+    .type-h1 { font-size: 2rem; font-weight: 700; letter-spacing: 0.06em; line-height: 1.3; }
+    .type-h2 { font-size: 1.5rem; font-weight: 700; letter-spacing: 0.05em; line-height: 1.3; }
+    .type-h3 { font-size: 1.125rem; font-weight: 700; letter-spacing: 0.04em; line-height: 1.4; }
+    .type-body { font-size: 0.875rem; font-weight: 400; line-height: 1.8; color: var(--color-text-secondary); letter-spacing: 0.02em; }
+    .type-label { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; }
+
+    /* ===== Mock Board ===== */
+    .board-wrapper {
+      background: var(--color-surface);
+      border: var(--border);
+      padding: 0;
+      overflow-x: auto;
+      transition: background 0.15s;
+    }
+
+    .board-svg text {
+      font-family: var(--font-family);
+      text-transform: uppercase;
+    }
+
+    /* ===== Element Gallery ===== */
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 0;
+    }
+
+    .gallery-card {
+      background: var(--color-surface);
+      border: var(--border);
+      padding: 24px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      margin-right: -3px;
+      margin-bottom: -3px;
+      transition: background 0.15s;
+    }
+
+    .gallery-icon {
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 1.25rem;
+      font-weight: 700;
+      border: var(--border);
+    }
+
+    .gallery-label {
+      font-size: 0.875rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      letter-spacing: 0.06em;
+    }
+
+    .gallery-desc {
+      font-size: 0.6875rem;
+      color: var(--color-text-secondary);
+      line-height: 1.7;
+      letter-spacing: 0.02em;
+    }
+
+    /* ===== Code Block ===== */
+    .code-block {
+      background: var(--color-surface-alt);
+      border: var(--border);
+      padding: 28px;
+      overflow-x: auto;
+      transition: background 0.15s;
+    }
+
+    [data-theme="dark"] .code-block {
+      background: #000000;
+    }
+
+    .code-block pre {
+      margin: 0;
+      font-family: var(--font-family);
+      font-size: 0.75rem;
+      line-height: 1.8;
+      color: var(--color-text);
+      white-space: pre;
+      text-transform: none;
+    }
+
+    .code-block .ck { color: var(--color-command); font-weight: 700; }
+    .code-block .cv { color: var(--color-event); }
+    .code-block .cc { color: var(--color-trigger); }
+    .code-block .cm { color: var(--color-automation); }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ===== 1. Header ===== -->
+    <header class="header">
+      <div>
+        <h1 class="header-title">BRUTALIST MONO</h1>
+        <p class="header-subtitle">EventModeler Design Proposal #9 &mdash; Raw / High-Contrast</p>
+      </div>
+      <div class="theme-toggle" onclick="toggleTheme()" role="button" aria-label="Toggle dark mode">
+        <span>DARK</span>
+        <div class="toggle-box"></div>
+      </div>
+    </header>
+
+    <!-- ===== 2. Color Palette ===== -->
+    <section class="section">
+      <h2 class="section-title">COLOR PALETTE</h2>
+      <p class="section-desc">Stark, pure colors. No tints, no opacity, no subtlety. Each element type gets a single flat color at full saturation.</p>
+      <div class="palette-grid">
+        <div class="swatch"><div class="swatch-color" style="background:#0000FF"></div><div class="swatch-info"><div class="swatch-label">COMMAND</div><div class="swatch-hex">#0000FF</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#FF0000"></div><div class="swatch-info"><div class="swatch-label">EVENT</div><div class="swatch-hex">#FF0000</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#00AA00"></div><div class="swatch-info"><div class="swatch-label">VIEW</div><div class="swatch-hex">#00AA00</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#808080"></div><div class="swatch-info"><div class="swatch-label">TRIGGER</div><div class="swatch-hex">#808080</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#FFFF00"></div><div class="swatch-info"><div class="swatch-label">EXCEPTION</div><div class="swatch-hex">#FFFF00</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#FF00FF"></div><div class="swatch-info"><div class="swatch-label">AUTOMATION</div><div class="swatch-hex">#FF00FF</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#FFFFFF;border-bottom:3px solid #000"></div><div class="swatch-info"><div class="swatch-label">BACKGROUND</div><div class="swatch-hex">#FFFFFF / #000000</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#FFFFFF;border-bottom:3px solid #000"></div><div class="swatch-info"><div class="swatch-label">SURFACE</div><div class="swatch-hex">#FFFFFF / #111111</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#000000"></div><div class="swatch-info"><div class="swatch-label">TEXT</div><div class="swatch-hex">#000000 / #FFFFFF</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#000000"></div><div class="swatch-info"><div class="swatch-label">BORDER</div><div class="swatch-hex">#000000 / #FFFFFF</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#333333"></div><div class="swatch-info"><div class="swatch-label">TEXT SECONDARY</div><div class="swatch-hex">#333333 / #CCCCCC</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#F0F0F0"></div><div class="swatch-info"><div class="swatch-label">SURFACE ALT</div><div class="swatch-hex">#F0F0F0 / #1A1A1A</div></div></div>
+      </div>
+    </section>
+
+    <!-- ===== 3. Typography ===== -->
+    <section class="section">
+      <h2 class="section-title">TYPOGRAPHY</h2>
+      <p class="section-desc">Space Mono from Google Fonts. Everything is monospaced. Everything is uppercase. No exceptions.</p>
+      <div class="type-card">
+        <div class="type-sample">
+          <div class="type-meta">HEADING 1 &mdash; SPACE MONO 700 / 2REM / LINE-HEIGHT 1.3 / TRACKING 0.06EM</div>
+          <div class="type-h1">EVENT MODELING CANVAS</div>
+        </div>
+        <div class="type-sample">
+          <div class="type-meta">HEADING 2 &mdash; SPACE MONO 700 / 1.5REM / LINE-HEIGHT 1.3 / TRACKING 0.05EM</div>
+          <div class="type-h2">SLICE: USER REGISTRATION</div>
+        </div>
+        <div class="type-sample">
+          <div class="type-meta">HEADING 3 &mdash; SPACE MONO 700 / 1.125REM / LINE-HEIGHT 1.4 / TRACKING 0.04EM</div>
+          <div class="type-h3">COMMAND &amp; EVENT DEFINITIONS</div>
+        </div>
+        <div class="type-sample">
+          <div class="type-meta">BODY &mdash; SPACE MONO 400 / 0.875REM / LINE-HEIGHT 1.8 / TRACKING 0.02EM</div>
+          <div class="type-body">EACH SLICE REPRESENTS A VERTICAL UNIT OF WORK FLOWING FROM TRIGGER THROUGH COMMAND AND EVENT TO A READ MODEL VIEW. SLICES ARE INDEPENDENTLY TESTABLE AND DELIVERABLE.</div>
+        </div>
+        <div class="type-sample">
+          <div class="type-meta">LABEL &mdash; SPACE MONO 700 / 0.75REM / TRACKING 0.1EM</div>
+          <div class="type-label">SWIMLANE &middot; USER INTERFACE</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 4. Mock Board ===== -->
+    <section class="section">
+      <h2 class="section-title">MOCK BOARD</h2>
+      <p class="section-desc">A representative EventModeler canvas. Straight lines only. Thick borders. No curves. No shadows. No mercy.</p>
+      <div class="board-wrapper">
+        <svg class="board-svg" viewBox="0 0 820 420" width="820" height="420" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="9" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,3.5 L0,7 z" fill="var(--color-text)"/>
+            </marker>
+            <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--color-border)" stroke-width="0.5" opacity="0.15"/>
+            </pattern>
+          </defs>
+
+          <!-- Grid background -->
+          <rect width="820" height="420" fill="var(--color-bg)"/>
+          <rect width="820" height="420" fill="url(#grid)"/>
+
+          <!-- Swimlane bands -->
+          <rect x="0" y="0" width="820" height="140" fill="var(--color-swimlane-user)" opacity="0.5"/>
+          <rect x="0" y="140" width="820" height="140" fill="var(--color-swimlane-system)" opacity="0.5"/>
+          <rect x="0" y="280" width="820" height="140" fill="var(--color-swimlane-external)" opacity="0.5"/>
+
+          <!-- Swimlane dividers - thick lines -->
+          <line x1="0" y1="140" x2="820" y2="140" stroke="var(--color-border)" stroke-width="3"/>
+          <line x1="0" y1="280" x2="820" y2="280" stroke="var(--color-border)" stroke-width="3"/>
+
+          <!-- Swimlane labels -->
+          <text x="12" y="22" font-size="11" font-weight="700" fill="var(--color-text)" letter-spacing="0.12em">USER</text>
+          <text x="12" y="162" font-size="11" font-weight="700" fill="var(--color-text)" letter-spacing="0.12em">SYSTEM</text>
+          <text x="12" y="302" font-size="11" font-weight="700" fill="var(--color-text)" letter-spacing="0.12em">EXTERNAL</text>
+
+          <!-- === Slice 1: USER REGISTRATION === -->
+          <!-- Slice label -->
+          <text x="100" y="48" font-size="10" font-weight="700" fill="var(--color-text)" letter-spacing="0.08em" text-decoration="underline">USER REGISTRATION</text>
+
+          <!-- Trigger: gray sharp rect -->
+          <rect x="50" y="62" width="110" height="48" fill="#808080" stroke="var(--color-border)" stroke-width="3"/>
+          <text x="105" y="82" font-size="8" font-weight="700" fill="#FFFFFF" text-anchor="middle" letter-spacing="0.08em">TRIGGER</text>
+          <text x="105" y="98" font-size="9" font-weight="400" fill="#FFFFFF" text-anchor="middle" letter-spacing="0.04em">SIGNUPCLICK</text>
+
+          <!-- Connection: Trigger -> Command (straight lines) -->
+          <line x1="160" y1="86" x2="185" y2="86" stroke="var(--color-border)" stroke-width="2.5" marker-end="url(#arrow)"/>
+          <line x1="185" y1="86" x2="185" y2="195" stroke="var(--color-border)" stroke-width="2.5"/>
+          <line x1="185" y1="195" x2="210" y2="195" stroke="var(--color-border)" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+          <!-- Command: REGISTERUSER -->
+          <rect x="210" y="171" width="130" height="48" fill="#0000FF" stroke="var(--color-border)" stroke-width="3"/>
+          <text x="275" y="191" font-size="8" font-weight="700" fill="#FFFFFF" text-anchor="middle" letter-spacing="0.08em">COMMAND</text>
+          <text x="275" y="207" font-size="9" font-weight="400" fill="#FFFFFF" text-anchor="middle" letter-spacing="0.04em">REGISTERUSER</text>
+
+          <!-- Connection: Command -> Event (straight line) -->
+          <line x1="340" y1="195" x2="380" y2="195" stroke="var(--color-border)" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+          <!-- Event: USERREGISTERED -->
+          <rect x="380" y="171" width="130" height="48" fill="#FF0000" stroke="var(--color-border)" stroke-width="3"/>
+          <text x="445" y="191" font-size="8" font-weight="700" fill="#FFFFFF" text-anchor="middle" letter-spacing="0.08em">EVENT</text>
+          <text x="445" y="207" font-size="9" font-weight="400" fill="#FFFFFF" text-anchor="middle" letter-spacing="0.04em">USERREGISTERED</text>
+
+          <!-- Connection: Event -> View (straight lines) -->
+          <line x1="510" y1="195" x2="535" y2="195" stroke="var(--color-border)" stroke-width="2.5"/>
+          <line x1="535" y1="195" x2="535" y2="86" stroke="var(--color-border)" stroke-width="2.5"/>
+          <line x1="535" y1="86" x2="560" y2="86" stroke="var(--color-border)" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+          <!-- View: USERPROFILE -->
+          <rect x="560" y="62" width="110" height="48" fill="#00AA00" stroke="var(--color-border)" stroke-width="3"/>
+          <text x="615" y="82" font-size="8" font-weight="700" fill="#FFFFFF" text-anchor="middle" letter-spacing="0.08em">VIEW</text>
+          <text x="615" y="98" font-size="9" font-weight="400" fill="#FFFFFF" text-anchor="middle" letter-spacing="0.04em">USERPROFILE</text>
+
+          <!-- === Slice 2: SEND WELCOME EMAIL === -->
+          <!-- Slice label -->
+          <text x="430" y="260" font-size="10" font-weight="700" fill="var(--color-text)" letter-spacing="0.08em" text-decoration="underline">SEND WELCOME EMAIL</text>
+
+          <!-- Connection: Event -> Automation (straight lines) -->
+          <line x1="445" y1="219" x2="445" y2="240" stroke="var(--color-border)" stroke-width="2.5"/>
+          <line x1="445" y1="240" x2="400" y2="240" stroke="var(--color-border)" stroke-width="2.5"/>
+          <line x1="400" y1="240" x2="400" y2="296" stroke="var(--color-border)" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+          <!-- Automation: ONUSERREGISTERED -->
+          <rect x="355" y="296" width="150" height="48" fill="#FF00FF" stroke="var(--color-border)" stroke-width="3"/>
+          <text x="430" y="316" font-size="8" font-weight="700" fill="#FFFFFF" text-anchor="middle" letter-spacing="0.08em">AUTOMATION</text>
+          <text x="430" y="332" font-size="8" font-weight="400" fill="#FFFFFF" text-anchor="middle" letter-spacing="0.04em">ONUSERREGISTERED</text>
+
+          <!-- Connection: Automation -> Command (straight lines) -->
+          <line x1="505" y1="320" x2="540" y2="320" stroke="var(--color-border)" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+          <!-- Command: SENDWELCOMEEMAIL -->
+          <rect x="540" y="296" width="150" height="48" fill="#0000FF" stroke="var(--color-border)" stroke-width="3"/>
+          <text x="615" y="316" font-size="8" font-weight="700" fill="#FFFFFF" text-anchor="middle" letter-spacing="0.08em">COMMAND</text>
+          <text x="615" y="332" font-size="8" font-weight="400" fill="#FFFFFF" text-anchor="middle" letter-spacing="0.04em">SENDWELCOMEEMAIL</text>
+
+          <!-- Connection: Command -> Event (straight line) -->
+          <line x1="690" y1="320" x2="710" y2="320" stroke="var(--color-border)" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+          <!-- Event: WELCOMEEMAILSENT -->
+          <rect x="710" y="296" width="100" height="48" fill="#FF0000" stroke="var(--color-border)" stroke-width="3"/>
+          <text x="760" y="316" font-size="8" font-weight="700" fill="#FFFFFF" text-anchor="middle" letter-spacing="0.08em">EVENT</text>
+          <text x="760" y="332" font-size="7" font-weight="400" fill="#FFFFFF" text-anchor="middle" letter-spacing="0.02em">WELCOMEEMAILSENT</text>
+
+          <!-- === Exception Element === -->
+          <!-- Connection: Command -> Exception (straight lines) -->
+          <line x1="275" y1="219" x2="275" y2="360" stroke="var(--color-border)" stroke-width="2.5"/>
+          <line x1="275" y1="360" x2="130" y2="360" stroke="var(--color-border)" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+          <!-- Exception: REGISTRATIONFAILED -->
+          <rect x="10" y="336" width="120" height="48" fill="#FFFF00" stroke="var(--color-border)" stroke-width="3"/>
+          <text x="70" y="356" font-size="8" font-weight="700" fill="#000000" text-anchor="middle" letter-spacing="0.08em">EXCEPTION</text>
+          <text x="70" y="372" font-size="7" font-weight="700" fill="#000000" text-anchor="middle" letter-spacing="0.02em">REGISTRATIONFAILED</text>
+        </svg>
+      </div>
+    </section>
+
+    <!-- ===== 5. Element Gallery ===== -->
+    <section class="section">
+      <h2 class="section-title">ELEMENT GALLERY</h2>
+      <p class="section-desc">The six core element types. Sharp rectangles. Flat fills. Thick borders. No decoration.</p>
+      <div class="gallery-grid">
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:#0000FF;color:#FFFFFF;">C</div>
+          <div>
+            <div class="gallery-label">COMMAND</div>
+            <div class="gallery-desc">AN INTENT TO CHANGE STATE. REPRESENTS A USER OR SYSTEM ACTION THAT MAY SUCCEED OR FAIL. ALWAYS IMPERATIVE.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:#FF0000;color:#FFFFFF;">E</div>
+          <div>
+            <div class="gallery-label">EVENT</div>
+            <div class="gallery-desc">A FACT THAT HAPPENED. IMMUTABLE PAST-TENSE RECORD OF A STATE CHANGE. THE BACKBONE OF THE MODEL.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:#00AA00;color:#FFFFFF;">V</div>
+          <div>
+            <div class="gallery-label">VIEW</div>
+            <div class="gallery-desc">A READ MODEL PROJECTION. SHOWS DATA DERIVED FROM EVENTS, OPTIMIZED FOR DISPLAY OR QUERY.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:#808080;color:#FFFFFF;">T</div>
+          <div>
+            <div class="gallery-label">TRIGGER</div>
+            <div class="gallery-desc">THE INITIATING ACTION: A BUTTON CLICK, PAGE LOAD, OR EXTERNAL WEBHOOK THAT STARTS A FLOW.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:#FFFF00;color:#000000;">X</div>
+          <div>
+            <div class="gallery-label">EXCEPTION</div>
+            <div class="gallery-desc">AN ERROR OR ALTERNATE PATH. CAPTURES VALIDATION FAILURES, BUSINESS RULE VIOLATIONS, OR EDGE CASES.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:#FF00FF;color:#FFFFFF;">A</div>
+          <div>
+            <div class="gallery-label">AUTOMATION</div>
+            <div class="gallery-desc">A SYSTEM PROCESS TRIGGERED BY AN EVENT. SAGAS, POLICIES, OR WORKFLOWS THAT REACT AUTOMATICALLY.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 6. CSS Variables Code Block ===== -->
+    <section class="section">
+      <h2 class="section-title">CSS CUSTOM PROPERTIES</h2>
+      <p class="section-desc">Complete variable set for both light and dark themes. Copy into your stylesheet to adopt the Brutalist Mono design system.</p>
+      <div class="code-block">
+<pre><span class="cc">/* BRUTALIST MONO - LIGHT THEME */</span>
+<span class="ck">:root</span> {
+  <span class="cv">--color-bg</span>: #FFFFFF;
+  <span class="cv">--color-surface</span>: #FFFFFF;
+  <span class="cv">--color-surface-alt</span>: #F0F0F0;
+  <span class="cv">--color-text</span>: #000000;
+  <span class="cv">--color-text-secondary</span>: #333333;
+  <span class="cv">--color-border</span>: #000000;
+
+  <span class="cc">/* ELEMENT COLORS */</span>
+  <span class="cv">--color-command</span>: #0000FF;
+  <span class="cv">--color-command-text</span>: #FFFFFF;
+  <span class="cv">--color-event</span>: #FF0000;
+  <span class="cv">--color-event-text</span>: #FFFFFF;
+  <span class="cv">--color-view</span>: #00AA00;
+  <span class="cv">--color-view-text</span>: #FFFFFF;
+  <span class="cv">--color-trigger</span>: #808080;
+  <span class="cv">--color-trigger-text</span>: #FFFFFF;
+  <span class="cv">--color-exception</span>: #FFFF00;
+  <span class="cv">--color-exception-text</span>: #000000;
+  <span class="cv">--color-automation</span>: #FF00FF;
+  <span class="cv">--color-automation-text</span>: #FFFFFF;
+
+  <span class="cc">/* SWIMLANE BACKGROUNDS */</span>
+  <span class="cv">--color-swimlane-user</span>: #FFFFFF;
+  <span class="cv">--color-swimlane-system</span>: #F5F5F5;
+  <span class="cv">--color-swimlane-external</span>: #EBEBEB;
+
+  <span class="cc">/* BRUTALIST SETTINGS */</span>
+  <span class="cv">--border-width</span>: 3px;
+  <span class="cv">--border</span>: 3px solid #000000;
+  <span class="cv">--border-radius</span>: 0px;
+  <span class="cv">--shadow</span>: none;
+  <span class="cv">--font-family</span>: 'Space Mono', monospace;
+  <span class="cv">--text-transform</span>: uppercase;
+}
+
+<span class="cc">/* BRUTALIST MONO - DARK THEME */</span>
+<span class="ck">[data-theme="dark"]</span> {
+  <span class="cv">--color-bg</span>: #000000;
+  <span class="cv">--color-surface</span>: #111111;
+  <span class="cv">--color-surface-alt</span>: #1A1A1A;
+  <span class="cv">--color-text</span>: #FFFFFF;
+  <span class="cv">--color-text-secondary</span>: #CCCCCC;
+  <span class="cv">--color-border</span>: #FFFFFF;
+
+  <span class="cv">--color-command</span>: #0000FF;
+  <span class="cv">--color-command-text</span>: #FFFFFF;
+  <span class="cv">--color-event</span>: #FF0000;
+  <span class="cv">--color-event-text</span>: #FFFFFF;
+  <span class="cv">--color-view</span>: #00AA00;
+  <span class="cv">--color-view-text</span>: #FFFFFF;
+  <span class="cv">--color-trigger</span>: #808080;
+  <span class="cv">--color-trigger-text</span>: #FFFFFF;
+  <span class="cv">--color-exception</span>: #FFFF00;
+  <span class="cv">--color-exception-text</span>: #000000;
+  <span class="cv">--color-automation</span>: #FF00FF;
+  <span class="cv">--color-automation-text</span>: #FFFFFF;
+
+  <span class="cv">--color-swimlane-user</span>: #0A0A0A;
+  <span class="cv">--color-swimlane-system</span>: #111111;
+  <span class="cv">--color-swimlane-external</span>: #181818;
+
+  <span class="cv">--border</span>: 3px solid #FFFFFF;
+  <span class="cv">--border-radius</span>: 0px;
+  <span class="cv">--shadow</span>: none;
+}</pre>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    function toggleTheme() {
+      var html = document.documentElement;
+      var isDark = html.getAttribute('data-theme') === 'dark';
+      if (isDark) {
+        html.removeAttribute('data-theme');
+        localStorage.setItem('brutalist-mono-theme', 'light');
+      } else {
+        html.setAttribute('data-theme', 'dark');
+        localStorage.setItem('brutalist-mono-theme', 'dark');
+      }
+    }
+
+    (function restoreTheme() {
+      var saved = localStorage.getItem('brutalist-mono-theme');
+      if (saved === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
+</body>
+</html>

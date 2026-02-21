@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alpine Dusk - EventModeler Design Proposal #14</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    /* ===== CSS Custom Properties ===== */
+    :root {
+      --color-bg: #EEF0F5;
+      --color-surface: #FFFFFF;
+      --color-surface-alt: #E4E8F0;
+      --color-text: #1E2230;
+      --color-text-secondary: #6B7080;
+      --color-border: #D0D5E0;
+      --color-accent: #E8993A;
+
+      --color-swimlane-user: rgba(30, 34, 48, 0.03);
+      --color-swimlane-system: rgba(34, 197, 94, 0.03);
+      --color-swimlane-external: rgba(232, 153, 58, 0.04);
+
+      --shadow-sm: 0 2px 6px rgba(30, 34, 48, 0.05);
+      --shadow-md: 0 4px 16px rgba(30, 34, 48, 0.08);
+      --shadow-lg: 0 8px 32px rgba(30, 34, 48, 0.12);
+      --radius-card: 12px;
+      --radius-element: 8px;
+      --font-family: 'DM Sans', system-ui, sans-serif;
+    }
+
+    [data-theme="dark"] {
+      --color-bg: #141822;
+      --color-surface: #1E2230;
+      --color-surface-alt: #181C28;
+      --color-text: #D5D8E2;
+      --color-text-secondary: #8088A0;
+      --color-border: #2A3040;
+      --color-accent: #F0A848;
+
+      --color-swimlane-user: rgba(208, 213, 224, 0.03);
+      --color-swimlane-system: rgba(34, 197, 94, 0.04);
+      --color-swimlane-external: rgba(240, 168, 72, 0.04);
+
+      --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.15);
+      --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.22);
+      --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    /* ===== Reset & Base ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-family);
+      background: var(--color-bg);
+      color: var(--color-text);
+      line-height: 1.6;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 48px 32px 80px;
+    }
+
+    /* ===== Header ===== */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 64px;
+      padding: 28px 32px;
+      background: linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-alt) 100%);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-sm);
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+
+    .header-title {
+      font-size: 2.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--color-text);
+    }
+
+    .header-subtitle {
+      font-size: 0.875rem;
+      font-weight: 400;
+      color: var(--color-text-secondary);
+      margin-top: 4px;
+    }
+
+    .header-accent {
+      color: var(--color-accent);
+    }
+
+    /* Toggle */
+    .theme-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.8125rem;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle-track {
+      width: 48px;
+      height: 26px;
+      background: var(--color-border);
+      border-radius: 13px;
+      position: relative;
+      transition: background 0.25s ease;
+    }
+
+    [data-theme="dark"] .toggle-track { background: var(--color-accent); }
+
+    .toggle-knob {
+      width: 20px;
+      height: 20px;
+      background: var(--color-surface);
+      border-radius: 50%;
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      transition: transform 0.25s ease;
+      box-shadow: var(--shadow-sm);
+    }
+
+    [data-theme="dark"] .toggle-knob { transform: translateX(22px); }
+
+    /* ===== Section ===== */
+    .section { margin-bottom: 64px; }
+
+    .section-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+
+    .section-desc {
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+      margin-bottom: 28px;
+      max-width: 600px;
+    }
+
+    /* ===== Color Palette ===== */
+    .palette-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 16px;
+    }
+
+    .swatch {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-card);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow 0.2s ease, border-color 0.3s ease, background 0.3s ease;
+    }
+
+    .swatch:hover { box-shadow: var(--shadow-md); }
+
+    .swatch-color {
+      height: 72px;
+      transition: background 0.3s ease;
+    }
+
+    .swatch-info { padding: 12px; }
+
+    .swatch-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+
+    .swatch-hex {
+      font-size: 0.6875rem;
+      color: var(--color-text-secondary);
+      font-family: 'DM Sans', monospace;
+    }
+
+    /* ===== Typography ===== */
+    .type-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-card);
+      padding: 32px;
+      box-shadow: var(--shadow-sm);
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+
+    .type-sample { margin-bottom: 24px; }
+    .type-sample:last-child { margin-bottom: 0; }
+
+    .type-meta {
+      font-size: 0.6875rem;
+      color: var(--color-text-secondary);
+      margin-bottom: 4px;
+      font-family: 'DM Sans', monospace;
+    }
+
+    .type-h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+    .type-h2 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.015em; line-height: 1.3; }
+    .type-h3 { font-size: 1.125rem; font-weight: 500; line-height: 1.4; }
+    .type-body { font-size: 0.9375rem; font-weight: 400; line-height: 1.6; color: var(--color-text-secondary); }
+    .type-label { font-size: 0.75rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-accent); }
+
+    /* ===== Mock Board ===== */
+    .board-wrapper {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-card);
+      padding: 20px;
+      box-shadow: var(--shadow-md);
+      overflow-x: auto;
+      position: relative;
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+
+    .board-wrapper::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 50%;
+      height: 40%;
+      background: radial-gradient(ellipse at bottom right, rgba(232, 153, 58, 0.04), transparent 70%);
+      border-radius: 0 0 var(--radius-card) 0;
+      pointer-events: none;
+    }
+
+    [data-theme="dark"] .board-wrapper::after {
+      background: radial-gradient(ellipse at bottom right, rgba(240, 168, 72, 0.05), transparent 70%);
+    }
+
+    .board-svg text {
+      font-family: var(--font-family);
+    }
+
+    /* ===== Element Gallery ===== */
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 20px;
+    }
+
+    .gallery-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-left: 3px solid transparent;
+      border-radius: var(--radius-card);
+      padding: 24px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      transition: box-shadow 0.2s ease, background 0.3s ease, border-color 0.3s ease, border-left-color 0.2s ease;
+    }
+
+    .gallery-card:hover {
+      box-shadow: var(--shadow-md);
+      border-left-color: var(--color-accent);
+    }
+
+    .gallery-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-element);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .gallery-icon.trigger-icon { color: #374151; }
+
+    .gallery-label {
+      font-size: 0.9375rem;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .gallery-desc {
+      font-size: 0.8125rem;
+      color: var(--color-text-secondary);
+      line-height: 1.5;
+    }
+
+    /* ===== Code Block ===== */
+    .code-block {
+      background: var(--color-surface-alt);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-card);
+      padding: 28px;
+      overflow-x: auto;
+      box-shadow: var(--shadow-sm);
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+
+    .code-block pre {
+      margin: 0;
+      font-family: 'DM Sans', 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.78rem;
+      line-height: 1.7;
+      color: var(--color-text-secondary);
+      white-space: pre;
+    }
+
+    .code-block .ck { color: var(--color-accent); }
+    .code-block .cv { color: #6B7080; }
+    .code-block .cc { color: var(--color-text-secondary); }
+
+    [data-theme="dark"] .code-block .cv { color: #8088A0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ===== 1. Header ===== -->
+    <header class="header">
+      <div>
+        <h1 class="header-title">Alpine <span class="header-accent">Dusk</span></h1>
+        <p class="header-subtitle">EventModeler Design Proposal #14 &mdash; Cool-Warm Twilight</p>
+      </div>
+      <div class="theme-toggle" onclick="toggleTheme()" role="button" aria-label="Toggle dark mode">
+        <span>Light</span>
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span>Dark</span>
+      </div>
+    </header>
+
+    <!-- ===== 2. Color Palette ===== -->
+    <section class="section">
+      <h2 class="section-title">Color Palette</h2>
+      <p class="section-desc">Six canonical element colors plus cool blue-gray foundations with a warm amber accent. The duotone palette evokes mountain twilight.</p>
+      <div class="palette-grid">
+        <div class="swatch"><div class="swatch-color" style="background:#3B82F6"></div><div class="swatch-info"><div class="swatch-label">Command</div><div class="swatch-hex">#3B82F6</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#F97316"></div><div class="swatch-info"><div class="swatch-label">Event</div><div class="swatch-hex">#F97316</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#22C55E"></div><div class="swatch-info"><div class="swatch-label">View</div><div class="swatch-hex">#22C55E</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#E5E7EB"></div><div class="swatch-info"><div class="swatch-label">Trigger</div><div class="swatch-hex">#E5E7EB</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#EF4444"></div><div class="swatch-info"><div class="swatch-label">Exception</div><div class="swatch-hex">#EF4444</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#8B5CF6"></div><div class="swatch-info"><div class="swatch-label">Automation</div><div class="swatch-hex">#8B5CF6</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#EEF0F5"></div><div class="swatch-info"><div class="swatch-label">Background</div><div class="swatch-hex">#EEF0F5</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#FFFFFF;border-bottom:1px solid #D0D5E0"></div><div class="swatch-info"><div class="swatch-label">Surface</div><div class="swatch-hex">#FFFFFF</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#1E2230"></div><div class="swatch-info"><div class="swatch-label">Text</div><div class="swatch-hex">#1E2230</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#D0D5E0"></div><div class="swatch-info"><div class="swatch-label">Border</div><div class="swatch-hex">#D0D5E0</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#E8993A"></div><div class="swatch-info"><div class="swatch-label">Accent</div><div class="swatch-hex">#E8993A</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#6B7080"></div><div class="swatch-info"><div class="swatch-label">Text Secondary</div><div class="swatch-hex">#6B7080</div></div></div>
+      </div>
+    </section>
+
+    <!-- ===== 3. Typography ===== -->
+    <section class="section">
+      <h2 class="section-title">Typography</h2>
+      <p class="section-desc">DM Sans provides a clean geometric sans-serif with a slightly rounded character, balancing professionalism and approachability.</p>
+      <div class="type-card">
+        <div class="type-sample">
+          <div class="type-meta">Heading 1 &mdash; DM Sans 700 / 2rem / line-height 1.2 / tracking -0.02em</div>
+          <div class="type-h1">Event Modeling Canvas</div>
+        </div>
+        <div class="type-sample">
+          <div class="type-meta">Heading 2 &mdash; DM Sans 700 / 1.5rem / line-height 1.3 / tracking -0.015em</div>
+          <div class="type-h2">Slice: User Registration</div>
+        </div>
+        <div class="type-sample">
+          <div class="type-meta">Heading 3 &mdash; DM Sans 500 / 1.125rem / line-height 1.4</div>
+          <div class="type-h3">Command &amp; Event Definitions</div>
+        </div>
+        <div class="type-sample">
+          <div class="type-meta">Body &mdash; DM Sans 400 / 0.9375rem / line-height 1.6</div>
+          <div class="type-body">Each slice represents a vertical unit of work flowing from trigger through command and event to a read model view. Slices are independently testable and deliverable.</div>
+        </div>
+        <div class="type-sample">
+          <div class="type-meta">Label &mdash; DM Sans 500 / 0.75rem / uppercase / tracking 0.06em / amber accent</div>
+          <div class="type-label">Swimlane &middot; User Interface</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 4. Mock Board ===== -->
+    <section class="section">
+      <h2 class="section-title">Mock Board</h2>
+      <p class="section-desc">A representative canvas with two slices, three swimlanes, and two-tone connection styling. Cool gray for commands/triggers, warm gray for events/views.</p>
+      <div class="board-wrapper">
+        <svg class="board-svg" viewBox="0 0 820 420" width="820" height="420" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow-cool" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,3.5 L0,7 z" fill="#8B90A0" opacity="0.5"/>
+            </marker>
+            <marker id="arrow-warm" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,3.5 L0,7 z" fill="#C4A882" opacity="0.5"/>
+            </marker>
+            <marker id="arrow-exception" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,3.5 L0,7 z" fill="#EF4444" opacity="0.45"/>
+            </marker>
+            <marker id="arrow-automation" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,3.5 L0,7 z" fill="#8B5CF6" opacity="0.45"/>
+            </marker>
+          </defs>
+
+          <!-- Swimlane backgrounds -->
+          <rect x="0" y="0" width="820" height="140" rx="0" fill="var(--color-swimlane-user)"/>
+          <rect x="0" y="140" width="820" height="140" rx="0" fill="var(--color-swimlane-system)"/>
+          <rect x="0" y="280" width="820" height="140" rx="0" fill="var(--color-swimlane-external)"/>
+
+          <!-- Swimlane dividers -->
+          <line x1="0" y1="140" x2="820" y2="140" stroke="var(--color-border)" stroke-width="1"/>
+          <line x1="0" y1="280" x2="820" y2="280" stroke="var(--color-border)" stroke-width="1"/>
+
+          <!-- Swimlane labels (amber accent) -->
+          <text x="14" y="24" font-size="10" font-weight="500" fill="var(--color-accent)" letter-spacing="0.08em" opacity="0.8">USER</text>
+          <text x="14" y="164" font-size="10" font-weight="500" fill="var(--color-accent)" letter-spacing="0.08em" opacity="0.8">SYSTEM</text>
+          <text x="14" y="304" font-size="10" font-weight="500" fill="var(--color-accent)" letter-spacing="0.08em" opacity="0.8">EXTERNAL</text>
+
+          <!-- === Slice 1: User Registration === -->
+          <text x="100" y="52" font-size="11" font-weight="700" fill="var(--color-text)" opacity="0.6">Slice 1: User Registration</text>
+
+          <!-- Trigger: SignUpClick -->
+          <rect x="50" y="68" width="110" height="44" rx="8" fill="#E5E7EB" stroke="#9CA3AF" stroke-width="1.5"/>
+          <text x="105" y="86" font-size="9" font-weight="500" fill="#9CA3AF" text-anchor="middle">TRIGGER</text>
+          <text x="105" y="101" font-size="10.5" font-weight="500" fill="#374151" text-anchor="middle">SignUpClick</text>
+
+          <!-- Connection: Trigger -> Command (cool gray) -->
+          <path d="M160,90 C182,90 182,195 204,195" fill="none" stroke="#8B90A0" stroke-width="1.5" opacity="0.4" marker-end="url(#arrow-cool)"/>
+
+          <!-- Command: RegisterUser -->
+          <rect x="204" y="173" width="120" height="44" rx="8" fill="#3B82F6" stroke="#2563EB" stroke-width="1.5"/>
+          <text x="264" y="191" font-size="9" font-weight="500" fill="#FFFFFF" text-anchor="middle" opacity="0.8">COMMAND</text>
+          <text x="264" y="206" font-size="10.5" font-weight="500" fill="#FFFFFF" text-anchor="middle">RegisterUser</text>
+
+          <!-- Connection: Command -> Event (warm gray) -->
+          <path d="M324,195 C350,195 350,195 376,195" fill="none" stroke="#C4A882" stroke-width="1.5" opacity="0.4" marker-end="url(#arrow-warm)"/>
+
+          <!-- Event: UserRegistered -->
+          <rect x="376" y="173" width="130" height="44" rx="8" fill="#F97316" stroke="#EA580C" stroke-width="1.5"/>
+          <text x="441" y="191" font-size="9" font-weight="500" fill="#FFFFFF" text-anchor="middle" opacity="0.8">EVENT</text>
+          <text x="441" y="206" font-size="10.5" font-weight="500" fill="#FFFFFF" text-anchor="middle">UserRegistered</text>
+
+          <!-- Connection: Event -> View (warm gray) -->
+          <path d="M506,195 C526,195 526,90 546,90" fill="none" stroke="#C4A882" stroke-width="1.5" opacity="0.4" marker-end="url(#arrow-warm)"/>
+
+          <!-- View: UserProfile -->
+          <rect x="546" y="68" width="110" height="44" rx="8" fill="#22C55E" stroke="#16A34A" stroke-width="1.5"/>
+          <text x="601" y="86" font-size="9" font-weight="500" fill="#FFFFFF" text-anchor="middle" opacity="0.8">VIEW</text>
+          <text x="601" y="101" font-size="10.5" font-weight="500" fill="#FFFFFF" text-anchor="middle">UserProfile</text>
+
+          <!-- === Slice 2: Send Welcome Email === -->
+          <text x="430" y="252" font-size="11" font-weight="700" fill="var(--color-text)" opacity="0.6">Slice 2: Send Welcome Email</text>
+
+          <!-- Connection: Event -> Automation (dashed, purple) -->
+          <path d="M441,217 C441,237 441,248 441,268" fill="none" stroke="#8B5CF6" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.45" marker-end="url(#arrow-automation)"/>
+
+          <!-- Automation: OnUserRegistered -->
+          <rect x="376" y="268" width="130" height="44" rx="8" fill="#8B5CF6" stroke="#7C3AED" stroke-width="1.5"/>
+          <text x="441" y="286" font-size="9" font-weight="500" fill="#FFFFFF" text-anchor="middle" opacity="0.8">AUTOMATION</text>
+          <text x="441" y="301" font-size="10" font-weight="500" fill="#FFFFFF" text-anchor="middle">OnUserRegistered</text>
+
+          <!-- Connection: Automation -> Command (cool gray) -->
+          <path d="M506,290 C536,290 536,355 566,355" fill="none" stroke="#8B90A0" stroke-width="1.5" opacity="0.4" marker-end="url(#arrow-cool)"/>
+
+          <!-- Command: SendWelcomeEmail -->
+          <rect x="566" y="333" width="140" height="44" rx="8" fill="#3B82F6" stroke="#2563EB" stroke-width="1.5"/>
+          <text x="636" y="351" font-size="9" font-weight="500" fill="#FFFFFF" text-anchor="middle" opacity="0.8">COMMAND</text>
+          <text x="636" y="366" font-size="10" font-weight="500" fill="#FFFFFF" text-anchor="middle">SendWelcomeEmail</text>
+
+          <!-- Connection: Command -> Event (warm gray) -->
+          <path d="M706,355 C726,355 726,290 746,290" fill="none" stroke="#C4A882" stroke-width="1.5" opacity="0.4" marker-end="url(#arrow-warm)"/>
+
+          <!-- Event: WelcomeEmailSent -->
+          <rect x="706" y="268" width="106" height="44" rx="8" fill="#F97316" stroke="#EA580C" stroke-width="1.5"/>
+          <text x="759" y="286" font-size="9" font-weight="500" fill="#FFFFFF" text-anchor="middle" opacity="0.8">EVENT</text>
+          <text x="759" y="301" font-size="10" font-weight="500" fill="#FFFFFF" text-anchor="middle">WelcomeEmailSent</text>
+
+          <!-- === Exception Element === -->
+          <rect x="204" y="330" width="140" height="44" rx="8" fill="#EF4444" stroke="#DC2626" stroke-width="1.5"/>
+          <text x="274" y="348" font-size="9" font-weight="500" fill="#FFFFFF" text-anchor="middle" opacity="0.8">EXCEPTION</text>
+          <text x="274" y="363" font-size="10" font-weight="500" fill="#FFFFFF" text-anchor="middle">RegistrationFailed</text>
+
+          <!-- Connection: Command -> Exception (dashed, red) -->
+          <path d="M264,217 C264,260 274,300 274,330" fill="none" stroke="#EF4444" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.4" marker-end="url(#arrow-exception)"/>
+        </svg>
+      </div>
+    </section>
+
+    <!-- ===== 5. Element Gallery ===== -->
+    <section class="section">
+      <h2 class="section-title">Element Gallery</h2>
+      <p class="section-desc">The six core element types used to construct an event model. Each carries a distinct canonical color for instant visual recognition.</p>
+      <div class="gallery-grid">
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:#3B82F6">C</div>
+          <div>
+            <div class="gallery-label">Command</div>
+            <div class="gallery-desc">An intent to change state. Represents a user or system action that may succeed or fail. Always imperative.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:#F97316">E</div>
+          <div>
+            <div class="gallery-label">Event</div>
+            <div class="gallery-desc">A fact that happened. Immutable past-tense record of a state change. The backbone of the model.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:#22C55E">V</div>
+          <div>
+            <div class="gallery-label">View</div>
+            <div class="gallery-desc">A read model projection. Shows data derived from events, optimized for display or query.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon trigger-icon" style="background:#E5E7EB">T</div>
+          <div>
+            <div class="gallery-label">Trigger</div>
+            <div class="gallery-desc">The initiating action: a button click, page load, or external webhook that starts a flow.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:#EF4444">X</div>
+          <div>
+            <div class="gallery-label">Exception</div>
+            <div class="gallery-desc">An error or alternate path. Captures validation failures, business rule violations, or edge cases.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background:#8B5CF6">A</div>
+          <div>
+            <div class="gallery-label">Automation</div>
+            <div class="gallery-desc">A system process triggered by an event. Sagas, policies, or workflows that react automatically.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 6. CSS Variables Code Block ===== -->
+    <section class="section">
+      <h2 class="section-title">CSS Custom Properties</h2>
+      <p class="section-desc">Complete variable set for both light and dark themes. Copy into your stylesheet to adopt the Alpine Dusk design system.</p>
+      <div class="code-block">
+<pre><span class="cc">/* Alpine Dusk - Light Theme */</span>
+<span class="ck">:root</span> {
+  <span class="cv">--color-bg</span>: #EEF0F5;
+  <span class="cv">--color-surface</span>: #FFFFFF;
+  <span class="cv">--color-surface-alt</span>: #E4E8F0;
+  <span class="cv">--color-text</span>: #1E2230;
+  <span class="cv">--color-text-secondary</span>: #6B7080;
+  <span class="cv">--color-border</span>: #D0D5E0;
+  <span class="cv">--color-accent</span>: #E8993A;
+
+  <span class="cc">/* Canonical Element Colors */</span>
+  <span class="cv">--color-command</span>: #3B82F6;
+  <span class="cv">--color-command-stroke</span>: #2563EB;
+  <span class="cv">--color-event</span>: #F97316;
+  <span class="cv">--color-event-stroke</span>: #EA580C;
+  <span class="cv">--color-view</span>: #22C55E;
+  <span class="cv">--color-view-stroke</span>: #16A34A;
+  <span class="cv">--color-trigger</span>: #E5E7EB;
+  <span class="cv">--color-trigger-stroke</span>: #9CA3AF;
+  <span class="cv">--color-exception</span>: #EF4444;
+  <span class="cv">--color-exception-stroke</span>: #DC2626;
+  <span class="cv">--color-automation</span>: #8B5CF6;
+  <span class="cv">--color-automation-stroke</span>: #7C3AED;
+
+  <span class="cc">/* Swimlane Tints */</span>
+  <span class="cv">--color-swimlane-user</span>: rgba(30, 34, 48, 0.03);
+  <span class="cv">--color-swimlane-system</span>: rgba(34, 197, 94, 0.03);
+  <span class="cv">--color-swimlane-external</span>: rgba(232, 153, 58, 0.04);
+
+  <span class="cc">/* Effects */</span>
+  <span class="cv">--shadow-sm</span>: 0 2px 6px rgba(30, 34, 48, 0.05);
+  <span class="cv">--shadow-md</span>: 0 4px 16px rgba(30, 34, 48, 0.08);
+  <span class="cv">--shadow-lg</span>: 0 8px 32px rgba(30, 34, 48, 0.12);
+  <span class="cv">--radius-card</span>: 12px;
+  <span class="cv">--radius-element</span>: 8px;
+}
+
+<span class="cc">/* Alpine Dusk - Dark Theme */</span>
+<span class="ck">[data-theme="dark"]</span> {
+  <span class="cv">--color-bg</span>: #141822;
+  <span class="cv">--color-surface</span>: #1E2230;
+  <span class="cv">--color-surface-alt</span>: #181C28;
+  <span class="cv">--color-text</span>: #D5D8E2;
+  <span class="cv">--color-text-secondary</span>: #8088A0;
+  <span class="cv">--color-border</span>: #2A3040;
+  <span class="cv">--color-accent</span>: #F0A848;
+
+  <span class="cv">--color-swimlane-user</span>: rgba(208, 213, 224, 0.03);
+  <span class="cv">--color-swimlane-system</span>: rgba(34, 197, 94, 0.04);
+  <span class="cv">--color-swimlane-external</span>: rgba(240, 168, 72, 0.04);
+
+  <span class="cv">--shadow-sm</span>: 0 2px 6px rgba(0, 0, 0, 0.15);
+  <span class="cv">--shadow-md</span>: 0 4px 16px rgba(0, 0, 0, 0.22);
+  <span class="cv">--shadow-lg</span>: 0 8px 32px rgba(0, 0, 0, 0.3);
+}</pre>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    function toggleTheme() {
+      const html = document.documentElement;
+      const isDark = html.getAttribute('data-theme') === 'dark';
+      if (isDark) {
+        html.removeAttribute('data-theme');
+        localStorage.setItem('alpine-dusk-theme', 'light');
+      } else {
+        html.setAttribute('data-theme', 'dark');
+        localStorage.setItem('alpine-dusk-theme', 'dark');
+      }
+    }
+
+    (function restoreTheme() {
+      const saved = localStorage.getItem('alpine-dusk-theme');
+      if (saved === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
+</body>
+</html>

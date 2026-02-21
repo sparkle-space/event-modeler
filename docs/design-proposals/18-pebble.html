@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pebble - EventModeler Design Proposal #18</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ===== CSS Custom Properties ===== */
+    :root {
+      --color-bg: #F7F5F2;
+      --color-surface: #FFFFFF;
+      --color-surface-alt: #EFECE8;
+      --color-text: #252220;
+      --color-text-secondary: #7A7570;
+      --color-border: #E0DBD5;
+      --color-accent: #8B5CF6;
+
+      --shadow-command: 0 4px 16px rgba(59,130,246,0.15);
+      --shadow-event: 0 4px 16px rgba(249,115,22,0.15);
+      --shadow-view: 0 4px 16px rgba(34,197,94,0.15);
+      --shadow-trigger: 0 4px 16px rgba(156,163,175,0.15);
+      --shadow-exception: 0 4px 16px rgba(239,68,68,0.15);
+      --shadow-automation: 0 4px 16px rgba(139,92,246,0.15);
+
+      --shadow-sm: 0 2px 8px rgba(37,34,32,0.04);
+      --shadow-md: 0 4px 20px rgba(37,34,32,0.07);
+      --shadow-lg: 0 8px 32px rgba(37,34,32,0.10);
+      --radius-card: 16px;
+      --radius-element: 12px;
+      --font-family: 'Rubik', system-ui, sans-serif;
+
+      --swimlane-user: rgba(59, 130, 246, 0.025);
+      --swimlane-system: rgba(122, 117, 112, 0.03);
+      --swimlane-external: rgba(139, 92, 246, 0.025);
+
+      --connection-color: #A09890;
+    }
+
+    [data-theme="dark"] {
+      --color-bg: #18171A;
+      --color-surface: #232228;
+      --color-surface-alt: #1E1D22;
+      --color-text: #E5E2DF;
+      --color-text-secondary: #9590A0;
+      --color-border: #35333A;
+      --color-accent: #A78BFA;
+
+      --shadow-command: 0 4px 16px rgba(59,130,246,0.20);
+      --shadow-event: 0 4px 16px rgba(249,115,22,0.20);
+      --shadow-view: 0 4px 16px rgba(34,197,94,0.20);
+      --shadow-trigger: 0 4px 16px rgba(156,163,175,0.12);
+      --shadow-exception: 0 4px 16px rgba(239,68,68,0.20);
+      --shadow-automation: 0 4px 16px rgba(139,92,246,0.20);
+
+      --shadow-sm: 0 2px 8px rgba(0,0,0,0.15);
+      --shadow-md: 0 4px 20px rgba(0,0,0,0.25);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,0.30);
+
+      --swimlane-user: rgba(59, 130, 246, 0.04);
+      --swimlane-system: rgba(149, 144, 160, 0.04);
+      --swimlane-external: rgba(139, 92, 246, 0.04);
+
+      --connection-color: #605850;
+    }
+
+    /* ===== Reset & Base ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-family);
+      background: var(--color-bg);
+      color: var(--color-text);
+      line-height: 1.6;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 48px 32px 80px;
+    }
+
+    /* ===== Header ===== */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 64px;
+    }
+
+    .header-title {
+      font-size: 2.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--color-text);
+    }
+
+    .header-subtitle {
+      font-size: 0.875rem;
+      font-weight: 400;
+      color: var(--color-text-secondary);
+      margin-top: 4px;
+    }
+
+    /* Toggle */
+    .theme-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.8125rem;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle-track {
+      width: 52px;
+      height: 28px;
+      background: var(--color-border);
+      border-radius: 14px;
+      position: relative;
+      transition: background 0.25s ease;
+    }
+
+    [data-theme="dark"] .toggle-track { background: var(--color-accent); }
+
+    .toggle-knob {
+      width: 22px;
+      height: 22px;
+      background: var(--color-surface);
+      border-radius: 50%;
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: var(--shadow-sm);
+    }
+
+    [data-theme="dark"] .toggle-knob { transform: translateX(24px); }
+
+    /* ===== Section ===== */
+    .section { margin-bottom: 64px; }
+
+    .section-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+
+    .section-desc {
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+      margin-bottom: 28px;
+      max-width: 600px;
+    }
+
+    /* ===== Color Palette ===== */
+    .palette-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 16px;
+    }
+
+    .swatch {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-card);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow 0.3s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.3s ease, background 0.3s ease;
+    }
+
+    .swatch:hover {
+      box-shadow: var(--shadow-md);
+      transform: scale(1.02);
+    }
+
+    .swatch-color {
+      height: 72px;
+      border-radius: 14px 14px 0 0;
+      transition: background 0.3s ease;
+    }
+
+    .swatch-info { padding: 14px; }
+
+    .swatch-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .swatch-hex {
+      font-size: 0.6875rem;
+      color: var(--color-text-secondary);
+      font-family: 'Rubik', monospace;
+    }
+
+    /* ===== Typography ===== */
+    .type-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-card);
+      padding: 36px;
+      box-shadow: var(--shadow-md);
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+
+    .type-sample { margin-bottom: 24px; }
+    .type-sample:last-child { margin-bottom: 0; }
+
+    .type-meta {
+      font-size: 0.6875rem;
+      color: var(--color-text-secondary);
+      margin-bottom: 4px;
+      font-family: 'Rubik', monospace;
+    }
+
+    .type-h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+    .type-h2 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.015em; line-height: 1.3; }
+    .type-h3 { font-size: 1.125rem; font-weight: 600; line-height: 1.4; }
+    .type-body { font-size: 0.9375rem; font-weight: 400; line-height: 1.6; color: var(--color-text-secondary); }
+    .type-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-secondary); }
+
+    /* ===== Mock Board ===== */
+    .board-wrapper {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-card);
+      padding: 24px;
+      box-shadow: var(--shadow-md);
+      overflow-x: auto;
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+
+    .board-svg text {
+      font-family: var(--font-family);
+    }
+
+    /* ===== Element Gallery ===== */
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 24px;
+    }
+
+    .gallery-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-card);
+      padding: 28px;
+      display: flex;
+      gap: 18px;
+      align-items: flex-start;
+      transition: box-shadow 0.3s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.3s ease, border-color 0.3s ease;
+    }
+
+    .gallery-card.card-command { box-shadow: var(--shadow-command); }
+    .gallery-card.card-event { box-shadow: var(--shadow-event); }
+    .gallery-card.card-view { box-shadow: var(--shadow-view); }
+    .gallery-card.card-trigger { box-shadow: var(--shadow-trigger); }
+    .gallery-card.card-exception { box-shadow: var(--shadow-exception); }
+    .gallery-card.card-automation { box-shadow: var(--shadow-automation); }
+
+    .gallery-card.card-command:hover { box-shadow: 0 6px 24px rgba(59,130,246,0.25); transform: scale(1.02); }
+    .gallery-card.card-event:hover { box-shadow: 0 6px 24px rgba(249,115,22,0.25); transform: scale(1.02); }
+    .gallery-card.card-view:hover { box-shadow: 0 6px 24px rgba(34,197,94,0.25); transform: scale(1.02); }
+    .gallery-card.card-trigger:hover { box-shadow: 0 6px 24px rgba(156,163,175,0.25); transform: scale(1.02); }
+    .gallery-card.card-exception:hover { box-shadow: 0 6px 24px rgba(239,68,68,0.25); transform: scale(1.02); }
+    .gallery-card.card-automation:hover { box-shadow: 0 6px 24px rgba(139,92,246,0.25); transform: scale(1.02); }
+
+    .gallery-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .gallery-icon.trigger-icon { color: #374151; }
+
+    .gallery-label {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .gallery-desc {
+      font-size: 0.8125rem;
+      color: var(--color-text-secondary);
+      line-height: 1.5;
+    }
+
+    /* ===== Code Block ===== */
+    .code-block {
+      background: var(--color-surface-alt);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-card);
+      padding: 28px;
+      overflow-x: auto;
+      box-shadow: var(--shadow-sm);
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+
+    .code-block pre {
+      margin: 0;
+      font-family: 'Rubik', 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.78rem;
+      line-height: 1.7;
+      color: var(--color-text-secondary);
+      white-space: pre;
+    }
+
+    .code-block .ck { color: var(--color-accent); }
+    .code-block .cv { color: #7A7570; }
+    .code-block .cc { color: var(--color-text-secondary); opacity: 0.6; }
+
+    [data-theme="dark"] .code-block .cv { color: #9590A0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ===== 1. Header ===== -->
+    <header class="header">
+      <div>
+        <h1 class="header-title">Pebble</h1>
+        <p class="header-subtitle">EventModeler Design Proposal #18 &mdash; Friendly &amp; Soft</p>
+      </div>
+      <div class="theme-toggle" onclick="toggleTheme()" role="button" aria-label="Toggle dark mode">
+        <span>Light</span>
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span>Dark</span>
+      </div>
+    </header>
+
+    <!-- ===== 2. Color Palette ===== -->
+    <section class="section">
+      <h2 class="section-title">Color Palette</h2>
+      <p class="section-desc">Canonical element colors on warm stone-toned foundations. Colored shadows match each element type, giving a soft glow like smooth pebbles catching light.</p>
+      <div class="palette-grid">
+        <div class="swatch"><div class="swatch-color" style="background:#3B82F6"></div><div class="swatch-info"><div class="swatch-label">Command</div><div class="swatch-hex">#3B82F6</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#F97316"></div><div class="swatch-info"><div class="swatch-label">Event</div><div class="swatch-hex">#F97316</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#22C55E"></div><div class="swatch-info"><div class="swatch-label">View</div><div class="swatch-hex">#22C55E</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#E5E7EB"></div><div class="swatch-info"><div class="swatch-label">Trigger</div><div class="swatch-hex">#E5E7EB</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#EF4444"></div><div class="swatch-info"><div class="swatch-label">Exception</div><div class="swatch-hex">#EF4444</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#8B5CF6"></div><div class="swatch-info"><div class="swatch-label">Automation</div><div class="swatch-hex">#8B5CF6</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#F7F5F2"></div><div class="swatch-info"><div class="swatch-label">Background</div><div class="swatch-hex">#F7F5F2</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#FFFFFF;border-bottom:1px solid #E0DBD5"></div><div class="swatch-info"><div class="swatch-label">Surface</div><div class="swatch-hex">#FFFFFF</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#252220"></div><div class="swatch-info"><div class="swatch-label">Text</div><div class="swatch-hex">#252220</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#E0DBD5"></div><div class="swatch-info"><div class="swatch-label">Border</div><div class="swatch-hex">#E0DBD5</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#8B5CF6"></div><div class="swatch-info"><div class="swatch-label">Accent</div><div class="swatch-hex">#8B5CF6</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#7A7570"></div><div class="swatch-info"><div class="swatch-label">Text Secondary</div><div class="swatch-hex">#7A7570</div></div></div>
+      </div>
+    </section>
+
+    <!-- ===== 3. Typography ===== -->
+    <section class="section">
+      <h2 class="section-title">Typography</h2>
+      <p class="section-desc">Rubik from Google Fonts brings slightly rounded letterforms that echo the pebble motif while maintaining legibility and warmth.</p>
+      <div class="type-card">
+        <div class="type-sample">
+          <div class="type-meta">Heading 1 &mdash; Rubik 700 / 2rem / line-height 1.2 / tracking -0.02em</div>
+          <div class="type-h1">Event Modeling Canvas</div>
+        </div>
+        <div class="type-sample">
+          <div class="type-meta">Heading 2 &mdash; Rubik 700 / 1.5rem / line-height 1.3 / tracking -0.015em</div>
+          <div class="type-h2">Slice: User Registration</div>
+        </div>
+        <div class="type-sample">
+          <div class="type-meta">Heading 3 &mdash; Rubik 600 / 1.125rem / line-height 1.4</div>
+          <div class="type-h3">Command &amp; Event Definitions</div>
+        </div>
+        <div class="type-sample">
+          <div class="type-meta">Body &mdash; Rubik 400 / 0.9375rem / line-height 1.6</div>
+          <div class="type-body">Each slice represents a vertical unit of work flowing from trigger through command and event to a read model view. Slices are independently testable and deliverable.</div>
+        </div>
+        <div class="type-sample">
+          <div class="type-meta">Label &mdash; Rubik 600 / 0.75rem / uppercase / tracking 0.06em</div>
+          <div class="type-label">Swimlane &middot; User Interface</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 4. Mock Board ===== -->
+    <section class="section">
+      <h2 class="section-title">Mock Board</h2>
+      <p class="section-desc">A softly rounded canvas with colored SVG drop shadows and warm gray connections. Approachable without being overly round.</p>
+      <div class="board-wrapper">
+        <svg class="board-svg" viewBox="0 0 820 420" width="820" height="420" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,3.5 L0,7 z" fill="#A09890" opacity="0.7"/>
+            </marker>
+            <marker id="arrow-exc" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,3.5 L0,7 z" fill="#EF4444" opacity="0.5"/>
+            </marker>
+            <marker id="arrow-auto" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,3.5 L0,7 z" fill="#8B5CF6" opacity="0.5"/>
+            </marker>
+            <!-- Colored drop shadows for SVG elements -->
+            <filter id="shadow-command" x="-20%" y="-20%" width="140%" height="160%">
+              <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#3B82F6" flood-opacity="0.20"/>
+            </filter>
+            <filter id="shadow-event" x="-20%" y="-20%" width="140%" height="160%">
+              <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#F97316" flood-opacity="0.20"/>
+            </filter>
+            <filter id="shadow-view" x="-20%" y="-20%" width="140%" height="160%">
+              <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#22C55E" flood-opacity="0.20"/>
+            </filter>
+            <filter id="shadow-trigger" x="-20%" y="-20%" width="140%" height="160%">
+              <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#9CA3AF" flood-opacity="0.15"/>
+            </filter>
+            <filter id="shadow-exception" x="-20%" y="-20%" width="140%" height="160%">
+              <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#EF4444" flood-opacity="0.20"/>
+            </filter>
+            <filter id="shadow-automation" x="-20%" y="-20%" width="140%" height="160%">
+              <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#8B5CF6" flood-opacity="0.20"/>
+            </filter>
+          </defs>
+
+          <!-- Swimlane backgrounds -->
+          <rect x="0" y="0" width="820" height="140" fill="var(--swimlane-user)"/>
+          <rect x="0" y="140" width="820" height="140" fill="var(--swimlane-system)"/>
+          <rect x="0" y="280" width="820" height="140" fill="var(--swimlane-external)"/>
+
+          <!-- Swimlane dividers -->
+          <line x1="0" y1="140" x2="820" y2="140" stroke="var(--color-border)" stroke-width="1" opacity="0.4"/>
+          <line x1="0" y1="280" x2="820" y2="280" stroke="var(--color-border)" stroke-width="1" opacity="0.4"/>
+
+          <!-- Swimlane labels -->
+          <text x="14" y="24" font-size="10" font-weight="600" fill="var(--color-text-secondary)" letter-spacing="0.08em" opacity="0.6">USER</text>
+          <text x="14" y="164" font-size="10" font-weight="600" fill="var(--color-text-secondary)" letter-spacing="0.08em" opacity="0.6">SYSTEM</text>
+          <text x="14" y="304" font-size="10" font-weight="600" fill="var(--color-text-secondary)" letter-spacing="0.08em" opacity="0.6">EXTERNAL</text>
+
+          <!-- === Slice 1: User Registration === -->
+          <text x="100" y="52" font-size="11" font-weight="700" fill="var(--color-text)" opacity="0.45">Slice 1: User Registration</text>
+
+          <!-- Trigger: SignUpClick -->
+          <rect x="50" y="68" width="110" height="44" rx="12" fill="#E5E7EB" stroke="#9CA3AF" stroke-width="1.5" filter="url(#shadow-trigger)"/>
+          <text x="105" y="86" font-size="9" font-weight="600" fill="#374151" text-anchor="middle" opacity="0.65">TRIGGER</text>
+          <text x="105" y="101" font-size="10.5" font-weight="500" fill="#374151" text-anchor="middle">SignUpClick</text>
+
+          <!-- Connection: Trigger -> Command -->
+          <path d="M160,90 C185,90 185,195 210,195" fill="none" stroke="#A09890" stroke-width="2.5" stroke-linecap="round" opacity="0.40" marker-end="url(#arrow)"/>
+
+          <!-- Command: RegisterUser -->
+          <rect x="210" y="173" width="120" height="44" rx="12" fill="#3B82F6" stroke="#2563EB" stroke-width="1.5" filter="url(#shadow-command)"/>
+          <text x="270" y="191" font-size="9" font-weight="600" fill="#FFFFFF" text-anchor="middle" opacity="0.8">COMMAND</text>
+          <text x="270" y="206" font-size="10.5" font-weight="500" fill="#FFFFFF" text-anchor="middle">RegisterUser</text>
+
+          <!-- Connection: Command -> Event -->
+          <path d="M330,195 C360,195 360,195 390,195" fill="none" stroke="#A09890" stroke-width="2.5" stroke-linecap="round" opacity="0.40" marker-end="url(#arrow)"/>
+
+          <!-- Event: UserRegistered -->
+          <rect x="390" y="173" width="130" height="44" rx="12" fill="#F97316" stroke="#EA580C" stroke-width="1.5" filter="url(#shadow-event)"/>
+          <text x="455" y="191" font-size="9" font-weight="600" fill="#FFFFFF" text-anchor="middle" opacity="0.8">EVENT</text>
+          <text x="455" y="206" font-size="10.5" font-weight="500" fill="#FFFFFF" text-anchor="middle">UserRegistered</text>
+
+          <!-- Connection: Event -> View -->
+          <path d="M520,195 C545,195 545,90 570,90" fill="none" stroke="#A09890" stroke-width="2.5" stroke-linecap="round" opacity="0.40" marker-end="url(#arrow)"/>
+
+          <!-- View: UserProfile -->
+          <rect x="570" y="68" width="110" height="44" rx="12" fill="#22C55E" stroke="#16A34A" stroke-width="1.5" filter="url(#shadow-view)"/>
+          <text x="625" y="86" font-size="9" font-weight="600" fill="#FFFFFF" text-anchor="middle" opacity="0.8">VIEW</text>
+          <text x="625" y="101" font-size="10.5" font-weight="500" fill="#FFFFFF" text-anchor="middle">UserProfile</text>
+
+          <!-- === Exception: RegistrationFailed === -->
+          <rect x="210" y="330" width="140" height="44" rx="12" fill="#EF4444" stroke="#DC2626" stroke-width="1.5" filter="url(#shadow-exception)"/>
+          <text x="280" y="348" font-size="9" font-weight="600" fill="#FFFFFF" text-anchor="middle" opacity="0.8">EXCEPTION</text>
+          <text x="280" y="363" font-size="10" font-weight="500" fill="#FFFFFF" text-anchor="middle">RegistrationFailed</text>
+
+          <!-- Connection: Command -> Exception (dashed) -->
+          <path d="M270,217 C270,260 280,300 280,330" fill="none" stroke="#EF4444" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="6 4" opacity="0.40" marker-end="url(#arrow-exc)"/>
+
+          <!-- === Slice 2: Send Welcome Email === -->
+          <text x="450" y="252" font-size="11" font-weight="700" fill="var(--color-text)" opacity="0.45">Slice 2: Send Welcome Email</text>
+
+          <!-- Automation: OnUserRegistered -->
+          <rect x="400" y="268" width="140" height="44" rx="12" fill="#8B5CF6" stroke="#7C3AED" stroke-width="1.5" filter="url(#shadow-automation)"/>
+          <text x="470" y="286" font-size="9" font-weight="600" fill="#FFFFFF" text-anchor="middle" opacity="0.8">AUTOMATION</text>
+          <text x="470" y="301" font-size="10" font-weight="500" fill="#FFFFFF" text-anchor="middle">OnUserRegistered</text>
+
+          <!-- Connection from Event to Automation (dashed) -->
+          <path d="M455,217 C455,237 470,248 470,268" fill="none" stroke="#8B5CF6" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="6 4" opacity="0.40" marker-end="url(#arrow-auto)"/>
+
+          <!-- Connection: Automation -> Command -->
+          <path d="M540,290 C570,290 570,355 600,355" fill="none" stroke="#A09890" stroke-width="2.5" stroke-linecap="round" opacity="0.40" marker-end="url(#arrow)"/>
+
+          <!-- Command: SendWelcomeEmail -->
+          <rect x="600" y="333" width="140" height="44" rx="12" fill="#3B82F6" stroke="#2563EB" stroke-width="1.5" filter="url(#shadow-command)"/>
+          <text x="670" y="351" font-size="9" font-weight="600" fill="#FFFFFF" text-anchor="middle" opacity="0.8">COMMAND</text>
+          <text x="670" y="366" font-size="10" font-weight="500" fill="#FFFFFF" text-anchor="middle">SendWelcomeEmail</text>
+
+          <!-- Connection: Command -> Event -->
+          <path d="M670,377 C670,397 750,397 750,370" fill="none" stroke="#A09890" stroke-width="2.5" stroke-linecap="round" opacity="0.40" marker-end="url(#arrow)"/>
+
+          <!-- Event: WelcomeEmailSent -->
+          <rect x="690" y="310" width="120" height="44" rx="12" fill="#F97316" stroke="#EA580C" stroke-width="1.5" filter="url(#shadow-event)"/>
+          <text x="750" y="328" font-size="9" font-weight="600" fill="#FFFFFF" text-anchor="middle" opacity="0.8">EVENT</text>
+          <text x="750" y="343" font-size="10" font-weight="500" fill="#FFFFFF" text-anchor="middle">WelcomeEmailSent</text>
+        </svg>
+      </div>
+    </section>
+
+    <!-- ===== 5. Element Gallery ===== -->
+    <section class="section">
+      <h2 class="section-title">Element Gallery</h2>
+      <p class="section-desc">The six core element types, each with a colored shadow that softly glows on hover. Rounded icon badges and generous padding create a warm, tactile feel.</p>
+      <div class="gallery-grid">
+        <div class="gallery-card card-command">
+          <div class="gallery-icon" style="background:#3B82F6">C</div>
+          <div>
+            <div class="gallery-label">Command</div>
+            <div class="gallery-desc">An intent to change state. Represents a user or system action that may succeed or fail. Always imperative.</div>
+          </div>
+        </div>
+        <div class="gallery-card card-event">
+          <div class="gallery-icon" style="background:#F97316">E</div>
+          <div>
+            <div class="gallery-label">Event</div>
+            <div class="gallery-desc">A fact that happened. Immutable past-tense record of a state change. The backbone of the model.</div>
+          </div>
+        </div>
+        <div class="gallery-card card-view">
+          <div class="gallery-icon" style="background:#22C55E">V</div>
+          <div>
+            <div class="gallery-label">View</div>
+            <div class="gallery-desc">A read model projection. Shows data derived from events, optimized for display or query.</div>
+          </div>
+        </div>
+        <div class="gallery-card card-trigger">
+          <div class="gallery-icon trigger-icon" style="background:#E5E7EB">T</div>
+          <div>
+            <div class="gallery-label">Trigger</div>
+            <div class="gallery-desc">The initiating action: a button click, page load, or external webhook that starts a flow.</div>
+          </div>
+        </div>
+        <div class="gallery-card card-exception">
+          <div class="gallery-icon" style="background:#EF4444">X</div>
+          <div>
+            <div class="gallery-label">Exception</div>
+            <div class="gallery-desc">An error or alternate path. Captures validation failures, business rule violations, or edge cases.</div>
+          </div>
+        </div>
+        <div class="gallery-card card-automation">
+          <div class="gallery-icon" style="background:#8B5CF6">A</div>
+          <div>
+            <div class="gallery-label">Automation</div>
+            <div class="gallery-desc">A system process triggered by an event. Sagas, policies, or workflows that react automatically.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 6. CSS Variables Code Block ===== -->
+    <section class="section">
+      <h2 class="section-title">CSS Custom Properties</h2>
+      <p class="section-desc">Complete variable set for both light and dark themes. Copy into your stylesheet to adopt the Pebble design system.</p>
+      <div class="code-block">
+<pre><span class="cc">/* Pebble - Light Theme */</span>
+<span class="ck">:root</span> {
+  <span class="cv">--color-bg</span>: #F7F5F2;
+  <span class="cv">--color-surface</span>: #FFFFFF;
+  <span class="cv">--color-surface-alt</span>: #EFECE8;
+  <span class="cv">--color-text</span>: #252220;
+  <span class="cv">--color-text-secondary</span>: #7A7570;
+  <span class="cv">--color-border</span>: #E0DBD5;
+  <span class="cv">--color-accent</span>: #8B5CF6;
+
+  <span class="cc">/* Canonical Element Colors */</span>
+  <span class="cv">--color-command</span>: #3B82F6;
+  <span class="cv">--color-command-stroke</span>: #2563EB;
+  <span class="cv">--color-event</span>: #F97316;
+  <span class="cv">--color-event-stroke</span>: #EA580C;
+  <span class="cv">--color-view</span>: #22C55E;
+  <span class="cv">--color-view-stroke</span>: #16A34A;
+  <span class="cv">--color-trigger</span>: #E5E7EB;
+  <span class="cv">--color-trigger-stroke</span>: #9CA3AF;
+  <span class="cv">--color-exception</span>: #EF4444;
+  <span class="cv">--color-exception-stroke</span>: #DC2626;
+  <span class="cv">--color-automation</span>: #8B5CF6;
+  <span class="cv">--color-automation-stroke</span>: #7C3AED;
+
+  <span class="cc">/* Colored Shadows */</span>
+  <span class="cv">--shadow-command</span>: 0 4px 16px rgba(59,130,246,0.15);
+  <span class="cv">--shadow-event</span>: 0 4px 16px rgba(249,115,22,0.15);
+  <span class="cv">--shadow-view</span>: 0 4px 16px rgba(34,197,94,0.15);
+  <span class="cv">--shadow-trigger</span>: 0 4px 16px rgba(156,163,175,0.15);
+  <span class="cv">--shadow-exception</span>: 0 4px 16px rgba(239,68,68,0.15);
+  <span class="cv">--shadow-automation</span>: 0 4px 16px rgba(139,92,246,0.15);
+
+  <span class="cc">/* Swimlane Tints */</span>
+  <span class="cv">--swimlane-user</span>: rgba(59, 130, 246, 0.025);
+  <span class="cv">--swimlane-system</span>: rgba(122, 117, 112, 0.03);
+  <span class="cv">--swimlane-external</span>: rgba(139, 92, 246, 0.025);
+
+  <span class="cc">/* Foundation */</span>
+  <span class="cv">--shadow-sm</span>: 0 2px 8px rgba(37,34,32,0.04);
+  <span class="cv">--shadow-md</span>: 0 4px 20px rgba(37,34,32,0.07);
+  <span class="cv">--shadow-lg</span>: 0 8px 32px rgba(37,34,32,0.10);
+  <span class="cv">--radius-card</span>: 16px;
+  <span class="cv">--radius-element</span>: 12px;
+  <span class="cv">--connection-color</span>: #A09890;
+}
+
+<span class="cc">/* Pebble - Dark Theme */</span>
+<span class="ck">[data-theme="dark"]</span> {
+  <span class="cv">--color-bg</span>: #18171A;
+  <span class="cv">--color-surface</span>: #232228;
+  <span class="cv">--color-surface-alt</span>: #1E1D22;
+  <span class="cv">--color-text</span>: #E5E2DF;
+  <span class="cv">--color-text-secondary</span>: #9590A0;
+  <span class="cv">--color-border</span>: #35333A;
+  <span class="cv">--color-accent</span>: #A78BFA;
+
+  <span class="cv">--shadow-command</span>: 0 4px 16px rgba(59,130,246,0.20);
+  <span class="cv">--shadow-event</span>: 0 4px 16px rgba(249,115,22,0.20);
+  <span class="cv">--shadow-view</span>: 0 4px 16px rgba(34,197,94,0.20);
+  <span class="cv">--shadow-trigger</span>: 0 4px 16px rgba(156,163,175,0.12);
+  <span class="cv">--shadow-exception</span>: 0 4px 16px rgba(239,68,68,0.20);
+  <span class="cv">--shadow-automation</span>: 0 4px 16px rgba(139,92,246,0.20);
+
+  <span class="cv">--shadow-sm</span>: 0 2px 8px rgba(0,0,0,0.15);
+  <span class="cv">--shadow-md</span>: 0 4px 20px rgba(0,0,0,0.25);
+  <span class="cv">--shadow-lg</span>: 0 8px 32px rgba(0,0,0,0.30);
+  <span class="cv">--connection-color</span>: #605850;
+}</pre>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    function toggleTheme() {
+      const html = document.documentElement;
+      const isDark = html.getAttribute('data-theme') === 'dark';
+      if (isDark) {
+        html.removeAttribute('data-theme');
+        localStorage.setItem('pebble-theme', 'light');
+      } else {
+        html.setAttribute('data-theme', 'dark');
+        localStorage.setItem('pebble-theme', 'dark');
+      }
+    }
+
+    (function restoreTheme() {
+      const saved = localStorage.getItem('pebble-theme');
+      if (saved === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
+</body>
+</html>

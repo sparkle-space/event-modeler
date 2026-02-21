@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Design Proposal #6 — Soft Clay</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ========== CSS Custom Properties ========== */
+    :root {
+      --color-bg: #FAF6F1;
+      --color-surface: #FFFFFF;
+      --color-surface-alt: #F5EFE8;
+      --color-text: #2E2520;
+      --color-text-muted: #7A6E63;
+      --color-border: #E8DFD4;
+      --color-border-light: #F0E9E0;
+      --color-accent: #C4956C;
+      --color-accent-hover: #B8854F;
+
+      --color-command: #7EB5D6;
+      --color-command-light: #D6EAF5;
+      --color-event: #D4927A;
+      --color-event-light: #F5DDD4;
+      --color-view: #8EBE8E;
+      --color-view-light: #D6EED6;
+      --color-trigger: #B8AD9E;
+      --color-trigger-light: #E8E2D8;
+      --color-exception: #D48B8B;
+      --color-exception-light: #F5D6D6;
+      --color-automation: #A890B8;
+      --color-automation-light: #E4D8F0;
+
+      --shadow-soft: 0 4px 20px rgba(46, 37, 32, 0.07);
+      --shadow-medium: 0 6px 24px rgba(46, 37, 32, 0.10);
+      --shadow-blob: 0 8px 30px rgba(46, 37, 32, 0.08), 0 2px 8px rgba(46, 37, 32, 0.04);
+      --radius-card: 16px;
+      --radius-element: 12px;
+      --radius-pill: 24px;
+    }
+
+    [data-theme="dark"] {
+      --color-bg: #1E1B18;
+      --color-surface: #2A2622;
+      --color-surface-alt: #33302B;
+      --color-text: #E8E0D8;
+      --color-text-muted: #A09488;
+      --color-border: #3A3530;
+      --color-border-light: #443E38;
+      --color-accent: #D4A87C;
+      --color-accent-hover: #E0B88E;
+
+      --color-command: #7EB5D6;
+      --color-command-light: #2A3A45;
+      --color-event: #D4927A;
+      --color-event-light: #3E2A22;
+      --color-view: #8EBE8E;
+      --color-view-light: #2A3A2A;
+      --color-trigger: #B8AD9E;
+      --color-trigger-light: #35302A;
+      --color-exception: #D48B8B;
+      --color-exception-light: #3E2828;
+      --color-automation: #A890B8;
+      --color-automation-light: #302840;
+
+      --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.20);
+      --shadow-medium: 0 6px 24px rgba(0, 0, 0, 0.28);
+      --shadow-blob: 0 8px 30px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.12);
+    }
+
+    /* ========== Base Styles ========== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: var(--color-bg);
+      color: var(--color-text);
+      line-height: 1.6;
+      transition: background 0.4s ease, color 0.4s ease;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    section {
+      margin-bottom: 56px;
+    }
+
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+      color: var(--color-text);
+      letter-spacing: -0.01em;
+    }
+
+    h2::before {
+      content: '';
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: var(--color-accent);
+      border-radius: 50%;
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+
+    /* ========== Header ========== */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 28px 32px;
+      background: var(--color-surface);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-blob);
+      margin-bottom: 48px;
+      border: 1px solid var(--color-border-light);
+    }
+
+    .header-left { display: flex; align-items: center; gap: 16px; }
+
+    .header-logo {
+      width: 48px; height: 48px;
+      background: linear-gradient(135deg, var(--color-event), var(--color-accent));
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem; color: #fff;
+    }
+
+    .header-title {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, var(--color-event), var(--color-accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .header-subtitle {
+      font-size: 0.82rem;
+      color: var(--color-text-muted);
+      font-weight: 400;
+    }
+
+    /* Toggle switch */
+    .toggle-wrapper { display: flex; align-items: center; gap: 10px; }
+    .toggle-label { font-size: 0.82rem; color: var(--color-text-muted); font-weight: 600; }
+
+    .toggle {
+      position: relative; width: 52px; height: 28px;
+      background: var(--color-border);
+      border-radius: 14px; cursor: pointer;
+      transition: background 0.3s ease;
+      border: none; padding: 0;
+    }
+    .toggle::after {
+      content: '';
+      position: absolute; top: 3px; left: 3px;
+      width: 22px; height: 22px;
+      background: var(--color-surface);
+      border-radius: 50%;
+      transition: transform 0.3s ease, background 0.3s ease;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+    }
+    .toggle.active { background: var(--color-accent); }
+    .toggle.active::after { transform: translateX(24px); }
+
+    /* ========== Color Palette ========== */
+    .palette-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 14px;
+    }
+
+    .swatch {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-card);
+      padding: 16px;
+      box-shadow: var(--shadow-soft);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .swatch:hover { transform: translateY(-2px); box-shadow: var(--shadow-medium); }
+
+    .swatch-color {
+      height: 48px;
+      border-radius: var(--radius-element);
+      margin-bottom: 10px;
+    }
+
+    .swatch-hex {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--color-text);
+      font-family: 'Nunito', monospace;
+    }
+
+    .swatch-label {
+      font-size: 0.72rem;
+      color: var(--color-text-muted);
+      font-weight: 600;
+      display: inline-block;
+      background: var(--color-surface-alt);
+      padding: 2px 10px;
+      border-radius: var(--radius-pill);
+      margin-top: 6px;
+    }
+
+    /* ========== Typography ========== */
+    .type-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-card);
+      padding: 32px;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .type-row {
+      padding: 16px 0;
+      border-bottom: 1px solid var(--color-border-light);
+      display: flex;
+      align-items: baseline;
+      gap: 24px;
+    }
+    .type-row:last-child { border-bottom: none; }
+
+    .type-meta {
+      min-width: 140px;
+      font-size: 0.72rem;
+      color: var(--color-text-muted);
+      font-weight: 600;
+      line-height: 1.8;
+    }
+
+    /* ========== Mock Board ========== */
+    .board-wrapper {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-card);
+      padding: 24px;
+      box-shadow: var(--shadow-blob);
+      overflow-x: auto;
+    }
+
+    /* ========== Element Gallery ========== */
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+    }
+
+    .gallery-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-card);
+      padding: 24px;
+      box-shadow: var(--shadow-soft);
+      display: flex; align-items: flex-start; gap: 16px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .gallery-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-medium); }
+
+    .gallery-icon {
+      flex-shrink: 0;
+      width: 48px; height: 36px;
+      border-radius: var(--radius-element);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; font-weight: 700; color: #fff;
+    }
+
+    .gallery-name { font-weight: 700; font-size: 0.95rem; margin-bottom: 4px; }
+    .gallery-desc { font-size: 0.8rem; color: var(--color-text-muted); line-height: 1.5; }
+
+    /* ========== Code Block ========== */
+    .code-block {
+      background: var(--color-surface-alt);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-card);
+      padding: 28px;
+      overflow-x: auto;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .code-block pre {
+      margin: 0;
+      font-family: 'Nunito', monospace;
+      font-size: 0.78rem;
+      line-height: 1.7;
+      color: var(--color-text);
+      white-space: pre;
+    }
+
+    .code-comment { color: var(--color-text-muted); }
+    .code-prop { color: var(--color-command); font-weight: 600; }
+    .code-val { color: var(--color-event); }
+    .code-selector { color: var(--color-automation); font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ==================== HEADER ==================== -->
+    <header class="header">
+      <div class="header-left">
+        <div class="header-logo">SC</div>
+        <div>
+          <div class="header-title">Soft Clay</div>
+          <div class="header-subtitle">Design Proposal #6 &mdash; Organic &amp; Gentle</div>
+        </div>
+      </div>
+      <div class="toggle-wrapper">
+        <span class="toggle-label">Light</span>
+        <button class="toggle" id="themeToggle" aria-label="Toggle dark mode"></button>
+        <span class="toggle-label">Dark</span>
+      </div>
+    </header>
+
+    <!-- ==================== COLOR PALETTE ==================== -->
+    <section>
+      <h2>Color Palette</h2>
+      <div class="palette-grid">
+        <div class="swatch"><div class="swatch-color" style="background: linear-gradient(180deg, #7EB5D6, #6BA3C6);"></div><div class="swatch-hex">#7EB5D6</div><div class="swatch-label">Command</div></div>
+        <div class="swatch"><div class="swatch-color" style="background: linear-gradient(180deg, #D4927A, #C4826A);"></div><div class="swatch-hex">#D4927A</div><div class="swatch-label">Event</div></div>
+        <div class="swatch"><div class="swatch-color" style="background: linear-gradient(180deg, #8EBE8E, #7EAE7E);"></div><div class="swatch-hex">#8EBE8E</div><div class="swatch-label">View</div></div>
+        <div class="swatch"><div class="swatch-color" style="background: linear-gradient(180deg, #B8AD9E, #A89D8E);"></div><div class="swatch-hex">#B8AD9E</div><div class="swatch-label">Trigger</div></div>
+        <div class="swatch"><div class="swatch-color" style="background: linear-gradient(180deg, #D48B8B, #C47B7B);"></div><div class="swatch-hex">#D48B8B</div><div class="swatch-label">Exception</div></div>
+        <div class="swatch"><div class="swatch-color" style="background: linear-gradient(180deg, #A890B8, #9880A8);"></div><div class="swatch-hex">#A890B8</div><div class="swatch-label">Automation</div></div>
+        <div class="swatch"><div class="swatch-color" style="background: linear-gradient(180deg, #FAF6F1, #F5EFE8);"></div><div class="swatch-hex">#FAF6F1</div><div class="swatch-label">Background</div></div>
+        <div class="swatch"><div class="swatch-color" style="background: #FFFFFF; border: 1px solid #E8DFD4;"></div><div class="swatch-hex">#FFFFFF</div><div class="swatch-label">Surface</div></div>
+        <div class="swatch"><div class="swatch-color" style="background: linear-gradient(180deg, #2E2520, #3E3530);"></div><div class="swatch-hex">#2E2520</div><div class="swatch-label">Text</div></div>
+        <div class="swatch"><div class="swatch-color" style="background: #E8DFD4;"></div><div class="swatch-hex">#E8DFD4</div><div class="swatch-label">Border</div></div>
+        <div class="swatch"><div class="swatch-color" style="background: linear-gradient(135deg, #C4956C, #D4A87C);"></div><div class="swatch-hex">#C4956C</div><div class="swatch-label">Accent</div></div>
+        <div class="swatch"><div class="swatch-color" style="background: #7A6E63;"></div><div class="swatch-hex">#7A6E63</div><div class="swatch-label">Text Muted</div></div>
+      </div>
+    </section>
+
+    <!-- ==================== TYPOGRAPHY ==================== -->
+    <section>
+      <h2>Typography</h2>
+      <div class="type-card">
+        <div class="type-row">
+          <div class="type-meta">Heading 1<br>700 / 2rem / 1.3</div>
+          <div style="font-size: 2rem; font-weight: 700; line-height: 1.3;">Event Modeling Canvas</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta">Heading 2<br>700 / 1.35rem / 1.4</div>
+          <div style="font-size: 1.35rem; font-weight: 700; line-height: 1.4;">Slice: User Registration</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta">Body<br>400 / 1rem / 1.6</div>
+          <div style="font-size: 1rem; font-weight: 400; line-height: 1.6;">Design your information systems collaboratively using Event Modeling. Import a PRD, build an event model on the visual canvas, and export a refined document.</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta">Label<br>600 / 0.82rem / 1.4</div>
+          <div style="font-size: 0.82rem; font-weight: 600; line-height: 1.4; letter-spacing: 0.02em;">COMMAND &middot; EVENT &middot; VIEW &middot; TRIGGER</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta">Caption<br>400 / 0.72rem / 1.5</div>
+          <div style="font-size: 0.72rem; font-weight: 400; line-height: 1.5; color: var(--color-text-muted);">Last edited 3 minutes ago by Alice</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== MOCK BOARD ==================== -->
+    <section>
+      <h2>Mock Board</h2>
+      <div class="board-wrapper">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 420" width="820" height="420" style="display: block; margin: 0 auto;">
+          <defs>
+            <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#FAF6F1"/>
+              <stop offset="100%" stop-color="#F5EDE3"/>
+            </linearGradient>
+            <linearGradient id="cmdGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#7EB5D6"/><stop offset="100%" stop-color="#6AA4C8"/>
+            </linearGradient>
+            <linearGradient id="evtGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#D4927A"/><stop offset="100%" stop-color="#C6826A"/>
+            </linearGradient>
+            <linearGradient id="viewGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#8EBE8E"/><stop offset="100%" stop-color="#7EAE7E"/>
+            </linearGradient>
+            <linearGradient id="trigGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#B8AD9E"/><stop offset="100%" stop-color="#A89D8E"/>
+            </linearGradient>
+            <linearGradient id="excGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#D48B8B"/><stop offset="100%" stop-color="#C47B7B"/>
+            </linearGradient>
+            <linearGradient id="autoGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#A890B8"/><stop offset="100%" stop-color="#9880A8"/>
+            </linearGradient>
+            <filter id="blobShadow">
+              <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#2E2520" flood-opacity="0.08"/>
+            </filter>
+            <marker id="arrowSoft" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 2 C 3 2, 7 5, 7 5 C 7 5, 3 8, 0 8 Z" fill="#B8AD9E"/>
+            </marker>
+          </defs>
+
+          <!-- Background -->
+          <rect width="820" height="420" rx="12" fill="url(#bgGrad)"/>
+
+          <!-- Swimlanes -->
+          <rect x="0" y="50" width="820" height="120" rx="0" fill="#F5EDE3" opacity="0.5"/>
+          <rect x="0" y="170" width="820" height="120" rx="0" fill="#EDE5DA" opacity="0.4"/>
+          <rect x="0" y="290" width="820" height="120" rx="0" fill="#E5DDD2" opacity="0.35"/>
+
+          <!-- Swimlane labels -->
+          <text x="16" y="118" font-family="Nunito, sans-serif" font-size="11" font-weight="600" fill="#7A6E63" opacity="0.7" transform="rotate(-90 16 118)">User</text>
+          <text x="16" y="238" font-family="Nunito, sans-serif" font-size="11" font-weight="600" fill="#7A6E63" opacity="0.7" transform="rotate(-90 16 238)">System</text>
+          <text x="16" y="358" font-family="Nunito, sans-serif" font-size="11" font-weight="600" fill="#7A6E63" opacity="0.7" transform="rotate(-90 16 358)">External</text>
+
+          <!-- ===== Slice 1: User Registration ===== -->
+          <!-- Slice label -->
+          <text x="210" y="36" font-family="Nunito, sans-serif" font-size="13" font-weight="700" fill="#7A6E63" text-anchor="middle">User Registration</text>
+          <line x1="95" y1="42" x2="335" y2="42" stroke="#E8DFD4" stroke-width="1" stroke-dasharray="4,3"/>
+
+          <!-- Trigger: UserClick -->
+          <rect x="50" y="80" width="110" height="48" rx="16" fill="url(#trigGrad)" filter="url(#blobShadow)"/>
+          <text x="105" y="108" font-family="Nunito, sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">SignUpClick</text>
+
+          <!-- Command: RegisterUser -->
+          <rect x="195" y="195" width="130" height="48" rx="16" fill="url(#cmdGrad)" filter="url(#blobShadow)"/>
+          <text x="260" y="224" font-family="Nunito, sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">RegisterUser</text>
+
+          <!-- Event: UserRegistered -->
+          <rect x="365" y="195" width="140" height="48" rx="16" fill="url(#evtGrad)" filter="url(#blobShadow)"/>
+          <text x="435" y="224" font-family="Nunito, sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">UserRegistered</text>
+
+          <!-- View: UserProfile -->
+          <rect x="310" y="80" width="120" height="48" rx="16" fill="url(#viewGrad)" filter="url(#blobShadow)"/>
+          <text x="370" y="108" font-family="Nunito, sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">UserProfile</text>
+
+          <!-- Connections Slice 1 -->
+          <path d="M 160,104 C 180,104 180,219 195,219" stroke="#B8AD9E" stroke-width="2.5" fill="none" stroke-linecap="round" marker-end="url(#arrowSoft)"/>
+          <path d="M 325,219 C 350,219 350,219 365,219" stroke="#B8AD9E" stroke-width="2.5" fill="none" stroke-linecap="round" marker-end="url(#arrowSoft)"/>
+          <path d="M 435,195 C 435,150 400,128 430,128" stroke="#B8AD9E" stroke-width="2.5" fill="none" stroke-linecap="round" marker-end="url(#arrowSoft)"/>
+
+          <!-- ===== Slice 2: Send Welcome Email ===== -->
+          <!-- Slice label -->
+          <text x="630" y="36" font-family="Nunito, sans-serif" font-size="13" font-weight="700" fill="#7A6E63" text-anchor="middle">Send Welcome Email</text>
+          <line x1="520" y1="42" x2="755" y2="42" stroke="#E8DFD4" stroke-width="1" stroke-dasharray="4,3"/>
+
+          <!-- Automation: OnUserRegistered -->
+          <rect x="530" y="195" width="145" height="48" rx="16" fill="url(#autoGrad)" filter="url(#blobShadow)"/>
+          <text x="602" y="224" font-family="Nunito, sans-serif" font-size="10" font-weight="700" fill="#fff" text-anchor="middle">OnUserRegistered</text>
+
+          <!-- Command: SendWelcomeEmail -->
+          <rect x="545" y="315" width="150" height="48" rx="16" fill="url(#cmdGrad)" filter="url(#blobShadow)"/>
+          <text x="620" y="344" font-family="Nunito, sans-serif" font-size="10" font-weight="700" fill="#fff" text-anchor="middle">SendWelcomeEmail</text>
+
+          <!-- Event: WelcomeEmailSent -->
+          <rect x="730" y="315" width="145" height="48" rx="16" fill="url(#evtGrad)" filter="url(#blobShadow)"/>
+          <text x="802" y="344" font-family="Nunito, sans-serif" font-size="10" font-weight="700" fill="#fff" text-anchor="middle" transform="translate(-3,0)">WelcomeEmailSent</text>
+
+          <!-- Connections Slice 2 -->
+          <path d="M 505,219 C 515,219 520,219 530,219" stroke="#B8AD9E" stroke-width="2.5" fill="none" stroke-linecap="round" marker-end="url(#arrowSoft)"/>
+          <path d="M 602,243 C 602,275 610,315 545,339" stroke="#B8AD9E" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <path d="M 602,243 C 602,280 620,305 620,315" stroke="#B8AD9E" stroke-width="2.5" fill="none" stroke-linecap="round" marker-end="url(#arrowSoft)"/>
+          <path d="M 695,339 C 715,339 720,339 730,339" stroke="#B8AD9E" stroke-width="2.5" fill="none" stroke-linecap="round" marker-end="url(#arrowSoft)"/>
+
+          <!-- Exception: RegistrationFailed -->
+          <rect x="195" y="315" width="155" height="48" rx="16" fill="url(#excGrad)" filter="url(#blobShadow)"/>
+          <text x="272" y="344" font-family="Nunito, sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">RegistrationFailed</text>
+
+          <!-- Exception connection from command -->
+          <path d="M 260,243 C 260,275 272,300 272,315" stroke="#D48B8B" stroke-width="2" fill="none" stroke-linecap="round" stroke-dasharray="6,4" marker-end="url(#arrowSoft)"/>
+        </svg>
+      </div>
+    </section>
+
+    <!-- ==================== ELEMENT GALLERY ==================== -->
+    <section>
+      <h2>Element Gallery</h2>
+      <div class="gallery-grid">
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background: linear-gradient(180deg, #7EB5D6, #6AA4C8);">C</div>
+          <div>
+            <div class="gallery-name">Command</div>
+            <div class="gallery-desc">An intention to change state. Represents a user or system action that may produce events.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background: linear-gradient(180deg, #D4927A, #C6826A);">E</div>
+          <div>
+            <div class="gallery-name">Event</div>
+            <div class="gallery-desc">An immutable fact that something happened. The single source of truth in the model.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background: linear-gradient(180deg, #8EBE8E, #7EAE7E);">V</div>
+          <div>
+            <div class="gallery-name">View</div>
+            <div class="gallery-desc">A read model or projection derived from events. What users and systems see and query.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background: linear-gradient(180deg, #B8AD9E, #A89D8E);">T</div>
+          <div>
+            <div class="gallery-name">Trigger</div>
+            <div class="gallery-desc">A user action or external input that initiates a flow. The starting point of a slice.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background: linear-gradient(180deg, #D48B8B, #C47B7B);">!</div>
+          <div>
+            <div class="gallery-name">Exception</div>
+            <div class="gallery-desc">An error or failure scenario. Captures what happens when a command cannot be fulfilled.</div>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <div class="gallery-icon" style="background: linear-gradient(180deg, #A890B8, #9880A8);">A</div>
+          <div>
+            <div class="gallery-name">Automation</div>
+            <div class="gallery-desc">A system-initiated reaction to an event. Triggers downstream commands without user input.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== CSS VARIABLES ==================== -->
+    <section>
+      <h2>CSS Variables</h2>
+      <div class="code-block">
+        <pre><span class="code-selector">:root</span> {
+  <span class="code-comment">/* Background &amp; Surface */</span>
+  <span class="code-prop">--color-bg</span>: <span class="code-val">#FAF6F1</span>;
+  <span class="code-prop">--color-surface</span>: <span class="code-val">#FFFFFF</span>;
+  <span class="code-prop">--color-surface-alt</span>: <span class="code-val">#F5EFE8</span>;
+
+  <span class="code-comment">/* Text */</span>
+  <span class="code-prop">--color-text</span>: <span class="code-val">#2E2520</span>;
+  <span class="code-prop">--color-text-muted</span>: <span class="code-val">#7A6E63</span>;
+
+  <span class="code-comment">/* Borders */</span>
+  <span class="code-prop">--color-border</span>: <span class="code-val">#E8DFD4</span>;
+  <span class="code-prop">--color-border-light</span>: <span class="code-val">#F0E9E0</span>;
+
+  <span class="code-comment">/* Accent */</span>
+  <span class="code-prop">--color-accent</span>: <span class="code-val">#C4956C</span>;
+  <span class="code-prop">--color-accent-hover</span>: <span class="code-val">#B8854F</span>;
+
+  <span class="code-comment">/* Element Colors */</span>
+  <span class="code-prop">--color-command</span>: <span class="code-val">#7EB5D6</span>;
+  <span class="code-prop">--color-event</span>: <span class="code-val">#D4927A</span>;
+  <span class="code-prop">--color-view</span>: <span class="code-val">#8EBE8E</span>;
+  <span class="code-prop">--color-trigger</span>: <span class="code-val">#B8AD9E</span>;
+  <span class="code-prop">--color-exception</span>: <span class="code-val">#D48B8B</span>;
+  <span class="code-prop">--color-automation</span>: <span class="code-val">#A890B8</span>;
+
+  <span class="code-comment">/* Shadows */</span>
+  <span class="code-prop">--shadow-soft</span>: <span class="code-val">0 4px 20px rgba(46,37,32,0.07)</span>;
+  <span class="code-prop">--shadow-blob</span>: <span class="code-val">0 8px 30px rgba(46,37,32,0.08)</span>;
+
+  <span class="code-comment">/* Radii */</span>
+  <span class="code-prop">--radius-card</span>: <span class="code-val">16px</span>;
+  <span class="code-prop">--radius-element</span>: <span class="code-val">12px</span>;
+  <span class="code-prop">--radius-pill</span>: <span class="code-val">24px</span>;
+}
+
+<span class="code-selector">[data-theme="dark"]</span> {
+  <span class="code-prop">--color-bg</span>: <span class="code-val">#1E1B18</span>;
+  <span class="code-prop">--color-surface</span>: <span class="code-val">#2A2622</span>;
+  <span class="code-prop">--color-surface-alt</span>: <span class="code-val">#33302B</span>;
+  <span class="code-prop">--color-text</span>: <span class="code-val">#E8E0D8</span>;
+  <span class="code-prop">--color-text-muted</span>: <span class="code-val">#A09488</span>;
+  <span class="code-prop">--color-border</span>: <span class="code-val">#3A3530</span>;
+  <span class="code-prop">--color-border-light</span>: <span class="code-val">#443E38</span>;
+  <span class="code-prop">--color-accent</span>: <span class="code-val">#D4A87C</span>;
+  <span class="code-prop">--color-accent-hover</span>: <span class="code-val">#E0B88E</span>;
+  <span class="code-prop">--color-shadow</span>: <span class="code-val">rgba(0,0,0,0.25)</span>;
+}</pre>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ==================== JAVASCRIPT ==================== -->
+  <script>
+    (function() {
+      const toggle = document.getElementById('themeToggle');
+      const html = document.documentElement;
+
+      function setTheme(dark) {
+        html.setAttribute('data-theme', dark ? 'dark' : 'light');
+        toggle.classList.toggle('active', dark);
+        localStorage.setItem('soft-clay-theme', dark ? 'dark' : 'light');
+      }
+
+      // Restore saved preference
+      const saved = localStorage.getItem('soft-clay-theme');
+      if (saved === 'dark') {
+        setTheme(true);
+      }
+
+      toggle.addEventListener('click', function() {
+        const isDark = html.getAttribute('data-theme') === 'dark';
+        setTheme(!isDark);
+      });
+    })();
+  </script>
+</body>
+</html>
