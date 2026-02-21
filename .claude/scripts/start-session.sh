@@ -10,6 +10,9 @@ if [ ! -x "$MISE_BIN" ]; then
   exit 0
 fi
 
+# Trust the project directory (needed for worktrees and first-time setups)
+"$MISE_BIN" trust "$PROJECT_ROOT" 2>/dev/null || true
+
 MISE_OUTPUT=$("$MISE_BIN" env --shell bash -C "$PROJECT_ROOT" 2>/dev/null) || {
   echo "Warning: mise env failed, skipping environment setup" >&2
   exit 0
