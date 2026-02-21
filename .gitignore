@@ -25,3 +25,7 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Phoenix
+/tmp/
+*.pem
