@@ -57,13 +57,14 @@ defmodule EventModeler.Canvas.HtmlRenderer do
   end
 
   defp connection_data(%Connection{} = conn) do
-    mid_x = div(conn.from_x + conn.to_x, 2)
+    end_x = conn.to_x - 10
+    mid_x = div(conn.from_x + end_x, 2)
 
     %{
       from_id: conn.from_id,
       to_id: conn.to_id,
       path:
-        "M #{conn.from_x} #{conn.from_y} C #{mid_x} #{conn.from_y} #{mid_x} #{conn.to_y} #{conn.to_x} #{conn.to_y}"
+        "M #{conn.from_x} #{conn.from_y} C #{mid_x} #{conn.from_y} #{mid_x} #{conn.to_y} #{end_x} #{conn.to_y}"
     }
   end
 
