@@ -14,7 +14,6 @@ defmodule EventModeler.BoardTest do
     {:ok, path} = Workspace.create_prd(@test_dir, "Board Test")
 
     on_exit(fn ->
-      # Stop board if running
       case Registry.lookup(EventModeler.Board.Registry, path) do
         [{pid, _}] -> GenServer.stop(pid, :normal)
         [] -> :ok
@@ -43,12 +42,77 @@ defmodule EventModeler.BoardTest do
     {:ok, _pid} = Board.open(path)
     assert :ok = Board.save(path)
 
-    # Verify file was written
     {:ok, prd} = Workspace.read_prd(path)
     assert prd.title == "Board Test"
   end
 
   test "get_state returns error for unopened board" do
     assert {:error, :not_open} = Board.get_state("/nonexistent/board.md")
+  end
+
+  test "place_element adds element and marks dirty", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+
+    assert {:ok, element_id} = Board.place_element(path, :command, "DoThing")
+    assert is_binary(element_id)
+
+    {:ok, state} = Board.get_state(path)
+    assert state.dirty == true
+
+    # Element should be in the PRD
+    all_elements =
+      Enum.flat_map(state.prd.slices, & &1.steps)
+
+    assert Enum.any?(all_elements, &(&1.label == "DoThing"))
+  end
+
+  test "edit_element updates label", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, element_id} = Board.place_element(path, :event, "OldLabel")
+
+    :ok = Board.edit_element(path, element_id, %{"label" => "NewLabel"})
+
+    {:ok, state} = Board.get_state(path)
+    all_elements = Enum.flat_map(state.prd.slices, & &1.steps)
+    edited = Enum.find(all_elements, &(&1.id == element_id))
+    assert edited.label == "NewLabel"
+  end
+
+  test "connect_elements validates connection rules", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, cmd_id} = Board.place_element(path, :command, "Cmd")
+    {:ok, view_id} = Board.place_element(path, :view, "View")
+    {:ok, evt_id} = Board.place_element(path, :event, "Evt")
+
+    # command -> view is invalid
+    assert {:error, reason} = Board.connect_elements(path, cmd_id, view_id)
+    assert reason =~ "Command"
+    assert reason =~ "View"
+
+    # command -> event is valid
+    assert :ok = Board.connect_elements(path, cmd_id, evt_id)
+  end
+
+  test "remove_element removes from PRD", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, element_id} = Board.place_element(path, :event, "ToRemove")
+
+    :ok = Board.remove_element(path, element_id)
+
+    {:ok, state} = Board.get_state(path)
+    all_elements = Enum.flat_map(state.prd.slices, & &1.steps)
+    refute Enum.any?(all_elements, &(&1.id == element_id))
+  end
+
+  test "mutations append event stream entries", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+
+    {:ok, state_before} = Board.get_state(path)
+    stream_count_before = length(state_before.prd.event_stream)
+
+    {:ok, _} = Board.place_element(path, :command, "Test")
+
+    {:ok, state_after} = Board.get_state(path)
+    assert length(state_after.prd.event_stream) > stream_count_before
   end
 end

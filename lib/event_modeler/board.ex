@@ -9,7 +9,8 @@ defmodule EventModeler.Board do
   use GenServer
 
   alias EventModeler.Prd
-  alias EventModeler.Canvas.{Layout, SvgRenderer}
+  alias EventModeler.Prd.{Element, EventStreamWriter}
+  alias EventModeler.Canvas.{Layout, SvgRenderer, ConnectionRules}
   alias EventModeler.Workspace
 
   defstruct [:file_path, :prd, :layout, :svg_data, dirty: false]
@@ -43,20 +44,36 @@ defmodule EventModeler.Board do
     end
   end
 
-  @doc """
-  Gets the current board state.
-  """
   @spec get_state(String.t()) :: {:ok, t()} | {:error, term()}
-  def get_state(file_path) do
-    call(file_path, :get_state)
+  def get_state(file_path), do: call(file_path, :get_state)
+
+  @spec save(String.t()) :: :ok | {:error, term()}
+  def save(file_path), do: call(file_path, :save)
+
+  @spec place_element(String.t(), atom(), String.t(), String.t() | nil) ::
+          {:ok, String.t()} | {:error, term()}
+  def place_element(file_path, type, label, swimlane \\ nil) do
+    call(file_path, {:place_element, type, label, swimlane})
   end
 
-  @doc """
-  Saves the board state back to the file.
-  """
-  @spec save(String.t()) :: :ok | {:error, term()}
-  def save(file_path) do
-    call(file_path, :save)
+  @spec move_element(String.t(), String.t(), number(), number()) :: :ok | {:error, term()}
+  def move_element(file_path, element_id, x, y) do
+    call(file_path, {:move_element, element_id, x, y})
+  end
+
+  @spec edit_element(String.t(), String.t(), map()) :: :ok | {:error, term()}
+  def edit_element(file_path, element_id, changes) do
+    call(file_path, {:edit_element, element_id, changes})
+  end
+
+  @spec connect_elements(String.t(), String.t(), String.t()) :: :ok | {:error, String.t()}
+  def connect_elements(file_path, from_id, to_id) do
+    call(file_path, {:connect_elements, from_id, to_id})
+  end
+
+  @spec remove_element(String.t(), String.t()) :: :ok | {:error, term()}
+  def remove_element(file_path, element_id) do
+    call(file_path, {:remove_element, element_id})
   end
 
   defp call(file_path, message) do
@@ -78,17 +95,7 @@ defmodule EventModeler.Board do
   def init(file_path) do
     case Workspace.read_prd(file_path) do
       {:ok, prd} ->
-        layout = Layout.compute(prd)
-        svg_data = SvgRenderer.render(layout)
-
-        state = %__MODULE__{
-          file_path: file_path,
-          prd: prd,
-          layout: layout,
-          svg_data: svg_data,
-          dirty: false
-        }
-
+        state = recompute_layout(%__MODULE__{file_path: file_path, prd: prd, dirty: false})
         {:ok, state, @inactivity_timeout}
 
       {:error, reason} ->
@@ -103,16 +110,181 @@ defmodule EventModeler.Board do
 
   def handle_call(:save, _from, state) do
     case Workspace.write_prd(state.file_path, state.prd) do
-      :ok ->
-        {:reply, :ok, %{state | dirty: false}, @inactivity_timeout}
-
-      {:error, _} = error ->
-        {:reply, error, state, @inactivity_timeout}
+      :ok -> {:reply, :ok, %{state | dirty: false}, @inactivity_timeout}
+      {:error, _} = error -> {:reply, error, state, @inactivity_timeout}
     end
+  end
+
+  def handle_call({:place_element, type, label, swimlane}, _from, state) do
+    element = %Element{
+      id: generate_id(),
+      type: type,
+      label: label,
+      swimlane: swimlane,
+      props: %{}
+    }
+
+    # Add element to the first slice, or create a default "Unassigned" slice
+    prd = add_element_to_prd(state.prd, element)
+
+    prd =
+      EventStreamWriter.append(prd, "ElementAdded", "user", %{
+        "elementId" => element.id,
+        "type" => to_string(type),
+        "label" => label
+      })
+
+    state =
+      %{state | prd: prd, dirty: true}
+      |> recompute_layout()
+
+    {:reply, {:ok, element.id}, state, @inactivity_timeout}
+  end
+
+  def handle_call({:move_element, element_id, _x, _y}, _from, state) do
+    # Position tracking is handled by the layout engine, not stored in PRD
+    # Just record the event
+    prd =
+      EventStreamWriter.append(state.prd, "ElementMoved", "user", %{
+        "elementId" => element_id
+      })
+
+    state = %{state | prd: prd, dirty: true}
+    {:reply, :ok, state, @inactivity_timeout}
+  end
+
+  def handle_call({:edit_element, element_id, changes}, _from, state) do
+    prd = update_element_in_prd(state.prd, element_id, changes)
+
+    prd =
+      EventStreamWriter.append(prd, "ElementModified", "user", %{
+        "elementId" => element_id,
+        "changes" => inspect(changes)
+      })
+
+    state =
+      %{state | prd: prd, dirty: true}
+      |> recompute_layout()
+
+    {:reply, :ok, state, @inactivity_timeout}
+  end
+
+  def handle_call({:connect_elements, from_id, to_id}, _from, state) do
+    from_elem = find_element(state.prd, from_id)
+    to_elem = find_element(state.prd, to_id)
+
+    cond do
+      is_nil(from_elem) ->
+        {:reply, {:error, "Source element not found"}, state, @inactivity_timeout}
+
+      is_nil(to_elem) ->
+        {:reply, {:error, "Target element not found"}, state, @inactivity_timeout}
+
+      true ->
+        case ConnectionRules.rejection_reason(from_elem.type, to_elem.type) do
+          nil ->
+            prd =
+              EventStreamWriter.append(state.prd, "ElementsConnected", "user", %{
+                "fromId" => from_id,
+                "toId" => to_id
+              })
+
+            state = %{state | prd: prd, dirty: true}
+            {:reply, :ok, state, @inactivity_timeout}
+
+          reason ->
+            {:reply, {:error, reason}, state, @inactivity_timeout}
+        end
+    end
+  end
+
+  def handle_call({:remove_element, element_id}, _from, state) do
+    prd = remove_element_from_prd(state.prd, element_id)
+
+    prd =
+      EventStreamWriter.append(prd, "ElementRemoved", "user", %{
+        "elementId" => element_id
+      })
+
+    state =
+      %{state | prd: prd, dirty: true}
+      |> recompute_layout()
+
+    {:reply, :ok, state, @inactivity_timeout}
   end
 
   @impl true
   def handle_info(:timeout, state) do
     {:stop, :normal, state}
+  end
+
+  # Private helpers
+
+  defp recompute_layout(state) do
+    layout = Layout.compute(state.prd)
+    svg_data = SvgRenderer.render(layout)
+    %{state | layout: layout, svg_data: svg_data}
+  end
+
+  defp generate_id do
+    :crypto.strong_rand_bytes(8) |> Base.url_encode64(padding: false)
+  end
+
+  defp add_element_to_prd(%Prd{slices: slices} = prd, element) do
+    case slices do
+      [] ->
+        # Create a default slice
+        slice = %Prd.Slice{name: "Unassigned", steps: [element]}
+        %{prd | slices: [slice]}
+
+      [first | rest] ->
+        # Add to the first slice
+        updated = %{first | steps: first.steps ++ [element]}
+        %{prd | slices: [updated | rest]}
+    end
+  end
+
+  defp update_element_in_prd(%Prd{slices: slices} = prd, element_id, changes) do
+    updated_slices =
+      Enum.map(slices, fn slice ->
+        updated_steps =
+          Enum.map(slice.steps, fn step ->
+            if step.id == element_id do
+              step
+              |> maybe_update(:label, changes["label"])
+              |> maybe_update(:swimlane, changes["swimlane"])
+              |> maybe_update_props(changes["props"])
+            else
+              step
+            end
+          end)
+
+        %{slice | steps: updated_steps}
+      end)
+
+    %{prd | slices: updated_slices}
+  end
+
+  defp maybe_update(struct, _key, nil), do: struct
+  defp maybe_update(struct, key, value), do: Map.put(struct, key, value)
+
+  defp maybe_update_props(struct, nil), do: struct
+  defp maybe_update_props(struct, props), do: %{struct | props: Map.merge(struct.props, props)}
+
+  defp remove_element_from_prd(%Prd{slices: slices} = prd, element_id) do
+    updated_slices =
+      slices
+      |> Enum.map(fn slice ->
+        %{slice | steps: Enum.reject(slice.steps, &(&1.id == element_id))}
+      end)
+      |> Enum.reject(fn slice -> slice.steps == [] and slice.name == "Unassigned" end)
+
+    %{prd | slices: updated_slices}
+  end
+
+  defp find_element(%Prd{slices: slices}, element_id) do
+    Enum.find_value(slices, fn slice ->
+      Enum.find(slice.steps, &(&1.id == element_id))
+    end)
   end
 end
