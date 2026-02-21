@@ -13,18 +13,24 @@ The core loop: **PRD in → Event Model → Refined PRD out**.
 
 Users import a PRD, collaboratively build an event model from it on a visual canvas, then export a refined PRD enriched with slices, scenarios, and data flows derived from the model. Teams that start without a PRD still get one: the act of modeling generates a structured requirements document.
 
-EventModeler ships as an **Elixir hex package** (`event_modeler`) that mounts into any Phoenix app, and as a **SaaS** (`eventmodeling.sparkle.space`) wrapping the same code with auth, billing, and multi-tenancy. sparkle.space itself includes the hex module — we dogfood our own tool to design our own system.
+EventModeler is built as a **standalone Phoenix/LiveView application** — a local server you run alongside your codebase. Once the core is mature and the API surface is stable, the reusable parts will be extracted into an **Elixir hex package** (`event_modeler`) that mounts into any Phoenix app. sparkle.space will dogfood the tool to design its own system.
+
+## Development Strategy
+
+1. **Local server** — Build a standalone Phoenix/LiveView application with full event modeling capability
+2. **Hex module extraction** — Once the core is mature, extract the reusable library (`event_modeler`) as a publishable hex package
+3. **Optional SaaS** — A hosted deployment (`eventmodeling.sparkle.space`) is a separate project that depends on the published hex module
 
 ## Key Differentiators
 
 | Differentiator | Why it matters |
 |----------------|----------------|
 | **PRD integration** | No existing tool connects requirements documents to visual event models bidirectionally. EventModeler treats the PRD as a first-class artifact — import it, model from it, export a refined version. |
-| **Embeddable** | No competitor offers a library you drop into your own project. All are standalone SaaS. The hex module lives alongside the code it describes, making models living documentation. |
+| **Embeddable** | Designed for eventual extraction as an embeddable hex module. The library will live alongside the code it describes, making models living documentation. No competitor offers this. |
 | **Non-technical accessibility** | Guided 7-step workshop facilitation mode designed for domain experts, not just developers. Enforces Event Modeling syntax (e.g., Commands cannot connect directly to Views) to prevent invalid models without requiring methodology expertise. |
 | **Facilitation-to-delivery pipeline** | Full journey from PRD → event model → slices → Given/When/Then scenarios → exportable tickets. Most tools stop at the whiteboard. |
 | **Test-case derivation** | Auto-generate Given/When/Then acceptance criteria from slices. The model is the test spec. |
-| **Affordable** | Hex module is free and open-source. SaaS fills the gap below purpose-built tools (prooph board at EUR 250/month) and above generic whiteboards (Miro). |
+| **Affordable** | Open-source when the hex module is extracted. Purpose-built event modeling at zero cost, compared to prooph board (EUR 250/month) and generic whiteboards (Miro). |
 
 ## PRD Format Definition
 
@@ -167,6 +173,324 @@ The existing format in `00-scratchpad/prd-ideas/` (Overview + Key Ideas + Source
 | Data Flows | Absent | Generated from model |
 | Dependencies | Optional | Enriched from model |
 | Sources | Optional | Preserved from input |
+| Event Stream | Absent | Appended by modeling sessions |
+
+### Event Stream
+
+PRD files carry an append-only event stream that records every modeling action. This makes the PRD self-describing: it contains not just the current model, but the history of how the model was built.
+
+**Placement:** Bottom of the PRD file, after all content sections. An HTML comment sentinel `<!-- event-stream -->` marks the start, followed by a `## Event Stream` heading.
+
+**Format:** One fenced `` ```eventstream `` block per event (same pattern as `` ```emlang ``). Each block contains YAML with the following schema:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `seq` | integer | yes | Monotonically increasing sequence number |
+| `ts` | ISO 8601 UTC | yes | Timestamp of the event |
+| `type` | PascalCase string | yes | Event type name |
+| `actor` | string | yes | Who or what caused the event |
+| `data` | map | yes | Event-specific payload |
+| `session` | string | no | Groups events from one modeling session |
+| `ref` | string | no | Reference to related entity (e.g., slice ID) |
+| `note` | string | no | Human-readable annotation |
+
+**Append-only rule:** New events are appended as new fenced blocks. Existing blocks are never modified or removed.
+
+**Event type catalog:**
+
+| Category | Event Types |
+|----------|-------------|
+| PRD lifecycle | `PrdCreated`, `PrdStatusChanged`, `PrdMetadataUpdated`, `PrdExported` |
+| Session | `SessionStarted`, `SessionEnded` |
+| Slices | `SliceAdded`, `SliceRenamed`, `SliceRemoved`, `SliceReordered` |
+| Elements | `ElementAdded`, `ElementModified`, `ElementRemoved`, `ElementsConnected` |
+| Scenarios | `ScenarioAdded`, `ScenarioModified`, `ScenarioRemoved` |
+| Swimlanes | `SwimlaneAdded`, `SwimlaneRemoved` |
+| Data flows | `DataFlowAdded` |
+| Annotations | `NoteAdded` |
+
+**Extraction:** Same pattern as emlang blocks:
+
+```bash
+awk '/^```eventstream/{p=1; print "---"; next} /^```/{p=0; next} p' feature-prd.md
+```
+
+**Example:**
+
+````markdown
+<!-- event-stream -->
+## Event Stream
+
+```eventstream
+seq: 1
+ts: "2026-02-21T10:00:00Z"
+type: PrdCreated
+actor: facilitator@example.com
+data:
+  title: "User Registration"
+  status: draft
+```
+
+```eventstream
+seq: 2
+ts: "2026-02-21T10:05:00Z"
+type: SliceAdded
+actor: facilitator@example.com
+session: "workshop-2026-02-21"
+data:
+  sliceName: RegisterUser
+  elements: [RegistrationForm, RegisterUser, UserRegistered, RegistrationConfirmation]
+```
+````
+
+## EventModeler's Own Event Model
+
+EventModeler models itself. The slices below describe the core workflows of the event_modeler application, defined in emlang notation. This serves as both documentation and a dogfood test of the PRD format.
+
+### Slice: CreateBoard
+
+User creates a new modeling board.
+
+```emlang
+slices:
+  CreateBoard:
+    steps:
+      - t: User/DashboardPage
+      - c: CreateBoard
+        props:
+          title: string
+          ownerId: string
+      - e: Board/BoardCreated
+        props:
+          boardId: string
+          title: string
+          ownerId: string
+      - v: BoardCanvas
+    tests:
+      HappyPath:
+        when:
+          - c: CreateBoard
+            props:
+              title: "My Event Model"
+        then:
+          - e: Board/BoardCreated
+```
+
+### Slice: ImportPrd
+
+User imports a markdown PRD into a board.
+
+```emlang
+slices:
+  ImportPrd:
+    steps:
+      - t: User/ImportDialog
+      - c: ImportPrd
+        props:
+          boardId: string
+          markdownContent: string
+      - e: Prd/PrdImported
+        props:
+          prdId: string
+          boardId: string
+          title: string
+          overview: string
+          keyIdeas: list
+      - v: BoardCanvasWithElements
+    tests:
+      WithEmlangBlocks:
+        when:
+          - c: ImportPrd
+            props:
+              markdownContent: "---\ntitle: Feature\n---\n## Slices\n```emlang\nslices:\n  Register:\n    steps:\n      - c: Register\n```"
+        then:
+          - e: Prd/PrdImported
+      EmptyPrd:
+        when:
+          - c: ImportPrd
+            props:
+              markdownContent: ""
+        then:
+          - x: InvalidPrdContent
+```
+
+### Slice: ModelOnCanvas
+
+User places elements, connects them, and defines swimlanes on the modeling canvas.
+
+```emlang
+slices:
+  PlaceElement:
+    steps:
+      - t: User/ElementPalette
+      - c: PlaceElement
+        props:
+          elementId: string
+          boardId: string
+          type: string
+          label: string
+          x: number
+          y: number
+      - e: Element/ElementPlaced
+        props:
+          elementId: string
+          boardId: string
+          type: string
+          label: string
+      - v: BoardCanvas
+  ConnectElements:
+    steps:
+      - t: User/BoardCanvas
+      - c: ConnectElements
+        props:
+          elementId: string
+          targetElementId: string
+          connectionType: string
+      - e: Element/ElementsConnected
+        props:
+          elementId: string
+          targetElementId: string
+      - v: BoardCanvas
+    tests:
+      ValidConnection:
+        when:
+          - c: ConnectElements
+            props:
+              connectionType: "command_to_event"
+        then:
+          - e: Element/ElementsConnected
+      InvalidConnection:
+        when:
+          - c: ConnectElements
+            props:
+              connectionType: "command_to_view"
+        then:
+          - x: InvalidConnectionType
+```
+
+### Slice: DefineSlice
+
+User groups elements into a named slice.
+
+```emlang
+slices:
+  DefineSlice:
+    steps:
+      - t: User/BoardCanvas
+      - c: DefineSlice
+        props:
+          sliceId: string
+          boardId: string
+          name: string
+          elementIds: list
+      - e: Slice/SliceDefined
+        props:
+          sliceId: string
+          boardId: string
+          name: string
+          elementIds: list
+      - v: SlicePanel
+    tests:
+      HappyPath:
+        when:
+          - c: DefineSlice
+            props:
+              name: "RegisterUser"
+        then:
+          - e: Slice/SliceDefined
+```
+
+### Slice: GenerateScenarios
+
+Auto-generate Given/When/Then scenarios from a slice's element graph.
+
+```emlang
+slices:
+  GenerateScenarios:
+    steps:
+      - t: User/SlicePanel
+      - c: GenerateScenarios
+        props:
+          sliceId: string
+      - e: Slice/ScenarioAdded
+        props:
+          scenarioId: string
+          sliceId: string
+          given: list
+          whenClause: string
+          thenClause: list
+      - v: ScenarioList
+    tests:
+      FromSliceGraph:
+        given:
+          - e: Slice/SliceDefined
+            props:
+              name: "RegisterUser"
+        when:
+          - c: GenerateScenarios
+        then:
+          - e: Slice/ScenarioAdded
+```
+
+### Slice: ExportPrd
+
+Export a refined PRD with slices, scenarios, data flows, and event stream.
+
+```emlang
+slices:
+  ExportPrd:
+    steps:
+      - t: User/ExportDialog
+      - c: ExportPrd
+        props:
+          prdId: string
+          format: string
+      - e: Prd/PrdExported
+        props:
+          prdId: string
+          format: string
+          exportedAt: string
+      - v: ExportDownload
+    tests:
+      MarkdownExport:
+        given:
+          - e: Prd/PrdImported
+        when:
+          - c: ExportPrd
+            props:
+              format: "markdown"
+        then:
+          - e: Prd/PrdExported
+```
+
+### Slice: VisualizeModel
+
+Read-only rendering of a PRD's event model — no editing, just visualization.
+
+```emlang
+slices:
+  VisualizeModel:
+    steps:
+      - t: System/PrdFile
+      - c: LoadModel
+        props:
+          prdId: string
+          mode: string
+      - e: Board/ModelLoaded
+        props:
+          boardId: string
+          prdId: string
+          elementCount: number
+      - v: ReadOnlyCanvas
+    tests:
+      LoadAndRender:
+        when:
+          - c: LoadModel
+            props:
+              mode: "readonly"
+        then:
+          - e: Board/ModelLoaded
+```
 
 ## MVP Feature Set
 
@@ -237,9 +561,17 @@ Each step constrains available tools (server-enforced, not just UI) and validate
 | Participant | Add/edit/move elements, define slices, add scenarios |
 | Viewer | Read-only canvas access, view slices and scenarios |
 
-### Hex Module Integration
+### Read-Only Visualization Mode
 
-The hex module (`event_modeler`) adds event modeling capability to any Phoenix app:
+Render a PRD's event model as a non-editable canvas. The system loads a PRD (or board state), renders the canvas, and disables all editing controls.
+
+- **Use cases:** Self-documentation in running systems, embedding model views in wikis/dashboards, sharing models with stakeholders who don't need editing access
+- **Event stream replay:** "Time-travel" slider replays the event stream to show how the model evolved over time
+- **Embeddable:** The read-only view is a standalone LiveView that can be mounted independently, making it suitable for embedding in other Phoenix apps or rendering as a static page
+
+### Future: Hex Module Extraction
+
+Once the standalone app is mature, the core will be extracted into a hex package (`event_modeler`) that adds event modeling capability to any Phoenix app:
 
 - Mountable routes via router macro
 - Own Ecto migrations (boards, elements, slices, scenarios)
@@ -247,14 +579,15 @@ The hex module (`event_modeler`) adds event modeling capability to any Phoenix a
 - Configurable authentication adapter — host app provides user context
 - Uses host app's Ecto Repo and PubSub
 
+This is the target architecture, not the initial one. The standalone app is built first; extraction happens when the API surface is stable.
+
 ## Deferred Features (Post-MVP)
 
 - **Code scaffolding** — Generate Elixir module stubs (aggregates, commands, events, projectors) from slices
 - **Ticket integration** — Export slices to Jira or Linear as tickets
 - **Version history** — Board versioning with visual model diffing
 - **Template library** — Pre-built event model patterns (user registration, e-commerce checkout, etc.)
-- **AI-assisted modeling** — Describe a business process in natural language, get a starting event model
-- **SaaS billing & multi-tenancy** — Stripe integration, org management, usage-based pricing
+- **LLM-assisted PRD generation** — LLMs generate PRDs externally; event_modeler imports and validates them. The verification loop: event_modeler checks completeness, LLM iterates based on feedback. Integration surface is PRD import/export — LLMs run external, not embedded. Keeping LLMs external preserves scope and avoids coupling; the PRD format IS the interface
 - **Information completeness checker (full)** — Per-board aggregate score and cross-board tracing (per-element and per-slice checking is MVP)
 - **Time collapsing** — Collapse regions of the timeline to manage large models
 
@@ -296,6 +629,15 @@ As a product owner, I want to import a PRD, model it with the team, and get back
 - I prioritize and reorder slices for delivery planning
 - I export the refined PRD with slices and scenarios for stakeholders
 
+### System Architect
+
+As an architect, I want to embed a read-only view of our event model in our internal docs so that the team always sees the current system design.
+
+- I point the read-only visualization at our PRD file
+- The model renders as an interactive (but non-editable) canvas
+- When the model is updated, the visualization reflects the changes
+- I can replay the event stream to show how the design evolved
+
 ## Competitive Landscape
 
 ### Purpose-Built Event Modeling Tools
@@ -324,10 +666,11 @@ As a product owner, I want to import a PRD, model it with the team, and get back
 
 EventModeler occupies a unique position:
 
-- **vs. ONote/Evident Design:** Adds PRD integration, embeddable hex module, and scenario generation. Open-source core vs. closed SaaS.
+- **vs. ONote/Evident Design:** Adds PRD integration, scenario generation, read-only visualization mode, and a path to an embeddable hex module.
 - **vs. Miro:** Purpose-built with syntax enforcement, slice management, and structured export — not a generic canvas with templates.
 - **vs. PlantUML/Mermaid:** Visual, collaborative, and interactive while still being embeddable in a codebase.
-- **vs. all competitors:** Only tool that offers an embeddable library for dogfooding inside your own application.
+- **vs. all competitors:** Only tool designed for eventual extraction as an embeddable library for dogfooding inside your own application. Embeddable read-only visualization of event models — no competitor offers this.
+- **Forward-looking:** LLM-ready PRD format enables external AI tools to generate and iterate on PRDs using event_modeler's import/export pipeline as the integration surface.
 
 ## References
 

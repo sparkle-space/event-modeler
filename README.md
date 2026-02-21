@@ -1,6 +1,6 @@
 # EventModeler
 
-A purpose-built collaborative canvas for designing information systems using [Event Modeling](https://eventmodeling.org). Ships as an Elixir hex package (`event_modeler`) that mounts into any Phoenix app, and as a SaaS at `eventmodeling.sparkle.space`.
+A purpose-built collaborative canvas for designing information systems using [Event Modeling](https://eventmodeling.org).
 
 **PRD in → Event Model → Refined PRD out.**
 
@@ -11,4 +11,6 @@ A purpose-built collaborative canvas for designing information systems using [Ev
 
 ## Status
 
-Pre-development. Product spec and technical design are complete. Next step: scaffold the Elixir project.
+Pre-development — local server first. Product spec and technical design are complete. Next step: scaffold a standalone Phoenix/LiveView application.
+
+**Development strategy:** Build a standalone Phoenix app with full event modeling capability. Extract the reusable hex module (`event_modeler`) once the core is mature and the API surface is stable.
