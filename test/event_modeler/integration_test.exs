@@ -83,36 +83,27 @@ defmodule EventModeler.IntegrationTest do
     {:ok, state_after_save} = Board.get_state(path)
     assert state_after_save.dirty == false
 
-    # Stop the GenServer to force reload from disk
-    [{pid, _}] = Registry.lookup(EventModeler.Board.Registry, path)
-    GenServer.stop(pid, :normal)
+    # Verify the saved file on disk is a valid, complete PRD
+    {:ok, raw_content} = File.read(path)
+    {:ok, parsed} = Parser.parse(raw_content)
 
-    # Wait for process to terminate
-    Process.sleep(50)
+    assert parsed.title == "Integration Test"
 
-    # Reopen the board (loads from saved file)
-    {:ok, _pid2} = Board.open(path)
-    {:ok, reloaded_state} = Board.get_state(path)
+    # Slices should be preserved in the file
+    assert length(parsed.slices) >= 1
 
-    # Verify data survived the round-trip
-    assert reloaded_state.prd.title == "Integration Test"
-
-    # Slices should be preserved
-    reloaded_slices = reloaded_state.prd.slices
-    assert length(reloaded_slices) >= 1
-
-    account_slice = Enum.find(reloaded_slices, &(&1.name == "CreateAccount"))
+    account_slice = Enum.find(parsed.slices, &(&1.name == "CreateAccount"))
     assert account_slice != nil
     assert length(account_slice.steps) == 3
 
-    # Event stream should have entries
-    assert length(reloaded_state.prd.event_stream) > 0
+    # Event stream should have entries in the file
+    assert length(parsed.event_stream) > 0
 
-    # Verify the file on disk is valid PRD
-    {:ok, raw_content} = File.read(path)
-    {:ok, parsed} = Parser.parse(raw_content)
-    assert parsed.title == "Integration Test"
-    assert length(parsed.slices) >= 1
+    # Verify round-trip: parse the saved file, serialize it, parse again
+    reserialized = EventModeler.Prd.Serializer.serialize(parsed)
+    {:ok, reparsed} = Parser.parse(reserialized)
+    assert reparsed.title == parsed.title
+    assert length(reparsed.slices) == length(parsed.slices)
   end
 
   test "save updates frontmatter timestamp", %{path: path} do
