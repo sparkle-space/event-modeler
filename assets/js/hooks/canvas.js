@@ -63,7 +63,7 @@ const EventModelerCanvas = {
 
     // Listen for server-pushed pan_to_slice events
     this.handleEvent("pan_to_slice", (payload) => {
-      this.panToSlice(payload.x, payload.width)
+      this.panToSlice(payload.x, payload.y, payload.width, payload.height)
     })
   },
 
@@ -90,12 +90,24 @@ const EventModelerCanvas = {
     this.viewport.style.cursor = "crosshair"
   },
 
-  panToSlice(sliceX, sliceWidth) {
-    const viewportWidth = this.viewport.getBoundingClientRect().width
-    const sliceCenterX = sliceX + sliceWidth / 2
+  panToSlice(sliceX, sliceY, sliceWidth, sliceHeight) {
+    const vp = this.viewport.getBoundingClientRect()
+    const padding = 80
 
-    // Center the slice horizontally: viewportCenter = translateX + sliceCenterX * scale
-    this.translateX = viewportWidth / 2 - sliceCenterX * this.scale
+    // Calculate scale to fit the slice bounding box in the viewport
+    const scaleX = vp.width / (sliceWidth + padding)
+    const scaleY = vp.height / (sliceHeight + padding)
+    const fitScale = Math.min(scaleX, scaleY)
+
+    // Clamp: minimum zoom floor for readability, cap at MAX_SCALE
+    const MIN_FIT_SCALE = 0.3
+    this.scale = Math.max(MIN_FIT_SCALE, Math.min(fitScale, MAX_SCALE))
+
+    // Center the bounding box in the viewport
+    const centerX = sliceX + sliceWidth / 2
+    const centerY = sliceY + sliceHeight / 2
+    this.translateX = vp.width / 2 - centerX * this.scale
+    this.translateY = vp.height / 2 - centerY * this.scale
 
     // Smooth transition, then remove so manual pan stays responsive
     this.world.style.transition = "transform 0.3s ease-out"

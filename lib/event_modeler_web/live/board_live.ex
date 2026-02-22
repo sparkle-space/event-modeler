@@ -236,8 +236,9 @@ defmodule EventModelerWeb.BoardLive do
     socket = assign(socket, selected_slice: name)
 
     case Enum.find(socket.assigns.canvas_data.slice_labels, &(&1.name == name)) do
-      %{x: x, width: width} ->
-        {:noreply, push_event(socket, "pan_to_slice", %{x: x, width: width})}
+      %{x: x, width: width, y: y, height: height} ->
+        {:noreply,
+         push_event(socket, "pan_to_slice", %{x: x, width: width, y: y, height: height})}
 
       nil ->
         {:noreply, socket}
