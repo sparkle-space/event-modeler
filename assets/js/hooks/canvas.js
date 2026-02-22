@@ -8,6 +8,9 @@
  * - Connect: shift+click source, shift+click target -> pushEvent
  * - Delete: Delete/Backspace -> pushEvent for selected element
  */
+const MIN_SCALE = 0.1
+const MAX_SCALE = 5
+
 const EventModelerCanvas = {
   mounted() {
     this.viewport = this.el
@@ -28,13 +31,18 @@ const EventModelerCanvas = {
       passive: false,
     })
 
-    // Double-click on element to edit label
+    // Double-click on element to edit label, on empty canvas to zoom in
     this.viewport.addEventListener("dblclick", (e) => {
       const elem = e.target.closest("[data-element-id]")
       if (elem) {
         this.pushEvent("element_dblclick", {
           element_id: elem.dataset.elementId,
         })
+      } else {
+        const rect = this.viewport.getBoundingClientRect()
+        const px = e.clientX - rect.left
+        const py = e.clientY - rect.top
+        this.zoomAtPoint(px, py, 1.5)
       }
     })
 
@@ -71,6 +79,15 @@ const EventModelerCanvas = {
 
   applyTransform() {
     this.world.style.transform = `translate(${this.translateX}px, ${this.translateY}px) scale(${this.scale})`
+  },
+
+  zoomAtPoint(px, py, factor) {
+    const newScale = this.scale * factor
+    if (newScale < MIN_SCALE || newScale > MAX_SCALE) return
+    this.translateX = px - factor * (px - this.translateX)
+    this.translateY = py - factor * (py - this.translateY)
+    this.scale = newScale
+    this.applyTransform()
   },
 
   onMouseDown(e) {
@@ -119,20 +136,17 @@ const EventModelerCanvas = {
 
     if (e.ctrlKey || e.metaKey) {
       // Zoom toward cursor (Ctrl/Cmd+scroll or trackpad pinch)
-      const factor = e.deltaY > 0 ? 0.9 : 1.1
+      const factor = e.deltaY > 0 ? 0.95 : 1.05
       const rect = this.viewport.getBoundingClientRect()
       const px = e.clientX - rect.left
       const py = e.clientY - rect.top
-      this.translateX = px - factor * (px - this.translateX)
-      this.translateY = py - factor * (py - this.translateY)
-      this.scale *= factor
+      this.zoomAtPoint(px, py, factor)
     } else {
       // Pan
       this.translateX -= e.deltaX
       this.translateY -= e.deltaY
+      this.applyTransform()
     }
-
-    this.applyTransform()
   },
 
   onDelete() {
