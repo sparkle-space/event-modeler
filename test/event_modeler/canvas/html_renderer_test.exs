@@ -44,7 +44,7 @@ defmodule EventModeler.Canvas.HtmlRendererTest do
           to_y: 70
         }
       ],
-      swimlanes: [%{name: "Default", y: 40, height: 100}],
+      swimlanes: [%{name: "Default", type: :command_view, y: 40, height: 100}],
       slice_labels: [%{name: "CreateBoard", x: 160, width: 420}]
     }
 
@@ -112,7 +112,7 @@ defmodule EventModeler.Canvas.HtmlRendererTest do
       height: 400,
       elements: [],
       connections: [],
-      swimlanes: [%{name: "UI", y: 50, height: 100}],
+      swimlanes: [%{name: "UI", type: :trigger, y: 50, height: 100}],
       slice_labels: []
     }
 
@@ -120,6 +120,7 @@ defmodule EventModeler.Canvas.HtmlRendererTest do
     [swimlane] = canvas_data.swimlanes
     assert swimlane.width == 1000
     assert swimlane.name == "UI"
+    assert swimlane.type == :trigger
   end
 
   test "unknown element type falls back to command classes" do

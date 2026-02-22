@@ -71,6 +71,7 @@ defmodule EventModeler.Canvas.HtmlRenderer do
   defp swimlane_data(swimlane, canvas_width) do
     %{
       name: swimlane.name,
+      type: swimlane.type,
       y: swimlane.y - 10,
       height: swimlane.height,
       width: canvas_width

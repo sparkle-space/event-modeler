@@ -120,8 +120,10 @@
   --shadow-automation: 0 4px 12px rgba(139, 92, 246, 0.25);
   --shadow-exception: 0 4px 12px rgba(239, 68, 68, 0.25);
 
-  /* Swimlane tints */
-  --swimlane-bg: rgba(239, 236, 232, 0.5);
+  /* Swimlane tints (per type) */
+  --swimlane-trigger-bg: rgba(219, 112, 147, 0.08);
+  --swimlane-command-view-bg: rgba(255, 255, 255, 0.6);
+  --swimlane-event-bg: rgba(249, 185, 22, 0.06);
   --swimlane-border: #E0DBD5;
 
   /* Connection colors */
@@ -144,7 +146,9 @@
   --shadow-automation: 0 4px 12px rgba(167, 139, 250, 0.3);
   --shadow-exception: 0 4px 12px rgba(239, 68, 68, 0.3);
 
-  --swimlane-bg: rgba(30, 29, 34, 0.5);
+  --swimlane-trigger-bg: rgba(219, 112, 147, 0.12);
+  --swimlane-command-view-bg: rgba(35, 34, 40, 0.6);
+  --swimlane-event-bg: rgba(249, 185, 22, 0.18);
   --swimlane-border: #35333A;
 
   --color-connection: #57555C;

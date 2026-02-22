@@ -5,10 +5,12 @@ defmodule EventModeler.Canvas.Layout do
 
   Elements are laid out left-to-right per slice in step order
   (wireframe -> command -> event -> view). Swimlane rows group elements
-  by their swimlane prefix.
+  by their swimlane prefix and are ordered by type: triggers on top,
+  commands/views in the middle, events at the bottom.
   """
 
   alias EventModeler.EventModel
+  alias EventModeler.Canvas.Swimlane
 
   @element_width 180
   @element_height 60
@@ -46,10 +48,10 @@ defmodule EventModeler.Canvas.Layout do
   """
   @spec compute(%EventModel{}) :: %LayoutResult{}
   def compute(%EventModel{slices: slices}) do
-    # Collect all unique swimlanes
+    # Collect all unique typed swimlanes
     all_swimlanes = collect_swimlanes(slices)
 
-    # Assign vertical positions per swimlane
+    # Assign vertical positions per swimlane (sorted by type then name)
     swimlane_y = assign_swimlane_positions(all_swimlanes)
 
     # Position elements slice by slice, left to right
@@ -59,10 +61,15 @@ defmodule EventModeler.Canvas.Layout do
     # Calculate canvas dimensions
     total_height = calculate_height(swimlane_y)
 
-    # Build swimlane data for rendering
+    # Build swimlane data for rendering (with type info)
     swimlane_data =
-      Enum.map(swimlane_y, fn {name, y} ->
-        %{name: name, y: y, height: @element_height + @v_gap}
+      Enum.map(all_swimlanes, fn %Swimlane{name: name, type: type} ->
+        %{
+          name: name,
+          type: type,
+          y: Map.get(swimlane_y, name, @padding),
+          height: @element_height + @v_gap
+        }
       end)
 
     %LayoutResult{
@@ -78,15 +85,22 @@ defmodule EventModeler.Canvas.Layout do
   defp collect_swimlanes(slices) do
     slices
     |> Enum.flat_map(fn slice ->
-      Enum.map(slice.steps, fn step -> step.swimlane || "Default" end)
+      Enum.map(slice.steps, fn step ->
+        name = step.swimlane || Swimlane.default_name(Swimlane.type_for_element(step.type))
+        type = Swimlane.type_for_element(step.type)
+        %Swimlane{name: name, type: type}
+      end)
     end)
-    |> Enum.uniq()
+    |> Enum.uniq_by(fn %Swimlane{name: name, type: type} -> {name, type} end)
+    |> Enum.sort_by(fn %Swimlane{name: name, type: type} ->
+      {Swimlane.sort_order(type), name}
+    end)
   end
 
   defp assign_swimlane_positions(swimlanes) do
     swimlanes
     |> Enum.with_index()
-    |> Map.new(fn {name, idx} ->
+    |> Map.new(fn {%Swimlane{name: name}, idx} ->
       {name, @padding + idx * (@element_height + @v_gap)}
     end)
   end
@@ -123,7 +137,9 @@ defmodule EventModeler.Canvas.Layout do
   defp layout_slice(slice, swimlane_y, start_x) do
     {elements, _x} =
       Enum.reduce(slice.steps, {[], start_x}, fn step, {acc, x} ->
-        swimlane = step.swimlane || "Default"
+        swimlane =
+          step.swimlane || Swimlane.default_name(Swimlane.type_for_element(step.type))
+
         y = Map.get(swimlane_y, swimlane, @padding)
 
         elem = %PositionedElement{

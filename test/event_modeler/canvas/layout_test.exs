@@ -72,7 +72,7 @@ defmodule EventModeler.Canvas.LayoutTest do
     assert conn2.to_id == "c"
   end
 
-  test "assigns different swimlane rows" do
+  test "assigns different swimlane rows by type" do
     event_model = %EventModel{
       slices: [
         %Slice{
@@ -96,6 +96,82 @@ defmodule EventModeler.Canvas.LayoutTest do
     assert length(ys) == 2
   end
 
+  test "swimlanes include type field" do
+    event_model = %EventModel{
+      slices: [
+        %Slice{
+          name: "Test",
+          steps: [
+            %Element{id: "1", type: :wireframe, label: "Form", swimlane: "Triggers"},
+            %Element{id: "2", type: :command, label: "DoThing", swimlane: "Processing"},
+            %Element{id: "3", type: :event, label: "ThingDone", swimlane: "Events"}
+          ]
+        }
+      ]
+    }
+
+    result = Layout.compute(event_model)
+
+    trigger_sl = Enum.find(result.swimlanes, &(&1.name == "Triggers"))
+    cmd_sl = Enum.find(result.swimlanes, &(&1.name == "Processing"))
+    event_sl = Enum.find(result.swimlanes, &(&1.name == "Events"))
+
+    assert trigger_sl.type == :trigger
+    assert cmd_sl.type == :command_view
+    assert event_sl.type == :event
+  end
+
+  test "swimlanes are ordered by type: trigger on top, events at bottom" do
+    event_model = %EventModel{
+      slices: [
+        %Slice{
+          name: "Test",
+          steps: [
+            # Insert in non-sorted order
+            %Element{id: "1", type: :event, label: "ThingDone", swimlane: "Events"},
+            %Element{id: "2", type: :wireframe, label: "Form", swimlane: "Triggers"},
+            %Element{id: "3", type: :command, label: "DoThing", swimlane: "Processing"}
+          ]
+        }
+      ]
+    }
+
+    result = Layout.compute(event_model)
+
+    # Should be sorted: trigger first, command_view second, event third
+    types = Enum.map(result.swimlanes, & &1.type)
+    assert types == [:trigger, :command_view, :event]
+
+    # Y positions should increase: trigger < command_view < event
+    ys = Enum.map(result.swimlanes, & &1.y)
+    assert ys == Enum.sort(ys)
+  end
+
+  test "elements without swimlane get typed default" do
+    event_model = %EventModel{
+      slices: [
+        %Slice{
+          name: "Test",
+          steps: [
+            %Element{id: "1", type: :wireframe, label: "Form"},
+            %Element{id: "2", type: :command, label: "DoThing"},
+            %Element{id: "3", type: :event, label: "ThingDone"}
+          ]
+        }
+      ]
+    }
+
+    result = Layout.compute(event_model)
+
+    wireframe = Enum.find(result.elements, &(&1.id == "1"))
+    command = Enum.find(result.elements, &(&1.id == "2"))
+    event = Enum.find(result.elements, &(&1.id == "3"))
+
+    assert wireframe.swimlane == "Triggers"
+    assert command.swimlane == "Processing"
+    assert event.swimlane == "Events"
+  end
+
   test "canvas width accommodates multi-element slices" do
     event_model = %EventModel{
       slices: [
@@ -117,9 +193,8 @@ defmodule EventModeler.Canvas.LayoutTest do
     rightmost = result.elements |> Enum.map(&(&1.x + &1.width)) |> Enum.max()
     assert result.width >= rightmost
 
-    # Swimlane bands should be at least as wide as the canvas
+    # Swimlane bands should have positive height
     Enum.each(result.swimlanes, fn sl ->
-      assert result.width >= rightmost
       assert sl.height > 0
     end)
 
