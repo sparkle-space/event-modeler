@@ -1,6 +1,6 @@
 defmodule EventModeler.Board do
   @moduledoc """
-  GenServer managing an open board backed by a PRD file.
+  GenServer managing an open board backed by an Event Model file.
 
   Each open board has its own GenServer process, started via DynamicSupervisor
   and registered via Registry keyed by file path.
@@ -8,17 +8,17 @@ defmodule EventModeler.Board do
 
   use GenServer
 
-  alias EventModeler.Prd
-  alias EventModeler.Prd.{Element, Slice, EventStreamWriter}
+  alias EventModeler.EventModel
+  alias EventModeler.EventModel.{Element, Slice, EventStreamWriter}
   alias EventModeler.Canvas.{Layout, HtmlRenderer, ConnectionRules}
   alias EventModeler.Workshop.ScenarioGenerator
   alias EventModeler.Workspace
 
-  defstruct [:file_path, :prd, :layout, :canvas_data, dirty: false, connections: []]
+  defstruct [:file_path, :event_model, :layout, :canvas_data, dirty: false, connections: []]
 
   @type t :: %__MODULE__{
           file_path: String.t(),
-          prd: Prd.t(),
+          event_model: EventModel.t(),
           layout: map(),
           canvas_data: map(),
           dirty: boolean(),
@@ -144,14 +144,14 @@ defmodule EventModeler.Board do
 
   @impl true
   def init(file_path) do
-    case Workspace.read_prd(file_path) do
-      {:ok, prd} ->
-        connections = extract_connections(prd.event_stream)
+    case Workspace.read_event_model(file_path) do
+      {:ok, event_model} ->
+        connections = extract_connections(event_model.event_stream)
 
         state =
           recompute_layout(%__MODULE__{
             file_path: file_path,
-            prd: prd,
+            event_model: event_model,
             dirty: false,
             connections: connections
           })
@@ -169,7 +169,7 @@ defmodule EventModeler.Board do
   end
 
   def handle_call(:save, _from, state) do
-    case Workspace.write_prd(state.file_path, state.prd) do
+    case Workspace.write_event_model(state.file_path, state.event_model) do
       :ok -> {:reply, :ok, %{state | dirty: false}, @inactivity_timeout}
       {:error, _} = error -> {:reply, error, state, @inactivity_timeout}
     end
@@ -185,45 +185,45 @@ defmodule EventModeler.Board do
     }
 
     # Add element to the first slice, or create a default "Unassigned" slice
-    prd = add_element_to_prd(state.prd, element)
+    event_model = add_element_to_event_model(state.event_model, element)
 
-    prd =
-      EventStreamWriter.append(prd, "ElementAdded", "user", %{
+    event_model =
+      EventStreamWriter.append(event_model, "ElementAdded", "user", %{
         "elementId" => element.id,
         "type" => to_string(type),
         "label" => label
       })
 
     state =
-      %{state | prd: prd, dirty: true}
+      %{state | event_model: event_model, dirty: true}
       |> recompute_layout()
 
     {:reply, {:ok, element.id}, state, @inactivity_timeout}
   end
 
   def handle_call({:move_element, element_id, _x, _y}, _from, state) do
-    # Position tracking is handled by the layout engine, not stored in PRD
+    # Position tracking is handled by the layout engine, not stored in Event Model
     # Just record the event
-    prd =
-      EventStreamWriter.append(state.prd, "ElementMoved", "user", %{
+    event_model =
+      EventStreamWriter.append(state.event_model, "ElementMoved", "user", %{
         "elementId" => element_id
       })
 
-    state = %{state | prd: prd, dirty: true}
+    state = %{state | event_model: event_model, dirty: true}
     {:reply, :ok, state, @inactivity_timeout}
   end
 
   def handle_call({:edit_element, element_id, changes}, _from, state) do
-    prd = update_element_in_prd(state.prd, element_id, changes)
+    event_model = update_element_in_event_model(state.event_model, element_id, changes)
 
-    prd =
-      EventStreamWriter.append(prd, "ElementModified", "user", %{
+    event_model =
+      EventStreamWriter.append(event_model, "ElementModified", "user", %{
         "elementId" => element_id,
         "changes" => inspect(changes)
       })
 
     state =
-      %{state | prd: prd, dirty: true}
+      %{state | event_model: event_model, dirty: true}
       |> recompute_layout()
 
     {:reply, :ok, state, @inactivity_timeout}
@@ -238,8 +238,8 @@ defmodule EventModeler.Board do
         {:reply, {:error, "These elements are already connected"}, state, @inactivity_timeout}
 
       true ->
-        from_elem = find_element(state.prd, from_id)
-        to_elem = find_element(state.prd, to_id)
+        from_elem = find_element(state.event_model, from_id)
+        to_elem = find_element(state.event_model, to_id)
 
         cond do
           is_nil(from_elem) ->
@@ -251,14 +251,14 @@ defmodule EventModeler.Board do
           true ->
             case ConnectionRules.rejection_reason(from_elem.type, to_elem.type) do
               nil ->
-                prd =
-                  EventStreamWriter.append(state.prd, "ElementsConnected", "user", %{
+                event_model =
+                  EventStreamWriter.append(state.event_model, "ElementsConnected", "user", %{
                     "fromId" => from_id,
                     "toId" => to_id
                   })
 
                 connections = [{from_id, to_id} | state.connections]
-                state = %{state | prd: prd, dirty: true, connections: connections}
+                state = %{state | event_model: event_model, dirty: true, connections: connections}
                 {:reply, :ok, state, @inactivity_timeout}
 
               reason ->
@@ -269,10 +269,10 @@ defmodule EventModeler.Board do
   end
 
   def handle_call({:remove_element, element_id}, _from, state) do
-    prd = remove_element_from_prd(state.prd, element_id)
+    event_model = remove_element_from_event_model(state.event_model, element_id)
 
-    prd =
-      EventStreamWriter.append(prd, "ElementRemoved", "user", %{
+    event_model =
+      EventStreamWriter.append(event_model, "ElementRemoved", "user", %{
         "elementId" => element_id
       })
 
@@ -282,7 +282,7 @@ defmodule EventModeler.Board do
       end)
 
     state =
-      %{state | prd: prd, dirty: true, connections: connections}
+      %{state | event_model: event_model, dirty: true, connections: connections}
       |> recompute_layout()
 
     {:reply, :ok, state, @inactivity_timeout}
@@ -290,7 +290,7 @@ defmodule EventModeler.Board do
 
   def handle_call({:define_slice, name, element_ids}, _from, state) do
     # Collect elements matching the given IDs
-    all_elements = Enum.flat_map(state.prd.slices, & &1.steps)
+    all_elements = Enum.flat_map(state.event_model.slices, & &1.steps)
     selected = Enum.filter(all_elements, &(&1.id in element_ids))
 
     if selected == [] do
@@ -300,22 +300,22 @@ defmodule EventModeler.Board do
       new_slice = %Slice{name: name, steps: selected, tests: []}
 
       updated_slices =
-        state.prd.slices
+        state.event_model.slices
         |> Enum.map(fn slice ->
           %{slice | steps: Enum.reject(slice.steps, &(&1.id in element_ids))}
         end)
         |> Enum.reject(fn s -> s.steps == [] and s.name == "Unassigned" end)
 
-      prd = %{state.prd | slices: updated_slices ++ [new_slice]}
+      event_model = %{state.event_model | slices: updated_slices ++ [new_slice]}
 
-      prd =
-        EventStreamWriter.append(prd, "SliceAdded", "user", %{
+      event_model =
+        EventStreamWriter.append(event_model, "SliceAdded", "user", %{
           "sliceName" => name,
           "elementCount" => length(selected)
         })
 
       state =
-        %{state | prd: prd, dirty: true}
+        %{state | event_model: event_model, dirty: true}
         |> recompute_layout()
 
       {:reply, :ok, state, @inactivity_timeout}
@@ -324,24 +324,24 @@ defmodule EventModeler.Board do
 
   def handle_call({:rename_slice, old_name, new_name}, _from, state) do
     updated_slices =
-      Enum.map(state.prd.slices, fn slice ->
+      Enum.map(state.event_model.slices, fn slice ->
         if slice.name == old_name, do: %{slice | name: new_name}, else: slice
       end)
 
-    prd = %{state.prd | slices: updated_slices}
+    event_model = %{state.event_model | slices: updated_slices}
 
-    prd =
-      EventStreamWriter.append(prd, "SliceRenamed", "user", %{
+    event_model =
+      EventStreamWriter.append(event_model, "SliceRenamed", "user", %{
         "oldName" => old_name,
         "newName" => new_name
       })
 
-    state = %{state | prd: prd, dirty: true}
+    state = %{state | event_model: event_model, dirty: true}
     {:reply, :ok, state, @inactivity_timeout}
   end
 
   def handle_call({:generate_scenarios, slice_name}, _from, state) do
-    case Enum.find(state.prd.slices, &(&1.name == slice_name)) do
+    case Enum.find(state.event_model.slices, &(&1.name == slice_name)) do
       nil ->
         {:reply, {:error, "Slice not found"}, state, @inactivity_timeout}
 
@@ -349,20 +349,20 @@ defmodule EventModeler.Board do
         scenarios = ScenarioGenerator.generate(slice)
 
         updated_slices =
-          Enum.map(state.prd.slices, fn s ->
+          Enum.map(state.event_model.slices, fn s ->
             if s.name == slice_name, do: %{s | tests: scenarios}, else: s
           end)
 
-        prd = %{state.prd | slices: updated_slices}
+        event_model = %{state.event_model | slices: updated_slices}
 
-        prd =
-          EventStreamWriter.append(prd, "ScenarioAdded", "user", %{
+        event_model =
+          EventStreamWriter.append(event_model, "ScenarioAdded", "user", %{
             "sliceName" => slice_name,
             "count" => length(scenarios)
           })
 
         state =
-          %{state | prd: prd, dirty: true}
+          %{state | event_model: event_model, dirty: true}
           |> recompute_layout()
 
         {:reply, {:ok, scenarios}, state, @inactivity_timeout}
@@ -373,14 +373,14 @@ defmodule EventModeler.Board do
     if {from_id, to_id} in state.connections do
       connections = List.delete(state.connections, {from_id, to_id})
 
-      prd =
-        EventStreamWriter.append(state.prd, "ElementsDisconnected", "user", %{
+      event_model =
+        EventStreamWriter.append(state.event_model, "ElementsDisconnected", "user", %{
           "fromId" => from_id,
           "toId" => to_id
         })
 
       state =
-        %{state | prd: prd, dirty: true, connections: connections}
+        %{state | event_model: event_model, dirty: true, connections: connections}
         |> recompute_layout()
 
       {:reply, :ok, state, @inactivity_timeout}
@@ -390,13 +390,13 @@ defmodule EventModeler.Board do
   end
 
   def handle_call({:remove_slice, slice_name}, _from, state) do
-    case Enum.find(state.prd.slices, &(&1.name == slice_name)) do
+    case Enum.find(state.event_model.slices, &(&1.name == slice_name)) do
       nil ->
         {:reply, {:error, "Slice not found"}, state, @inactivity_timeout}
 
       slice ->
         elements = slice.steps
-        remaining = Enum.reject(state.prd.slices, &(&1.name == slice_name))
+        remaining = Enum.reject(state.event_model.slices, &(&1.name == slice_name))
 
         # Move elements to Unassigned slice
         updated_slices =
@@ -416,16 +416,16 @@ defmodule EventModeler.Board do
             remaining
           end
 
-        prd = %{state.prd | slices: updated_slices}
+        event_model = %{state.event_model | slices: updated_slices}
 
-        prd =
-          EventStreamWriter.append(prd, "SliceRemoved", "user", %{
+        event_model =
+          EventStreamWriter.append(event_model, "SliceRemoved", "user", %{
             "sliceName" => slice_name,
             "elementCount" => length(elements)
           })
 
         state =
-          %{state | prd: prd, dirty: true}
+          %{state | event_model: event_model, dirty: true}
           |> recompute_layout()
 
         {:reply, :ok, state, @inactivity_timeout}
@@ -433,7 +433,7 @@ defmodule EventModeler.Board do
   end
 
   def handle_call({:remove_element_from_slice, slice_name, element_id}, _from, state) do
-    case Enum.find(state.prd.slices, &(&1.name == slice_name)) do
+    case Enum.find(state.event_model.slices, &(&1.name == slice_name)) do
       nil ->
         {:reply, {:error, "Slice not found"}, state, @inactivity_timeout}
 
@@ -445,7 +445,7 @@ defmodule EventModeler.Board do
           updated_source = %{slice | steps: Enum.reject(slice.steps, &(&1.id == element_id))}
 
           updated_slices =
-            Enum.map(state.prd.slices, fn s ->
+            Enum.map(state.event_model.slices, fn s ->
               if s.name == slice_name, do: updated_source, else: s
             end)
 
@@ -469,16 +469,16 @@ defmodule EventModeler.Board do
               s.steps == [] and s.name != "Unassigned" and s.name == slice_name
             end)
 
-          prd = %{state.prd | slices: updated_slices}
+          event_model = %{state.event_model | slices: updated_slices}
 
-          prd =
-            EventStreamWriter.append(prd, "ElementRemovedFromSlice", "user", %{
+          event_model =
+            EventStreamWriter.append(event_model, "ElementRemovedFromSlice", "user", %{
               "sliceName" => slice_name,
               "elementId" => element_id
             })
 
           state =
-            %{state | prd: prd, dirty: true}
+            %{state | event_model: event_model, dirty: true}
             |> recompute_layout()
 
           {:reply, :ok, state, @inactivity_timeout}
@@ -489,7 +489,7 @@ defmodule EventModeler.Board do
   end
 
   def handle_call({:remove_scenario, slice_name, scenario_name}, _from, state) do
-    case Enum.find(state.prd.slices, &(&1.name == slice_name)) do
+    case Enum.find(state.event_model.slices, &(&1.name == slice_name)) do
       nil ->
         {:reply, {:error, "Slice not found"}, state, @inactivity_timeout}
 
@@ -501,26 +501,26 @@ defmodule EventModeler.Board do
           {:reply, {:error, "Scenario not found"}, state, @inactivity_timeout}
         else
           updated_slices =
-            Enum.map(state.prd.slices, fn s ->
+            Enum.map(state.event_model.slices, fn s ->
               if s.name == slice_name, do: %{s | tests: updated_tests}, else: s
             end)
 
-          prd = %{state.prd | slices: updated_slices}
+          event_model = %{state.event_model | slices: updated_slices}
 
-          prd =
-            EventStreamWriter.append(prd, "ScenarioRemoved", "user", %{
+          event_model =
+            EventStreamWriter.append(event_model, "ScenarioRemoved", "user", %{
               "sliceName" => slice_name,
               "scenarioName" => scenario_name
             })
 
-          state = %{state | prd: prd, dirty: true}
+          state = %{state | event_model: event_model, dirty: true}
           {:reply, :ok, state, @inactivity_timeout}
         end
     end
   end
 
   def handle_call({:update_scenario, slice_name, scenario_name, changes}, _from, state) do
-    case Enum.find(state.prd.slices, &(&1.name == slice_name)) do
+    case Enum.find(state.event_model.slices, &(&1.name == slice_name)) do
       nil ->
         {:reply, {:error, "Slice not found"}, state, @inactivity_timeout}
 
@@ -543,26 +543,26 @@ defmodule EventModeler.Board do
             updated_tests = List.replace_at(tests, idx, updated_scenario)
 
             updated_slices =
-              Enum.map(state.prd.slices, fn s ->
+              Enum.map(state.event_model.slices, fn s ->
                 if s.name == slice_name, do: %{s | tests: updated_tests}, else: s
               end)
 
-            prd = %{state.prd | slices: updated_slices}
+            event_model = %{state.event_model | slices: updated_slices}
 
-            prd =
-              EventStreamWriter.append(prd, "ScenarioModified", "user", %{
+            event_model =
+              EventStreamWriter.append(event_model, "ScenarioModified", "user", %{
                 "sliceName" => slice_name,
                 "scenarioName" => scenario_name
               })
 
-            state = %{state | prd: prd, dirty: true}
+            state = %{state | event_model: event_model, dirty: true}
             {:reply, :ok, state, @inactivity_timeout}
         end
     end
   end
 
   def handle_call({:add_scenario, slice_name, scenario}, _from, state) do
-    case Enum.find(state.prd.slices, &(&1.name == slice_name)) do
+    case Enum.find(state.event_model.slices, &(&1.name == slice_name)) do
       nil ->
         {:reply, {:error, "Slice not found"}, state, @inactivity_timeout}
 
@@ -578,19 +578,19 @@ defmodule EventModeler.Board do
         updated_tests = (slice.tests || []) ++ [new_scenario]
 
         updated_slices =
-          Enum.map(state.prd.slices, fn s ->
+          Enum.map(state.event_model.slices, fn s ->
             if s.name == slice_name, do: %{s | tests: updated_tests}, else: s
           end)
 
-        prd = %{state.prd | slices: updated_slices}
+        event_model = %{state.event_model | slices: updated_slices}
 
-        prd =
-          EventStreamWriter.append(prd, "ScenarioAdded", "user", %{
+        event_model =
+          EventStreamWriter.append(event_model, "ScenarioAdded", "user", %{
             "sliceName" => slice_name,
             "scenarioName" => new_scenario.name
           })
 
-        state = %{state | prd: prd, dirty: true}
+        state = %{state | event_model: event_model, dirty: true}
         {:reply, :ok, state, @inactivity_timeout}
     end
   end
@@ -603,7 +603,7 @@ defmodule EventModeler.Board do
   # Private helpers
 
   defp recompute_layout(state) do
-    layout = Layout.compute(state.prd)
+    layout = Layout.compute(state.event_model)
     canvas_data = HtmlRenderer.render(layout)
     %{state | layout: layout, canvas_data: canvas_data}
   end
@@ -612,21 +612,25 @@ defmodule EventModeler.Board do
     :crypto.strong_rand_bytes(8) |> Base.url_encode64(padding: false)
   end
 
-  defp add_element_to_prd(%Prd{slices: slices} = prd, element) do
+  defp add_element_to_event_model(%EventModel{slices: slices} = event_model, element) do
     case slices do
       [] ->
         # Create a default slice
-        slice = %Prd.Slice{name: "Unassigned", steps: [element]}
-        %{prd | slices: [slice]}
+        slice = %Slice{name: "Unassigned", steps: [element]}
+        %{event_model | slices: [slice]}
 
       [first | rest] ->
         # Add to the first slice
         updated = %{first | steps: first.steps ++ [element]}
-        %{prd | slices: [updated | rest]}
+        %{event_model | slices: [updated | rest]}
     end
   end
 
-  defp update_element_in_prd(%Prd{slices: slices} = prd, element_id, changes) do
+  defp update_element_in_event_model(
+         %EventModel{slices: slices} = event_model,
+         element_id,
+         changes
+       ) do
     updated_slices =
       Enum.map(slices, fn slice ->
         updated_steps =
@@ -644,7 +648,7 @@ defmodule EventModeler.Board do
         %{slice | steps: updated_steps}
       end)
 
-    %{prd | slices: updated_slices}
+    %{event_model | slices: updated_slices}
   end
 
   defp maybe_update(struct, _key, nil), do: struct
@@ -653,7 +657,7 @@ defmodule EventModeler.Board do
   defp maybe_update_props(struct, nil), do: struct
   defp maybe_update_props(struct, props), do: %{struct | props: Map.merge(struct.props, props)}
 
-  defp remove_element_from_prd(%Prd{slices: slices} = prd, element_id) do
+  defp remove_element_from_event_model(%EventModel{slices: slices} = event_model, element_id) do
     updated_slices =
       slices
       |> Enum.map(fn slice ->
@@ -661,10 +665,10 @@ defmodule EventModeler.Board do
       end)
       |> Enum.reject(fn slice -> slice.steps == [] and slice.name == "Unassigned" end)
 
-    %{prd | slices: updated_slices}
+    %{event_model | slices: updated_slices}
   end
 
-  defp find_element(%Prd{slices: slices}, element_id) do
+  defp find_element(%EventModel{slices: slices}, element_id) do
     Enum.find_value(slices, fn slice ->
       Enum.find(slice.steps, &(&1.id == element_id))
     end)

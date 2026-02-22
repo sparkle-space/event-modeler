@@ -13,13 +13,13 @@ defmodule EventModelerWeb.BoardLive do
               {:ok, state} ->
                 {:ok,
                  assign(socket,
-                   page_title: state.prd.title || "Board",
+                   page_title: state.event_model.title || "Board",
                    file_path: file_path,
-                   prd: state.prd,
+                   event_model: state.event_model,
                    canvas_data: state.canvas_data,
                    dirty: state.dirty,
-                   slice_names: Enum.map(state.prd.slices, & &1.name),
-                   slices: state.prd.slices,
+                   slice_names: Enum.map(state.event_model.slices, & &1.name),
+                   slices: state.event_model.slices,
                    save_message: nil,
                    error: nil,
                    selected_element: nil,
@@ -461,11 +461,11 @@ defmodule EventModelerWeb.BoardLive do
     case Board.get_state(socket.assigns.file_path) do
       {:ok, state} ->
         assign(socket,
-          prd: state.prd,
+          event_model: state.event_model,
           canvas_data: state.canvas_data,
           dirty: state.dirty,
-          slice_names: Enum.map(state.prd.slices, & &1.name),
-          slices: state.prd.slices,
+          slice_names: Enum.map(state.event_model.slices, & &1.name),
+          slices: state.event_model.slices,
           swimlane_options: existing_swimlanes(state.canvas_data)
         )
 
@@ -505,18 +505,20 @@ defmodule EventModelerWeb.BoardLive do
             >
               &larr; Boards
             </.link>
-            <h1 class="font-semibold text-[var(--color-text-primary)]">{@prd.title || "Untitled"}</h1>
+            <h1 class="font-semibold text-[var(--color-text-primary)]">
+              {@event_model.title || "Untitled"}
+            </h1>
             <span
-              :if={@prd.status}
+              :if={@event_model.status}
               class="text-xs px-2.5 py-0.5 rounded-full font-medium bg-[var(--color-surface-alt)] text-[var(--color-text-secondary)]"
             >
-              {@prd.status}
+              {@event_model.status}
             </span>
             <span :if={@dirty} class="text-xs text-warning font-medium">Unsaved changes</span>
           </div>
           <div class="flex items-center gap-2">
-            <span :if={@prd.updated} class="text-xs text-[var(--color-text-secondary)]">
-              Updated: {String.slice(@prd.updated || "", 0..18)}
+            <span :if={@event_model.updated} class="text-xs text-[var(--color-text-secondary)]">
+              Updated: {String.slice(@event_model.updated || "", 0..18)}
             </span>
             <p :if={@save_message} class="text-sm text-success">{@save_message}</p>
             <Layouts.theme_toggle />
@@ -1061,10 +1063,10 @@ defmodule EventModelerWeb.BoardLive do
               </form>
             </div>
 
-            <div :if={@prd.overview} class="mt-6">
+            <div :if={@event_model.overview} class="mt-6">
               <h2 class="text-sm font-semibold text-[var(--color-text-primary)] mb-2">Overview</h2>
               <p class="text-xs text-[var(--color-text-secondary)]">
-                {String.slice(@prd.overview || "", 0..200)}
+                {String.slice(@event_model.overview || "", 0..200)}
               </p>
             </div>
           </div>

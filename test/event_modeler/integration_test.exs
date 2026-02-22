@@ -2,7 +2,7 @@ defmodule EventModeler.IntegrationTest do
   use ExUnit.Case, async: false
 
   alias EventModeler.{Board, Workspace}
-  alias EventModeler.Prd.Parser
+  alias EventModeler.EventModel.Parser
 
   @test_dir Path.join(
               System.tmp_dir!(),
@@ -14,7 +14,7 @@ defmodule EventModeler.IntegrationTest do
     File.rm_rf!(@test_dir)
     File.mkdir_p!(@test_dir)
 
-    {:ok, path} = Workspace.create_prd(@test_dir, "Integration Test")
+    {:ok, path} = Workspace.create_event_model(@test_dir, "Integration Test")
 
     on_exit(fn ->
       try do
@@ -71,7 +71,7 @@ defmodule EventModeler.IntegrationTest do
     # Verify in-memory state
     {:ok, state} = Board.get_state(path)
     assert state.dirty == true
-    slice = Enum.find(state.prd.slices, &(&1.name == "CreateAccount"))
+    slice = Enum.find(state.event_model.slices, &(&1.name == "CreateAccount"))
     assert slice != nil
     assert length(slice.steps) == 3
     assert slice.tests != nil
@@ -83,7 +83,7 @@ defmodule EventModeler.IntegrationTest do
     {:ok, state_after_save} = Board.get_state(path)
     assert state_after_save.dirty == false
 
-    # Verify the saved file on disk is a valid, complete PRD
+    # Verify the saved file on disk is a valid, complete event model
     {:ok, raw_content} = File.read(path)
     {:ok, parsed} = Parser.parse(raw_content)
 
@@ -100,7 +100,7 @@ defmodule EventModeler.IntegrationTest do
     assert length(parsed.event_stream) > 0
 
     # Verify round-trip: parse the saved file, serialize it, parse again
-    reserialized = EventModeler.Prd.Serializer.serialize(parsed)
+    reserialized = EventModeler.EventModel.Serializer.serialize(parsed)
     {:ok, reparsed} = Parser.parse(reserialized)
     assert reparsed.title == parsed.title
     assert length(reparsed.slices) == length(parsed.slices)
@@ -110,7 +110,7 @@ defmodule EventModeler.IntegrationTest do
     {:ok, _pid} = Board.open(path)
 
     {:ok, state_before} = Board.get_state(path)
-    original_updated = state_before.prd.updated
+    original_updated = state_before.event_model.updated
 
     # Make a change and save
     {:ok, _} = Board.place_element(path, :command, "TestCmd")

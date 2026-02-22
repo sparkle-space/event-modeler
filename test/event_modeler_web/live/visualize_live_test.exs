@@ -5,12 +5,12 @@ defmodule EventModelerWeb.VisualizeLiveTest do
 
   test "renders the visualize page", %{conn: conn} do
     {:ok, view, html} = live(conn, ~p"/visualize")
-    assert html =~ "PRD Visualizer"
-    assert html =~ "Paste PRD Markdown"
+    assert html =~ "Event Model Visualizer"
+    assert html =~ "Paste Event Model Markdown"
     assert has_element?(view, "button", "Visualize")
   end
 
-  test "visualizes submitted PRD markdown", %{conn: conn} do
+  test "visualizes submitted event model markdown", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/visualize")
 
     markdown = """
@@ -59,7 +59,7 @@ defmodule EventModelerWeb.VisualizeLiveTest do
   test "shows error for invalid input", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/visualize")
 
-    # Empty string should still parse (minimal PRD)
+    # Empty string should still parse (minimal event model)
     html =
       view
       |> form("form[phx-submit=visualize]", %{markdown: ""})

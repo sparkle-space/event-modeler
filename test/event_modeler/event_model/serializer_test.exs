@@ -1,17 +1,17 @@
-defmodule EventModeler.Prd.SerializerTest do
+defmodule EventModeler.EventModel.SerializerTest do
   use ExUnit.Case, async: true
 
-  alias EventModeler.Prd
-  alias EventModeler.Prd.{Serializer, Parser, Slice, Element, EventEntry}
+  alias EventModeler.EventModel
+  alias EventModeler.EventModel.{Serializer, Parser, Slice, Element, EventEntry}
 
-  test "serializes a minimal PRD" do
-    prd = %Prd{
+  test "serializes a minimal event model" do
+    event_model = %EventModel{
       title: "Test",
       status: "draft",
       overview: "A test feature."
     }
 
-    result = Serializer.serialize(prd)
+    result = Serializer.serialize(event_model)
     assert result =~ "title:"
     assert result =~ "Test"
     assert result =~ "status:"
@@ -21,7 +21,7 @@ defmodule EventModeler.Prd.SerializerTest do
   end
 
   test "serializes slices as emlang blocks" do
-    prd = %Prd{
+    event_model = %EventModel{
       title: "Feature",
       status: "draft",
       slices: [
@@ -37,7 +37,7 @@ defmodule EventModeler.Prd.SerializerTest do
       ]
     }
 
-    result = Serializer.serialize(prd)
+    result = Serializer.serialize(event_model)
     assert result =~ "## Slices"
     assert result =~ "### Slice: DoThing"
     assert result =~ "**Wireframe:** A form"
@@ -48,61 +48,61 @@ defmodule EventModeler.Prd.SerializerTest do
   end
 
   test "serializes event stream entries" do
-    prd = %Prd{
+    event_model = %EventModel{
       title: "Test",
       status: "draft",
       event_stream: [
         %EventEntry{
           seq: 1,
           ts: "2026-02-21T10:00:00Z",
-          type: "PrdCreated",
+          type: "EventModelCreated",
           actor: "system",
           data: %{"title" => "Test", "status" => "draft"}
         }
       ]
     }
 
-    result = Serializer.serialize(prd)
+    result = Serializer.serialize(event_model)
     assert result =~ "<!-- event-stream -->"
     assert result =~ "## Event Stream"
     assert result =~ "```eventstream"
     assert result =~ "seq: 1"
-    assert result =~ "PrdCreated"
+    assert result =~ "EventModelCreated"
   end
 
   test "round-trip: parse -> serialize -> parse preserves data" do
-    template = File.read!("docs/templates/feature-prd.md")
-    {:ok, prd1} = Parser.parse(template)
+    template = File.read!("docs/templates/feature-event-model.md")
+    {:ok, event_model1} = Parser.parse(template)
 
-    serialized = Serializer.serialize(prd1)
-    {:ok, prd2} = Parser.parse(serialized)
+    serialized = Serializer.serialize(event_model1)
+    {:ok, event_model2} = Parser.parse(serialized)
 
     # Title, status, domain should survive round-trip
-    assert prd2.title == prd1.title
-    assert prd2.status == prd1.status
-    assert prd2.domain == prd1.domain
+    assert event_model2.title == event_model1.title
+    assert event_model2.status == event_model1.status
+    assert event_model2.domain == event_model1.domain
 
     # Same number of slices
-    assert length(prd2.slices) == length(prd1.slices)
+    assert length(event_model2.slices) == length(event_model1.slices)
 
     # Same slice names
-    names1 = Enum.map(prd1.slices, & &1.name) |> Enum.sort()
-    names2 = Enum.map(prd2.slices, & &1.name) |> Enum.sort()
+    names1 = Enum.map(event_model1.slices, & &1.name) |> Enum.sort()
+    names2 = Enum.map(event_model2.slices, & &1.name) |> Enum.sort()
     assert names2 == names1
 
     # Same number of event stream entries
-    assert length(prd2.event_stream) == length(prd1.event_stream)
+    assert length(event_model2.event_stream) == length(event_model1.event_stream)
   end
 
   test "serializes frontmatter with lists" do
-    prd = %Prd{
+    event_model = %EventModel{
       title: "Test",
       status: "draft",
       dependencies: ["auth.md"],
       tags: ["event-modeling", "test"]
     }
 
-    result = Serializer.serialize(prd)
+    result = Serializer.serialize(event_model)
     assert result =~ "dependencies:"
     assert result =~ "auth.md"
     assert result =~ "tags:"
@@ -110,19 +110,19 @@ defmodule EventModeler.Prd.SerializerTest do
   end
 
   test "serialize_for_save updates timestamp" do
-    prd = %Prd{
+    event_model = %EventModel{
       title: "Test",
       status: "draft",
       updated: "2026-01-01T00:00:00Z"
     }
 
-    result = Serializer.serialize_for_save(prd)
+    result = Serializer.serialize_for_save(event_model)
     # The updated timestamp should not be the old one
     refute result =~ "2026-01-01T00:00:00Z"
   end
 
   test "serialize_for_save promotes draft to refined when scenarios exist" do
-    prd = %Prd{
+    event_model = %EventModel{
       title: "Test",
       status: "draft",
       slices: [
@@ -134,12 +134,12 @@ defmodule EventModeler.Prd.SerializerTest do
       ]
     }
 
-    result = Serializer.serialize_for_save(prd)
+    result = Serializer.serialize_for_save(event_model)
     assert result =~ "refined"
   end
 
   test "serialize_for_save keeps draft status when no scenarios" do
-    prd = %Prd{
+    event_model = %EventModel{
       title: "Test",
       status: "draft",
       slices: [
@@ -151,12 +151,12 @@ defmodule EventModeler.Prd.SerializerTest do
       ]
     }
 
-    result = Serializer.serialize_for_save(prd)
+    result = Serializer.serialize_for_save(event_model)
     assert result =~ ~s(status: "draft")
   end
 
   test "generates data flows table from matching field names" do
-    prd = %Prd{
+    event_model = %EventModel{
       title: "Test",
       status: "draft",
       slices: [
@@ -172,14 +172,14 @@ defmodule EventModeler.Prd.SerializerTest do
       ]
     }
 
-    result = Serializer.serialize(prd)
+    result = Serializer.serialize(event_model)
     assert result =~ "## Data Flows"
     assert result =~ "| Register | email | Registered | email |"
     assert result =~ "| Registered | email | Profile | email |"
   end
 
   test "double round-trip preserves all data" do
-    prd1 = %Prd{
+    event_model1 = %EventModel{
       title: "Round Trip Test",
       status: "draft",
       domain: "testing",
@@ -212,29 +212,29 @@ defmodule EventModeler.Prd.SerializerTest do
         %EventEntry{
           seq: 1,
           ts: "2026-01-01T00:00:00Z",
-          type: "PrdCreated",
+          type: "EventModelCreated",
           actor: "system",
           data: %{"title" => "Round Trip Test"}
         }
       ]
     }
 
-    serialized1 = Serializer.serialize(prd1)
-    {:ok, prd2} = Parser.parse(serialized1)
-    serialized2 = Serializer.serialize(prd2)
-    {:ok, prd3} = Parser.parse(serialized2)
+    serialized1 = Serializer.serialize(event_model1)
+    {:ok, event_model2} = Parser.parse(serialized1)
+    serialized2 = Serializer.serialize(event_model2)
+    {:ok, event_model3} = Parser.parse(serialized2)
 
     # Structural equivalence after double round-trip
-    assert prd3.title == prd1.title
-    assert prd3.status == prd1.status
-    assert prd3.domain == prd1.domain
-    assert prd3.overview == prd1.overview
-    assert length(prd3.slices) == length(prd1.slices)
-    assert length(prd3.event_stream) == length(prd1.event_stream)
+    assert event_model3.title == event_model1.title
+    assert event_model3.status == event_model1.status
+    assert event_model3.domain == event_model1.domain
+    assert event_model3.overview == event_model1.overview
+    assert length(event_model3.slices) == length(event_model1.slices)
+    assert length(event_model3.event_stream) == length(event_model1.event_stream)
 
     # Slice details preserved
-    [s1] = prd1.slices
-    [s3] = prd3.slices
+    [s1] = event_model1.slices
+    [s3] = event_model3.slices
     assert s3.name == s1.name
     assert length(s3.steps) == length(s1.steps)
   end

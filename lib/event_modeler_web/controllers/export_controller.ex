@@ -1,14 +1,14 @@
 defmodule EventModelerWeb.ExportController do
   use EventModelerWeb, :controller
 
-  alias EventModeler.Prd.Serializer
+  alias EventModeler.EventModel.Serializer
   alias EventModeler.Board
 
   def export(conn, %{"path" => encoded_path}) do
     with {:ok, file_path} <- Base.url_decode64(encoded_path, padding: false),
          {:ok, state} <- Board.get_state(file_path) do
       filename = Path.basename(file_path)
-      content = Serializer.serialize(state.prd)
+      content = Serializer.serialize(state.event_model)
 
       conn
       |> put_resp_content_type("text/markdown")

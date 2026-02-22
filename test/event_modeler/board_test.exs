@@ -16,7 +16,7 @@ defmodule EventModeler.BoardTest do
     File.rm_rf!(@test_dir)
     File.mkdir_p!(@test_dir)
 
-    {:ok, path} = Workspace.create_prd(@test_dir, "Board Test")
+    {:ok, path} = Workspace.create_event_model(@test_dir, "Board Test")
 
     on_exit(fn ->
       try do
@@ -52,7 +52,7 @@ defmodule EventModeler.BoardTest do
   test "opens a board from file", %{path: path} do
     assert {:ok, _pid} = Board.open(path)
     assert {:ok, state} = Board.get_state(path)
-    assert state.prd.title == "Board Test"
+    assert state.event_model.title == "Board Test"
     assert state.dirty == false
   end
 
@@ -66,8 +66,8 @@ defmodule EventModeler.BoardTest do
     {:ok, _pid} = Board.open(path)
     assert :ok = Board.save(path)
 
-    {:ok, prd} = Workspace.read_prd(path)
-    assert prd.title == "Board Test"
+    {:ok, event_model} = Workspace.read_event_model(path)
+    assert event_model.title == "Board Test"
   end
 
   test "get_state returns error for unopened board" do
@@ -83,9 +83,9 @@ defmodule EventModeler.BoardTest do
     {:ok, state} = Board.get_state(path)
     assert state.dirty == true
 
-    # Element should be in the PRD
+    # Element should be in the event model
     all_elements =
-      Enum.flat_map(state.prd.slices, & &1.steps)
+      Enum.flat_map(state.event_model.slices, & &1.steps)
 
     assert Enum.any?(all_elements, &(&1.label == "DoThing"))
   end
@@ -97,7 +97,7 @@ defmodule EventModeler.BoardTest do
     :ok = Board.edit_element(path, element_id, %{"label" => "NewLabel"})
 
     {:ok, state} = Board.get_state(path)
-    all_elements = Enum.flat_map(state.prd.slices, & &1.steps)
+    all_elements = Enum.flat_map(state.event_model.slices, & &1.steps)
     edited = Enum.find(all_elements, &(&1.id == element_id))
     assert edited.label == "NewLabel"
   end
@@ -117,14 +117,14 @@ defmodule EventModeler.BoardTest do
     assert :ok = Board.connect_elements(path, cmd_id, evt_id)
   end
 
-  test "remove_element removes from PRD", %{path: path} do
+  test "remove_element removes from event model", %{path: path} do
     {:ok, _pid} = Board.open(path)
     {:ok, element_id} = Board.place_element(path, :event, "ToRemove")
 
     :ok = Board.remove_element(path, element_id)
 
     {:ok, state} = Board.get_state(path)
-    all_elements = Enum.flat_map(state.prd.slices, & &1.steps)
+    all_elements = Enum.flat_map(state.event_model.slices, & &1.steps)
     refute Enum.any?(all_elements, &(&1.id == element_id))
   end
 
@@ -132,12 +132,12 @@ defmodule EventModeler.BoardTest do
     {:ok, _pid} = Board.open(path)
 
     {:ok, state_before} = Board.get_state(path)
-    stream_count_before = length(state_before.prd.event_stream)
+    stream_count_before = length(state_before.event_model.event_stream)
 
     {:ok, _} = Board.place_element(path, :command, "Test")
 
     {:ok, state_after} = Board.get_state(path)
-    assert length(state_after.prd.event_stream) > stream_count_before
+    assert length(state_after.event_model.event_stream) > stream_count_before
   end
 
   test "define_slice groups elements into a named slice", %{path: path} do
@@ -148,7 +148,7 @@ defmodule EventModeler.BoardTest do
     assert :ok = Board.define_slice(path, "RegisterUser", [cmd_id, evt_id])
 
     {:ok, state} = Board.get_state(path)
-    slice = Enum.find(state.prd.slices, &(&1.name == "RegisterUser"))
+    slice = Enum.find(state.event_model.slices, &(&1.name == "RegisterUser"))
     assert slice != nil
     assert length(slice.steps) == 2
     assert Enum.any?(slice.steps, &(&1.label == "RegisterUser"))
@@ -170,8 +170,8 @@ defmodule EventModeler.BoardTest do
     :ok = Board.rename_slice(path, "OldName", "NewName")
 
     {:ok, state} = Board.get_state(path)
-    assert Enum.any?(state.prd.slices, &(&1.name == "NewName"))
-    refute Enum.any?(state.prd.slices, &(&1.name == "OldName"))
+    assert Enum.any?(state.event_model.slices, &(&1.name == "NewName"))
+    refute Enum.any?(state.event_model.slices, &(&1.name == "OldName"))
   end
 
   test "generate_scenarios creates GWT scenarios for a slice", %{path: path} do
@@ -206,7 +206,7 @@ defmodule EventModeler.BoardTest do
     {:ok, _scenarios} = Board.generate_scenarios(path, "Login")
 
     {:ok, state} = Board.get_state(path)
-    slice = Enum.find(state.prd.slices, &(&1.name == "Login"))
+    slice = Enum.find(state.event_model.slices, &(&1.name == "Login"))
     assert slice.tests != nil
     assert length(slice.tests) == 1
   end
@@ -293,10 +293,10 @@ defmodule EventModeler.BoardTest do
     assert :ok = Board.remove_slice(path, "MySlice")
 
     {:ok, state} = Board.get_state(path)
-    refute Enum.any?(state.prd.slices, &(&1.name == "MySlice"))
+    refute Enum.any?(state.event_model.slices, &(&1.name == "MySlice"))
 
     # Elements should be in Unassigned
-    unassigned = Enum.find(state.prd.slices, &(&1.name == "Unassigned"))
+    unassigned = Enum.find(state.event_model.slices, &(&1.name == "Unassigned"))
     assert unassigned != nil
     assert length(unassigned.steps) == 2
   end
@@ -317,12 +317,12 @@ defmodule EventModeler.BoardTest do
     assert :ok = Board.remove_element_from_slice(path, "MySlice", cmd_id)
 
     {:ok, state} = Board.get_state(path)
-    slice = Enum.find(state.prd.slices, &(&1.name == "MySlice"))
+    slice = Enum.find(state.event_model.slices, &(&1.name == "MySlice"))
     assert length(slice.steps) == 1
     refute Enum.any?(slice.steps, &(&1.id == cmd_id))
 
     # Element should be in Unassigned
-    unassigned = Enum.find(state.prd.slices, &(&1.name == "Unassigned"))
+    unassigned = Enum.find(state.event_model.slices, &(&1.name == "Unassigned"))
     assert unassigned != nil
     assert Enum.any?(unassigned.steps, &(&1.id == cmd_id))
   end
@@ -348,7 +348,7 @@ defmodule EventModeler.BoardTest do
     assert :ok = Board.remove_scenario(path, "DoSlice", "DoSliceHappyPath")
 
     {:ok, state} = Board.get_state(path)
-    slice = Enum.find(state.prd.slices, &(&1.name == "DoSlice"))
+    slice = Enum.find(state.event_model.slices, &(&1.name == "DoSlice"))
     assert slice.tests == []
   end
 
@@ -374,7 +374,7 @@ defmodule EventModeler.BoardTest do
              })
 
     {:ok, state} = Board.get_state(path)
-    slice = Enum.find(state.prd.slices, &(&1.name == "DoSlice"))
+    slice = Enum.find(state.event_model.slices, &(&1.name == "DoSlice"))
     scenario = hd(slice.tests)
     assert scenario.name == "DoSliceEdgeCase"
     assert scenario.auto_generated == false
@@ -394,7 +394,7 @@ defmodule EventModeler.BoardTest do
              })
 
     {:ok, state} = Board.get_state(path)
-    slice = Enum.find(state.prd.slices, &(&1.name == "DoSlice"))
+    slice = Enum.find(state.event_model.slices, &(&1.name == "DoSlice"))
     assert length(slice.tests) == 1
     scenario = hd(slice.tests)
     assert scenario.name == "ManualScenario"

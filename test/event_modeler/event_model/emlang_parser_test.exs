@@ -1,7 +1,7 @@
-defmodule EventModeler.Prd.EmlangParserTest do
+defmodule EventModeler.EventModel.EmlangParserTest do
   use ExUnit.Case, async: true
 
-  alias EventModeler.Prd.EmlangParser
+  alias EventModeler.EventModel.EmlangParser
 
   test "parses a single slice with steps" do
     markdown = """

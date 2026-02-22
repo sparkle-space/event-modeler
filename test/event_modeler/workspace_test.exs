@@ -14,51 +14,51 @@ defmodule EventModeler.WorkspaceTest do
     :ok
   end
 
-  test "list_prds returns empty list for empty directory" do
-    assert Workspace.list_prds(@test_dir) == []
+  test "list_event_models returns empty list for empty directory" do
+    assert Workspace.list_event_models(@test_dir) == []
   end
 
-  test "list_prds returns empty for non-existent directory" do
-    assert Workspace.list_prds("/nonexistent/path") == []
+  test "list_event_models returns empty for non-existent directory" do
+    assert Workspace.list_event_models("/nonexistent/path") == []
   end
 
-  test "create_prd creates a new PRD file" do
-    assert {:ok, path} = Workspace.create_prd(@test_dir, "Test Feature")
+  test "create_event_model creates a new event model file" do
+    assert {:ok, path} = Workspace.create_event_model(@test_dir, "Test Feature")
     assert File.exists?(path)
     assert String.ends_with?(path, "test-feature.md")
 
-    {:ok, prd} = Workspace.read_prd(path)
-    assert prd.title == "Test Feature"
-    assert prd.status == "draft"
-    assert length(prd.event_stream) == 1
+    {:ok, event_model} = Workspace.read_event_model(path)
+    assert event_model.title == "Test Feature"
+    assert event_model.status == "draft"
+    assert length(event_model.event_stream) == 1
   end
 
-  test "create_prd rejects duplicate filenames" do
-    {:ok, _} = Workspace.create_prd(@test_dir, "Test Feature")
-    assert {:error, _} = Workspace.create_prd(@test_dir, "Test Feature")
+  test "create_event_model rejects duplicate filenames" do
+    {:ok, _} = Workspace.create_event_model(@test_dir, "Test Feature")
+    assert {:error, _} = Workspace.create_event_model(@test_dir, "Test Feature")
   end
 
-  test "list_prds finds created files" do
-    {:ok, _} = Workspace.create_prd(@test_dir, "Feature One")
-    {:ok, _} = Workspace.create_prd(@test_dir, "Feature Two")
+  test "list_event_models finds created files" do
+    {:ok, _} = Workspace.create_event_model(@test_dir, "Feature One")
+    {:ok, _} = Workspace.create_event_model(@test_dir, "Feature Two")
 
-    prds = Workspace.list_prds(@test_dir)
-    assert length(prds) == 2
-    titles = Enum.map(prds, & &1.title)
+    event_models = Workspace.list_event_models(@test_dir)
+    assert length(event_models) == 2
+    titles = Enum.map(event_models, & &1.title)
     assert "Feature One" in titles
     assert "Feature Two" in titles
   end
 
-  test "write_prd and read_prd round-trip" do
-    {:ok, path} = Workspace.create_prd(@test_dir, "Round Trip")
-    {:ok, prd1} = Workspace.read_prd(path)
+  test "write_event_model and read_event_model round-trip" do
+    {:ok, path} = Workspace.create_event_model(@test_dir, "Round Trip")
+    {:ok, event_model1} = Workspace.read_event_model(path)
 
     # Modify and write back
-    prd2 = %{prd1 | status: "modeling"}
-    :ok = Workspace.write_prd(path, prd2)
+    event_model2 = %{event_model1 | status: "modeling"}
+    :ok = Workspace.write_event_model(path, event_model2)
 
-    {:ok, prd3} = Workspace.read_prd(path)
-    assert prd3.status == "modeling"
-    assert prd3.title == "Round Trip"
+    {:ok, event_model3} = Workspace.read_event_model(path)
+    assert event_model3.status == "modeling"
+    assert event_model3.title == "Round Trip"
   end
 end

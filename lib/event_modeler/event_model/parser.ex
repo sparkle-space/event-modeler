@@ -1,20 +1,26 @@
-defmodule EventModeler.Prd.Parser do
+defmodule EventModeler.EventModel.Parser do
   @moduledoc """
-  Main entry point for parsing PRD markdown into structured data.
+  Main entry point for parsing Event Model markdown into structured data.
 
   Combines frontmatter, section, emlang, and event stream parsing
-  into a single `%Prd{}` struct.
+  into a single `%EventModel{}` struct.
   """
 
-  alias EventModeler.Prd
-  alias EventModeler.Prd.{FrontmatterParser, SectionParser, EmlangParser, EventStreamParser}
+  alias EventModeler.EventModel
+
+  alias EventModeler.EventModel.{
+    FrontmatterParser,
+    SectionParser,
+    EmlangParser,
+    EventStreamParser
+  }
 
   @doc """
-  Parses a PRD markdown string into a `%Prd{}` struct.
+  Parses an Event Model markdown string into a `%EventModel{}` struct.
 
-  Returns `{:ok, %Prd{}}` on success or `{:error, reason}` on failure.
+  Returns `{:ok, %EventModel{}}` on success or `{:error, reason}` on failure.
   """
-  @spec parse(String.t()) :: {:ok, Prd.t()} | {:error, String.t()}
+  @spec parse(String.t()) :: {:ok, EventModel.t()} | {:error, String.t()}
   def parse(markdown) when is_binary(markdown) do
     with {:ok, frontmatter, body} <- FrontmatterParser.parse(markdown),
          sections <- SectionParser.parse(body),
@@ -22,7 +28,7 @@ defmodule EventModeler.Prd.Parser do
          {:ok, event_stream} <- EventStreamParser.parse(markdown) do
       slices_with_wireframes = attach_wireframe_descriptions(slices, sections["Slices"])
 
-      prd = %Prd{
+      event_model = %EventModel{
         title: frontmatter["title"],
         status: frontmatter["status"],
         domain: frontmatter["domain"],
@@ -36,14 +42,14 @@ defmodule EventModeler.Prd.Parser do
         slices: slices_with_wireframes,
         scenarios: parse_scenarios(sections["Scenarios"]),
         data_flows: sections["Data Flows"],
-        prd_dependencies: sections["Dependencies"],
+        model_dependencies: sections["Dependencies"],
         sources: sections["Sources"],
         event_stream: event_stream,
         raw_markdown: markdown,
         sections: sections
       }
 
-      {:ok, prd}
+      {:ok, event_model}
     end
   end
 

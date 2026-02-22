@@ -1,6 +1,6 @@
-defmodule EventModeler.Prd.SectionParser do
+defmodule EventModeler.EventModel.SectionParser do
   @moduledoc """
-  Extracts named sections from PRD markdown body (after frontmatter removal).
+  Extracts named sections from Event Model markdown body (after frontmatter removal).
   """
 
   @known_sections [

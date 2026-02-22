@@ -1,7 +1,7 @@
-defmodule EventModeler.Prd.SectionParserTest do
+defmodule EventModeler.EventModel.SectionParserTest do
   use ExUnit.Case, async: true
 
-  alias EventModeler.Prd.SectionParser
+  alias EventModeler.EventModel.SectionParser
 
   test "parses known sections" do
     markdown = """
@@ -66,13 +66,13 @@ defmodule EventModeler.Prd.SectionParserTest do
   test "extracts key ideas from bullet list" do
     content = """
     - **Board creation** -- Users create named boards
-    - **PRD import** -- Existing markdown PRDs can be imported
+    - **Event model import** -- Existing markdown event models can be imported
     """
 
     ideas = SectionParser.extract_key_ideas(content)
     assert length(ideas) == 2
     assert Enum.at(ideas, 0) =~ "Board creation"
-    assert Enum.at(ideas, 1) =~ "PRD import"
+    assert Enum.at(ideas, 1) =~ "Event model import"
   end
 
   test "extract_key_ideas returns empty list for nil" do

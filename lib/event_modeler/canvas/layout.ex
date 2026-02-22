@@ -1,6 +1,6 @@
 defmodule EventModeler.Canvas.Layout do
   @moduledoc """
-  Pure module that takes a parsed `%Prd{}` and computes element positions
+  Pure module that takes a parsed `%EventModel{}` and computes element positions
   for SVG rendering.
 
   Elements are laid out left-to-right per slice in step order
@@ -8,7 +8,7 @@ defmodule EventModeler.Canvas.Layout do
   by their swimlane prefix.
   """
 
-  alias EventModeler.Prd
+  alias EventModeler.EventModel
 
   @element_width 180
   @element_height 60
@@ -41,11 +41,11 @@ defmodule EventModeler.Canvas.Layout do
   end
 
   @doc """
-  Computes layout positions for all elements in a parsed PRD.
+  Computes layout positions for all elements in a parsed Event Model.
   Returns a `%LayoutResult{}` with positioned elements and connections.
   """
-  @spec compute(%Prd{}) :: %LayoutResult{}
-  def compute(%Prd{slices: slices}) do
+  @spec compute(%EventModel{}) :: %LayoutResult{}
+  def compute(%EventModel{slices: slices}) do
     # Collect all unique swimlanes
     all_swimlanes = collect_swimlanes(slices)
 

@@ -1,6 +1,6 @@
-# /prd-plan — Event Modeling & PRD Format
+# /event-model-plan — Event Modeling & Event Model Format
 
-You are helping design event models and write PRDs for EventModeler. Follow the Event Modeling methodology and the PRD format defined in `docs/product-spec.md`.
+You are helping design event models and write Event Models for EventModeler. Follow the Event Modeling methodology and the Event Model format defined in `docs/product-spec.md`.
 
 ## Event Modeling Workshop (7 Steps)
 
@@ -47,7 +47,7 @@ slices:
           - x: ErrorName
 ```
 
-## PRD Format
+## Event Model Format
 
 ### Structure
 
@@ -76,12 +76,12 @@ version: 1
 
 ### Event Stream
 
-Append-only log at the bottom of PRD files. Each event is a fenced `eventstream` block:
+Append-only log at the bottom of Event Model files. Each event is a fenced `eventstream` block:
 
 ```eventstream
 seq: 1
 ts: "2026-02-21T10:00:00Z"
-type: PrdCreated
+type: EventModelCreated
 actor: user@example.com
 data:
   title: "Feature Name"
@@ -92,7 +92,7 @@ data:
 
 - Emlang blocks: one per slice, under `### Slice:` heading
 - Event stream: append-only, never modify existing blocks
-- Frontmatter status tracks PRD lifecycle: draft → modeling → refined → approved
+- Frontmatter status tracks Event Model lifecycle: draft → modeling → refined → approved
 - Wireframes are ASCII art (plain text, no images)
 
 ## Guidance

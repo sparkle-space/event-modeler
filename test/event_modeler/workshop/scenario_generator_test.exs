@@ -2,7 +2,7 @@ defmodule EventModeler.Workshop.ScenarioGeneratorTest do
   use ExUnit.Case, async: true
 
   alias EventModeler.Workshop.ScenarioGenerator
-  alias EventModeler.Prd.{Slice, Element}
+  alias EventModeler.EventModel.{Slice, Element}
 
   test "generates scenario from simple command-event slice" do
     slice = %Slice{

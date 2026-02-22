@@ -7,11 +7,11 @@ defmodule EventModeler.Workshop.ScenarioGenerator do
   - Events preceding the command (via views) = Given preconditions
   - Events and views produced by the command = Then outcomes
 
-  When automations link multiple commands (event→automation→command), the algorithm
+  When automations link multiple commands (event->automation->command), the algorithm
   generates chained scenarios where the Then of scenario N feeds the Given of scenario N+1.
   """
 
-  alias EventModeler.Prd.Slice
+  alias EventModeler.EventModel.Slice
 
   @doc """
   Generates GWT scenarios from a slice's elements.
