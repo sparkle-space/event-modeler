@@ -23,24 +23,31 @@ Standalone Phoenix/LiveView application, event-sourced with Commanded + EventSto
 
 ## Repository Structure
 
-Currently docs-only. Target structure when code exists:
-
 ```
 event_modeler/
 ├── lib/
-│   ├── event_modeler/          # Core domain (aggregates, projectors, collaboration)
-│   ├── event_modeler_web/      # Phoenix web layer (LiveViews, hooks, assets)
+│   ├── event_modeler/
+│   │   ├── board.ex              # Board GenServer — state machine per board session
+│   │   ├── workspace.ex          # Board discovery — lists available Event Model files
+│   │   ├── canvas/               # Layout engine, HTML/SVG renderers, swimlane logic
+│   │   ├── event_model/          # Parser, serializer, emlang, event stream
+│   │   ├── event_model.ex        # Core EventModel struct
+│   │   └── workshop/             # Scenario generator (AI-assisted)
+│   ├── event_modeler_web/
+│   │   ├── live/                 # LiveViews (BoardLive, DashboardLive)
+│   │   ├── components/           # Phoenix components
+│   │   └── router.ex
 │   └── event_modeler.ex
-├── assets/                     # JS/CSS for SVG canvas
-├── priv/repo/migrations/
+├── assets/js/hooks/              # JS hooks (canvas pan/zoom/select, theme)
+├── priv/event_models/            # Sample Event Model markdown files
 ├── test/
 ├── config/
 ├── docs/
-│   ├── product-spec.md         # Product specification
-│   └── technical-design.md     # Technical design
-├── CLAUDE.md                   # This file
+│   ├── product-spec.md           # Product specification
+│   └── technical-design.md       # Technical design
+├── mise.toml                     # Tool versions (Elixir, Erlang, Node, CLI tools)
 ├── mix.exs
-└── README.md
+└── CLAUDE.md
 ```
 
 ## Development Setup
@@ -60,6 +67,18 @@ docker compose up -d  # PostgreSQL
 mix deps.get
 mix ecto.setup
 mix phx.server        # localhost:4000
+```
+
+## Commands
+
+```bash
+mix phx.server                    # Dev server on localhost:4000
+mix test                          # Run all tests
+mix test path/to/test.exs:42      # Run single test at line
+mix format                        # Auto-format all Elixir files
+mix format --check-formatted      # Check formatting (CI)
+mix compile --warnings-as-errors  # Strict compilation (CI)
+mix deps.get                      # Install dependencies
 ```
 
 ## Git Workflow
@@ -90,6 +109,19 @@ Append-only event log at the bottom of Event Model files. Fenced `` ```eventstre
 - **Slice** — A vertical unit of work: Trigger → Command → Event → View. Named, testable, deliverable.
 - **Event Model lifecycle** — draft → modeling → refined → approved. Import starts modeling; export produces refined.
 - **Two-level sync** — Ephemeral (GenServer + Channels for cursors/drags) + Persistent (event-sourced for model state).
+
+## Code Patterns
+
+- **Canvas layout is computed, not stored.** Element positions are calculated by `Layout.compute/1` from the `EventModel` struct on every change — no position data in the domain model.
+- **Board GenServer caches layout.** `Board.recompute_layout/1` runs `Layout.compute` → `HtmlRenderer.render` and stores the result in GenServer state. The LiveView reads `canvas_data` from the Board.
+- **Pan/zoom is client-side only.** CSS transforms (`translate` + `scale`) on `#canvas-world`, managed by the `EventModelerCanvas` JS hook. Server knows nothing about viewport state.
+- **Server→client events via `push_event`.** E.g., `push_event(socket, "pan_to_slice", payload)` triggers `this.handleEvent("pan_to_slice", ...)` in the JS hook.
+
+## Gotchas
+
+- **Board GenServer caches stale data on code reload.** After changing layout/rendering code, the running Board GenServer still holds old `canvas_data`. Restart the server or navigate away and back to force a fresh mount.
+- **`mix format` line length.** The Elixir formatter enforces line length. Long `push_event` calls with map payloads often need line-breaking. Always run `mix format` before committing.
+- **CI runs format check.** PR checks include `mix format --check-formatted` — formatting failures block merge.
 
 ## Visual Web Inspection
 
