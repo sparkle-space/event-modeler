@@ -62,6 +62,11 @@ const EventModelerCanvas = {
     })
   },
 
+  updated() {
+    this.world = this.el.querySelector("#canvas-world")
+    this.applyTransform()
+  },
+
   panToSlice(sliceX, sliceWidth) {
     const viewportWidth = this.viewport.getBoundingClientRect().width
     const sliceCenterX = sliceX + sliceWidth / 2
