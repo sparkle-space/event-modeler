@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "phoenix",
-      "runtimeExecutable": "mise",
-      "runtimeArgs": ["exec", "--", "mix", "phx.server"],
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "mise exec -- mix deps.get && mise exec -- mix phx.server"],
       "port": 4000
     }
   ]
