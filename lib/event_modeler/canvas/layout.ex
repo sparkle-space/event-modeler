@@ -122,10 +122,14 @@ defmodule EventModeler.Canvas.Layout do
         {slice_elems, slice_conns, next_x} =
           layout_slice(slice, swimlane_y, x_offset)
 
+        {min_y, max_y_bottom} = slice_vertical_bounds(slice_elems)
+
         label = %{
           name: slice.name,
           x: x_offset,
-          width: next_x - x_offset - @slice_gap
+          width: next_x - x_offset - @slice_gap,
+          y: min_y,
+          height: max_y_bottom - min_y
         }
 
         {elems ++ slice_elems, conns ++ slice_conns, labels ++ [label], next_x}
@@ -180,5 +184,15 @@ defmodule EventModeler.Canvas.Layout do
       end
 
     {elements, connections, next_x}
+  end
+
+  defp slice_vertical_bounds([]) do
+    {@padding, @padding + @element_height}
+  end
+
+  defp slice_vertical_bounds(elements) do
+    min_y = elements |> Enum.map(& &1.y) |> Enum.min()
+    max_y_bottom = elements |> Enum.map(&(&1.y + &1.height)) |> Enum.max()
+    {min_y, max_y_bottom}
   end
 end
