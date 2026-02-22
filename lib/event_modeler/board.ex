@@ -95,6 +95,36 @@ defmodule EventModeler.Board do
     call(file_path, {:generate_scenarios, slice_name})
   end
 
+  @spec disconnect_elements(String.t(), String.t(), String.t()) :: :ok | {:error, term()}
+  def disconnect_elements(file_path, from_id, to_id) do
+    call(file_path, {:disconnect_elements, from_id, to_id})
+  end
+
+  @spec remove_slice(String.t(), String.t()) :: :ok | {:error, term()}
+  def remove_slice(file_path, slice_name) do
+    call(file_path, {:remove_slice, slice_name})
+  end
+
+  @spec remove_element_from_slice(String.t(), String.t(), String.t()) :: :ok | {:error, term()}
+  def remove_element_from_slice(file_path, slice_name, element_id) do
+    call(file_path, {:remove_element_from_slice, slice_name, element_id})
+  end
+
+  @spec remove_scenario(String.t(), String.t(), String.t()) :: :ok | {:error, term()}
+  def remove_scenario(file_path, slice_name, scenario_name) do
+    call(file_path, {:remove_scenario, slice_name, scenario_name})
+  end
+
+  @spec update_scenario(String.t(), String.t(), String.t(), map()) :: :ok | {:error, term()}
+  def update_scenario(file_path, slice_name, scenario_name, changes) do
+    call(file_path, {:update_scenario, slice_name, scenario_name, changes})
+  end
+
+  @spec add_scenario(String.t(), String.t(), map()) :: :ok | {:error, term()}
+  def add_scenario(file_path, slice_name, scenario) do
+    call(file_path, {:add_scenario, slice_name, scenario})
+  end
+
   defp call(file_path, message) do
     case Registry.lookup(EventModeler.Board.Registry, file_path) do
       [{pid, _}] -> GenServer.call(pid, message)
@@ -339,6 +369,232 @@ defmodule EventModeler.Board do
     end
   end
 
+  def handle_call({:disconnect_elements, from_id, to_id}, _from, state) do
+    if {from_id, to_id} in state.connections do
+      connections = List.delete(state.connections, {from_id, to_id})
+
+      prd =
+        EventStreamWriter.append(state.prd, "ElementsDisconnected", "user", %{
+          "fromId" => from_id,
+          "toId" => to_id
+        })
+
+      state =
+        %{state | prd: prd, dirty: true, connections: connections}
+        |> recompute_layout()
+
+      {:reply, :ok, state, @inactivity_timeout}
+    else
+      {:reply, {:error, "Connection not found"}, state, @inactivity_timeout}
+    end
+  end
+
+  def handle_call({:remove_slice, slice_name}, _from, state) do
+    case Enum.find(state.prd.slices, &(&1.name == slice_name)) do
+      nil ->
+        {:reply, {:error, "Slice not found"}, state, @inactivity_timeout}
+
+      slice ->
+        elements = slice.steps
+        remaining = Enum.reject(state.prd.slices, &(&1.name == slice_name))
+
+        # Move elements to Unassigned slice
+        updated_slices =
+          if elements != [] do
+            case Enum.find(remaining, &(&1.name == "Unassigned")) do
+              nil ->
+                remaining ++ [%Slice{name: "Unassigned", steps: elements, tests: []}]
+
+              _unassigned ->
+                Enum.map(remaining, fn s ->
+                  if s.name == "Unassigned",
+                    do: %{s | steps: s.steps ++ elements},
+                    else: s
+                end)
+            end
+          else
+            remaining
+          end
+
+        prd = %{state.prd | slices: updated_slices}
+
+        prd =
+          EventStreamWriter.append(prd, "SliceRemoved", "user", %{
+            "sliceName" => slice_name,
+            "elementCount" => length(elements)
+          })
+
+        state =
+          %{state | prd: prd, dirty: true}
+          |> recompute_layout()
+
+        {:reply, :ok, state, @inactivity_timeout}
+    end
+  end
+
+  def handle_call({:remove_element_from_slice, slice_name, element_id}, _from, state) do
+    case Enum.find(state.prd.slices, &(&1.name == slice_name)) do
+      nil ->
+        {:reply, {:error, "Slice not found"}, state, @inactivity_timeout}
+
+      slice ->
+        element = Enum.find(slice.steps, &(&1.id == element_id))
+
+        if element do
+          # Remove from source slice
+          updated_source = %{slice | steps: Enum.reject(slice.steps, &(&1.id == element_id))}
+
+          updated_slices =
+            Enum.map(state.prd.slices, fn s ->
+              if s.name == slice_name, do: updated_source, else: s
+            end)
+
+          # Add to Unassigned slice
+          updated_slices =
+            case Enum.find(updated_slices, &(&1.name == "Unassigned")) do
+              nil ->
+                updated_slices ++ [%Slice{name: "Unassigned", steps: [element], tests: []}]
+
+              _unassigned ->
+                Enum.map(updated_slices, fn s ->
+                  if s.name == "Unassigned",
+                    do: %{s | steps: s.steps ++ [element]},
+                    else: s
+                end)
+            end
+
+          # Remove empty source slice (unless it's Unassigned)
+          updated_slices =
+            Enum.reject(updated_slices, fn s ->
+              s.steps == [] and s.name != "Unassigned" and s.name == slice_name
+            end)
+
+          prd = %{state.prd | slices: updated_slices}
+
+          prd =
+            EventStreamWriter.append(prd, "ElementRemovedFromSlice", "user", %{
+              "sliceName" => slice_name,
+              "elementId" => element_id
+            })
+
+          state =
+            %{state | prd: prd, dirty: true}
+            |> recompute_layout()
+
+          {:reply, :ok, state, @inactivity_timeout}
+        else
+          {:reply, {:error, "Element not found in slice"}, state, @inactivity_timeout}
+        end
+    end
+  end
+
+  def handle_call({:remove_scenario, slice_name, scenario_name}, _from, state) do
+    case Enum.find(state.prd.slices, &(&1.name == slice_name)) do
+      nil ->
+        {:reply, {:error, "Slice not found"}, state, @inactivity_timeout}
+
+      slice ->
+        tests = slice.tests || []
+        updated_tests = Enum.reject(tests, &(&1.name == scenario_name))
+
+        if length(updated_tests) == length(tests) do
+          {:reply, {:error, "Scenario not found"}, state, @inactivity_timeout}
+        else
+          updated_slices =
+            Enum.map(state.prd.slices, fn s ->
+              if s.name == slice_name, do: %{s | tests: updated_tests}, else: s
+            end)
+
+          prd = %{state.prd | slices: updated_slices}
+
+          prd =
+            EventStreamWriter.append(prd, "ScenarioRemoved", "user", %{
+              "sliceName" => slice_name,
+              "scenarioName" => scenario_name
+            })
+
+          state = %{state | prd: prd, dirty: true}
+          {:reply, :ok, state, @inactivity_timeout}
+        end
+    end
+  end
+
+  def handle_call({:update_scenario, slice_name, scenario_name, changes}, _from, state) do
+    case Enum.find(state.prd.slices, &(&1.name == slice_name)) do
+      nil ->
+        {:reply, {:error, "Slice not found"}, state, @inactivity_timeout}
+
+      slice ->
+        tests = slice.tests || []
+
+        case Enum.find_index(tests, &(&1.name == scenario_name)) do
+          nil ->
+            {:reply, {:error, "Scenario not found"}, state, @inactivity_timeout}
+
+          idx ->
+            updated_scenario =
+              Enum.at(tests, idx)
+              |> maybe_update_scenario(:name, changes["name"])
+              |> maybe_update_scenario(:given, changes["given"])
+              |> maybe_update_scenario(:when_clause, changes["when_clause"])
+              |> maybe_update_scenario(:then_clause, changes["then_clause"])
+              |> Map.put(:auto_generated, false)
+
+            updated_tests = List.replace_at(tests, idx, updated_scenario)
+
+            updated_slices =
+              Enum.map(state.prd.slices, fn s ->
+                if s.name == slice_name, do: %{s | tests: updated_tests}, else: s
+              end)
+
+            prd = %{state.prd | slices: updated_slices}
+
+            prd =
+              EventStreamWriter.append(prd, "ScenarioModified", "user", %{
+                "sliceName" => slice_name,
+                "scenarioName" => scenario_name
+              })
+
+            state = %{state | prd: prd, dirty: true}
+            {:reply, :ok, state, @inactivity_timeout}
+        end
+    end
+  end
+
+  def handle_call({:add_scenario, slice_name, scenario}, _from, state) do
+    case Enum.find(state.prd.slices, &(&1.name == slice_name)) do
+      nil ->
+        {:reply, {:error, "Slice not found"}, state, @inactivity_timeout}
+
+      slice ->
+        new_scenario = %{
+          name: scenario["name"] || "NewScenario",
+          given: scenario["given"] || [],
+          when_clause: scenario["when_clause"] || [],
+          then_clause: scenario["then_clause"] || [],
+          auto_generated: false
+        }
+
+        updated_tests = (slice.tests || []) ++ [new_scenario]
+
+        updated_slices =
+          Enum.map(state.prd.slices, fn s ->
+            if s.name == slice_name, do: %{s | tests: updated_tests}, else: s
+          end)
+
+        prd = %{state.prd | slices: updated_slices}
+
+        prd =
+          EventStreamWriter.append(prd, "ScenarioAdded", "user", %{
+            "sliceName" => slice_name,
+            "scenarioName" => new_scenario.name
+          })
+
+        state = %{state | prd: prd, dirty: true}
+        {:reply, :ok, state, @inactivity_timeout}
+    end
+  end
+
   @impl true
   def handle_info(:timeout, state) do
     {:stop, :normal, state}
@@ -415,8 +671,19 @@ defmodule EventModeler.Board do
   end
 
   defp extract_connections(event_stream) do
-    event_stream
-    |> Enum.filter(fn entry -> entry.type == "ElementsConnected" end)
-    |> Enum.map(fn entry -> {entry.data["fromId"], entry.data["toId"]} end)
+    connected =
+      event_stream
+      |> Enum.filter(fn entry -> entry.type == "ElementsConnected" end)
+      |> Enum.map(fn entry -> {entry.data["fromId"], entry.data["toId"]} end)
+
+    disconnected =
+      event_stream
+      |> Enum.filter(fn entry -> entry.type == "ElementsDisconnected" end)
+      |> Enum.map(fn entry -> {entry.data["fromId"], entry.data["toId"]} end)
+
+    connected -- disconnected
   end
+
+  defp maybe_update_scenario(scenario, _key, nil), do: scenario
+  defp maybe_update_scenario(scenario, key, value), do: Map.put(scenario, key, value)
 end

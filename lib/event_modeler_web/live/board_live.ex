@@ -30,7 +30,12 @@ defmodule EventModelerWeb.BoardLive do
                    selected_slice: nil,
                    defining_slice: false,
                    slice_selection: [],
-                   new_slice_name: ""
+                   new_slice_name: "",
+                   editing_scenario: nil,
+                   editing_scenario_data: nil,
+                   adding_scenario: false,
+                   new_scenario_name: "",
+                   swimlane_options: existing_swimlanes(state.canvas_data)
                  )}
 
               {:error, reason} ->
@@ -158,6 +163,18 @@ defmodule EventModelerWeb.BoardLive do
 
   def handle_event("cancel_edit", _params, socket) do
     {:noreply, assign(socket, editing_element: nil, editing_element_data: nil)}
+  end
+
+  def handle_event("swimlane_select_changed", %{"swimlane_select" => "__new__"}, socket) do
+    data = socket.assigns.editing_element_data
+    updated = Map.merge(data, %{custom_swimlane: true, custom_swimlane_value: ""})
+    {:noreply, assign(socket, editing_element_data: updated)}
+  end
+
+  def handle_event("swimlane_select_changed", %{"swimlane_select" => value}, socket) do
+    data = socket.assigns.editing_element_data
+    updated = Map.merge(data, %{swimlane: value, custom_swimlane: false})
+    {:noreply, assign(socket, editing_element_data: updated)}
   end
 
   def handle_event("add_prop", _params, socket) do
@@ -310,6 +327,136 @@ defmodule EventModelerWeb.BoardLive do
     end
   end
 
+  # Disconnect elements
+  def handle_event("disconnect_elements", %{"from_id" => from_id, "to_id" => to_id}, socket) do
+    case Board.disconnect_elements(socket.assigns.file_path, from_id, to_id) do
+      :ok ->
+        {:noreply, refresh_state(socket)}
+
+      {:error, reason} ->
+        {:noreply, assign(socket, flash_message: "Error: #{reason}")}
+    end
+  end
+
+  # Slice removal
+  def handle_event("remove_slice", %{"name" => name}, socket) do
+    case Board.remove_slice(socket.assigns.file_path, name) do
+      :ok ->
+        selected =
+          if socket.assigns.selected_slice == name, do: nil, else: socket.assigns.selected_slice
+
+        {:noreply,
+         refresh_state(socket)
+         |> assign(selected_slice: selected)}
+
+      {:error, reason} ->
+        {:noreply, assign(socket, flash_message: "Error: #{reason}")}
+    end
+  end
+
+  # Remove element from slice
+  def handle_event(
+        "remove_element_from_slice",
+        %{"slice" => slice_name, "element_id" => element_id},
+        socket
+      ) do
+    case Board.remove_element_from_slice(socket.assigns.file_path, slice_name, element_id) do
+      :ok ->
+        {:noreply, refresh_state(socket)}
+
+      {:error, reason} ->
+        {:noreply, assign(socket, flash_message: "Error: #{reason}")}
+    end
+  end
+
+  # Scenario removal
+  def handle_event(
+        "remove_scenario",
+        %{"slice" => slice_name, "scenario" => scenario_name},
+        socket
+      ) do
+    case Board.remove_scenario(socket.assigns.file_path, slice_name, scenario_name) do
+      :ok ->
+        {:noreply, refresh_state(socket)}
+
+      {:error, reason} ->
+        {:noreply, assign(socket, flash_message: "Error: #{reason}")}
+    end
+  end
+
+  # Start editing scenario
+  def handle_event(
+        "start_edit_scenario",
+        %{"slice" => slice_name, "scenario" => scenario_name},
+        socket
+      ) do
+    slice = Enum.find(socket.assigns.slices, &(&1.name == slice_name))
+    scenario = slice && Enum.find(slice.tests || [], &(&1.name == scenario_name))
+
+    if scenario do
+      {:noreply,
+       assign(socket,
+         editing_scenario: %{slice: slice_name, name: scenario_name},
+         editing_scenario_data: %{name: scenario.name}
+       )}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("cancel_edit_scenario", _params, socket) do
+    {:noreply, assign(socket, editing_scenario: nil, editing_scenario_data: nil)}
+  end
+
+  def handle_event("save_scenario", %{"name" => new_name}, socket) do
+    %{slice: slice_name, name: old_name} = socket.assigns.editing_scenario
+    new_name = String.trim(new_name)
+
+    if new_name == "" do
+      {:noreply, assign(socket, flash_message: "Scenario name cannot be empty")}
+    else
+      case Board.update_scenario(socket.assigns.file_path, slice_name, old_name, %{
+             "name" => new_name
+           }) do
+        :ok ->
+          {:noreply,
+           refresh_state(socket)
+           |> assign(editing_scenario: nil, editing_scenario_data: nil)}
+
+        {:error, reason} ->
+          {:noreply, assign(socket, flash_message: "Error: #{reason}")}
+      end
+    end
+  end
+
+  # Add scenario
+  def handle_event("start_add_scenario", %{"slice" => slice_name}, socket) do
+    {:noreply, assign(socket, adding_scenario: slice_name, new_scenario_name: "")}
+  end
+
+  def handle_event("cancel_add_scenario", _params, socket) do
+    {:noreply, assign(socket, adding_scenario: false, new_scenario_name: "")}
+  end
+
+  def handle_event("confirm_add_scenario", %{"name" => name}, socket) do
+    name = String.trim(name)
+    slice_name = socket.assigns.adding_scenario
+
+    if name == "" do
+      {:noreply, assign(socket, flash_message: "Scenario name cannot be empty")}
+    else
+      case Board.add_scenario(socket.assigns.file_path, slice_name, %{"name" => name}) do
+        :ok ->
+          {:noreply,
+           refresh_state(socket)
+           |> assign(adding_scenario: false, new_scenario_name: "")}
+
+        {:error, reason} ->
+          {:noreply, assign(socket, flash_message: "Error: #{reason}")}
+      end
+    end
+  end
+
   defp refresh_state(socket) do
     case Board.get_state(socket.assigns.file_path) do
       {:ok, state} ->
@@ -318,7 +465,8 @@ defmodule EventModelerWeb.BoardLive do
           canvas_data: state.canvas_data,
           dirty: state.dirty,
           slice_names: Enum.map(state.prd.slices, & &1.name),
-          slices: state.prd.slices
+          slices: state.prd.slices,
+          swimlane_options: existing_swimlanes(state.canvas_data)
         )
 
       {:error, _} ->
@@ -416,7 +564,8 @@ defmodule EventModelerWeb.BoardLive do
                     {:command, "Command", "bg-[#3B82F6]", "--shadow-command"},
                     {:view, "View", "bg-[#22C55E]", "--shadow-view"},
                     {:wireframe, "Wireframe", "bg-[#9CA3AF]", "--shadow-wireframe"},
-                    {:automation, "Automation", "bg-[#8B5CF6]", "--shadow-automation"}
+                    {:automation, "Automation", "bg-[#8B5CF6]", "--shadow-automation"},
+                    {:exception, "Exception", "bg-[#EF4444]", "--shadow-exception"}
                   ]
                 }
                 phx-click="select_palette"
@@ -483,7 +632,7 @@ defmodule EventModelerWeb.BoardLive do
 
               <%!-- Connection SVG overlay --%>
               <svg
-                style={"position: absolute; top: 0; left: 0; width: #{@canvas_data.canvas_width}px; height: #{@canvas_data.canvas_height}px; pointer-events: none; overflow: visible;"}
+                style={"position: absolute; top: 0; left: 0; width: #{@canvas_data.canvas_width}px; height: #{@canvas_data.canvas_height}px; overflow: visible;"}
                 xmlns="http://www.w3.org/2000/svg"
               >
                 <defs>
@@ -498,14 +647,28 @@ defmodule EventModelerWeb.BoardLive do
                     <polygon points="0 0, 10 3.5, 0 7" fill="var(--color-connection)" />
                   </marker>
                 </defs>
-                <path
-                  :for={conn <- @canvas_data.connections}
-                  d={conn.path}
-                  fill="none"
-                  stroke="var(--color-connection)"
-                  stroke-width="2"
-                  marker-end="url(#arrowhead)"
-                />
+                <g :for={conn <- @canvas_data.connections}>
+                  <%!-- Invisible wider path for easier clicking --%>
+                  <path
+                    d={conn.path}
+                    fill="none"
+                    stroke="transparent"
+                    stroke-width="12"
+                    style="cursor: pointer; pointer-events: stroke;"
+                    phx-click="disconnect_elements"
+                    phx-value-from_id={conn.from_id}
+                    phx-value-to_id={conn.to_id}
+                  />
+                  <%!-- Visible path --%>
+                  <path
+                    d={conn.path}
+                    fill="none"
+                    stroke="var(--color-connection)"
+                    stroke-width="2"
+                    marker-end="url(#arrowhead)"
+                    style="pointer-events: none;"
+                  />
+                </g>
               </svg>
 
               <%!-- Element divs --%>
@@ -604,7 +767,7 @@ defmodule EventModelerWeb.BoardLive do
                 phx-click="select_slice"
                 phx-value-name={name}
                 class={[
-                  "text-sm text-[var(--color-text-primary)] flex items-center gap-2 px-2 py-1 rounded-[8px] cursor-pointer transition-colors",
+                  "text-sm text-[var(--color-text-primary)] flex items-center gap-2 px-2 py-1 rounded-[8px] cursor-pointer transition-colors group",
                   if(@selected_slice == name,
                     do: "bg-primary/10 ring-1 ring-primary/20",
                     else: "hover:bg-[var(--color-surface-alt)]"
@@ -612,7 +775,16 @@ defmodule EventModelerWeb.BoardLive do
                 ]}
               >
                 <span class="w-2 h-2 bg-primary rounded-full shrink-0"></span>
-                <span class="truncate">{name}</span>
+                <span class="truncate flex-1">{name}</span>
+                <button
+                  :if={name != "Unassigned"}
+                  phx-click="remove_slice"
+                  phx-value-name={name}
+                  class="text-xs text-error/60 hover:text-error opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                  title="Delete slice"
+                >
+                  &times;
+                </button>
               </li>
             </ul>
 
@@ -628,6 +800,30 @@ defmodule EventModelerWeb.BoardLive do
                   <span class="text-xs text-[var(--color-text-secondary)]">
                     {length(slice.steps)} elements
                   </span>
+                </div>
+
+                <%!-- Elements in slice --%>
+                <div :if={slice.steps != []} class="mb-2">
+                  <div
+                    :for={elem <- slice.steps}
+                    class="flex items-center justify-between text-xs py-0.5 group/elem"
+                  >
+                    <span class="text-[var(--color-text-primary)] truncate">
+                      {elem.label}
+                      <span class="text-[var(--color-text-secondary)]">
+                        ({type_label(elem.type)})
+                      </span>
+                    </span>
+                    <button
+                      phx-click="remove_element_from_slice"
+                      phx-value-slice={slice.name}
+                      phx-value-element_id={elem.id}
+                      class="text-error/60 hover:text-error opacity-0 group-hover/elem:opacity-100 transition-opacity text-xs shrink-0 ml-1"
+                      title="Remove from slice"
+                    >
+                      &times;
+                    </button>
+                  </div>
                 </div>
 
                 <button
@@ -647,7 +843,52 @@ defmodule EventModelerWeb.BoardLive do
                     :for={scenario <- slice.tests}
                     class="text-xs bg-[var(--color-surface)] rounded-[8px] p-2 mb-1 border border-[var(--color-border)]"
                   >
-                    <p class="font-medium text-[var(--color-text-primary)]">{scenario.name}</p>
+                    <%!-- Scenario header with edit/delete --%>
+                    <div class="flex items-center justify-between group/sc">
+                      <%= if @editing_scenario && @editing_scenario.slice == slice.name && @editing_scenario.name == scenario.name do %>
+                        <form phx-submit="save_scenario" class="flex gap-1 flex-1">
+                          <input
+                            type="text"
+                            name="name"
+                            value={@editing_scenario_data.name}
+                            class="flex-1 text-xs border border-primary/30 rounded px-1 py-0.5 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
+                            autofocus
+                          />
+                          <button type="submit" class="text-xs text-primary">Save</button>
+                          <button
+                            type="button"
+                            phx-click="cancel_edit_scenario"
+                            class="text-xs text-[var(--color-text-secondary)]"
+                          >
+                            Cancel
+                          </button>
+                        </form>
+                      <% else %>
+                        <p class="font-medium text-[var(--color-text-primary)] flex-1">
+                          {scenario.name}
+                        </p>
+                        <div class="flex gap-1 opacity-0 group-hover/sc:opacity-100 transition-opacity">
+                          <button
+                            phx-click="start_edit_scenario"
+                            phx-value-slice={slice.name}
+                            phx-value-scenario={scenario.name}
+                            class="text-primary/60 hover:text-primary text-[10px]"
+                            title="Rename"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            phx-click="remove_scenario"
+                            phx-value-slice={slice.name}
+                            phx-value-scenario={scenario.name}
+                            class="text-error/60 hover:text-error text-[10px]"
+                            title="Delete"
+                          >
+                            &times;
+                          </button>
+                        </div>
+                      <% end %>
+                    </div>
                     <div :if={scenario.given != []} class="mt-1">
                       <span class="text-[var(--color-text-secondary)]">Given:</span>
                       <span :for={g <- scenario.given} class="ml-1 text-warning">{g.label}</span>
@@ -670,6 +911,36 @@ defmodule EventModelerWeb.BoardLive do
                 <div :if={slice.tests == nil or slice.tests == []}>
                   <p class="text-xs text-[var(--color-text-secondary)] italic">No scenarios yet.</p>
                 </div>
+
+                <%!-- Add scenario --%>
+                <%= if @adding_scenario == slice.name do %>
+                  <form phx-submit="confirm_add_scenario" class="mt-2 flex gap-1">
+                    <input
+                      type="text"
+                      name="name"
+                      placeholder="Scenario name"
+                      value={@new_scenario_name}
+                      class="flex-1 text-xs border border-primary/30 rounded-[6px] px-1.5 py-0.5 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
+                      autofocus
+                    />
+                    <button type="submit" class="text-xs text-primary">Add</button>
+                    <button
+                      type="button"
+                      phx-click="cancel_add_scenario"
+                      class="text-xs text-[var(--color-text-secondary)]"
+                    >
+                      Cancel
+                    </button>
+                  </form>
+                <% else %>
+                  <button
+                    phx-click="start_add_scenario"
+                    phx-value-slice={slice.name}
+                    class="mt-1 text-xs text-primary hover:text-primary/80 transition-colors"
+                  >
+                    + Add Scenario
+                  </button>
+                <% end %>
               </div>
             </div>
 
@@ -692,12 +963,34 @@ defmodule EventModelerWeb.BoardLive do
                 />
 
                 <label class="block text-xs text-[var(--color-text-secondary)] mb-1">Swimlane</label>
+                <select
+                  name="swimlane_select"
+                  phx-change="swimlane_select_changed"
+                  class="w-full text-sm border border-[var(--color-border)] rounded-[8px] px-2 py-1 mb-2 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
+                >
+                  <option
+                    :for={sl <- @swimlane_options}
+                    value={sl}
+                    selected={sl == (@editing_element_data.swimlane || "")}
+                  >
+                    {sl || "Default"}
+                  </option>
+                  <option value="__new__">+ New swimlane...</option>
+                </select>
                 <input
+                  :if={@editing_element_data[:custom_swimlane]}
                   type="text"
                   name="swimlane"
-                  value={@editing_element_data.swimlane}
-                  placeholder="Default"
+                  value={@editing_element_data[:custom_swimlane_value] || ""}
+                  placeholder="Enter new swimlane name"
+                  autofocus
                   class="w-full text-sm border border-[var(--color-border)] rounded-[8px] px-2 py-1 mb-2 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
+                />
+                <input
+                  :if={!@editing_element_data[:custom_swimlane]}
+                  type="hidden"
+                  name="swimlane"
+                  value={@editing_element_data.swimlane}
                 />
 
                 <div class="flex items-center justify-between mb-1">
@@ -779,6 +1072,12 @@ defmodule EventModelerWeb.BoardLive do
       </div>
     </div>
     """
+  end
+
+  defp existing_swimlanes(canvas_data) do
+    canvas_data.swimlanes
+    |> Enum.map(& &1.name)
+    |> Enum.sort()
   end
 
   defp type_label(:command), do: "Command"

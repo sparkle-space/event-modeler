@@ -46,7 +46,12 @@ const EventModelerCanvas = {
       }
     })
 
+    // Escape key cancels connection mode
     document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        this.clearConnectSource()
+      }
+
       if (
         (e.key === "Delete" || e.key === "Backspace") &&
         e.target.tagName !== "INPUT" &&
@@ -65,6 +70,24 @@ const EventModelerCanvas = {
   updated() {
     this.world = this.el.querySelector("#canvas-world")
     this.applyTransform()
+  },
+
+  clearConnectSource() {
+    if (this.connectSource) {
+      const prev = this.viewport.querySelector(".connecting-source")
+      if (prev) prev.classList.remove("connecting-source")
+      this.connectSource = null
+      this.viewport.style.cursor = ""
+    }
+  },
+
+  setConnectSource(id) {
+    this.connectSource = id
+    const sourceEl = this.viewport.querySelector(
+      `[data-element-id="${id}"]`
+    )
+    if (sourceEl) sourceEl.classList.add("connecting-source")
+    this.viewport.style.cursor = "crosshair"
   },
 
   panToSlice(sliceX, sliceWidth) {
@@ -106,15 +129,16 @@ const EventModelerCanvas = {
           from_id: this.connectSource,
           to_id: id,
         })
-        this.connectSource = null
+        this.clearConnectSource()
       } else {
-        this.connectSource = id
+        this.setConnectSource(id)
       }
     } else if (!elem) {
+      // Click on empty canvas clears connection mode
+      this.clearConnectSource()
       // Pan mode
       this.isPanning = true
       this.panStart = { x: e.clientX, y: e.clientY }
-      this.connectSource = null
       this.viewport.style.cursor = "grabbing"
     }
   },
@@ -132,7 +156,8 @@ const EventModelerCanvas = {
     if (this.isPanning) {
       this.isPanning = false
       this.panStart = null
-      this.viewport.style.cursor = ""
+      // Restore cursor based on connection mode state
+      this.viewport.style.cursor = this.connectSource ? "crosshair" : ""
     }
   },
 
