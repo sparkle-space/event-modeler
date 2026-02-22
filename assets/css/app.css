@@ -161,3 +161,14 @@ body {
   outline: 3px dashed #7C3AED;
   outline-offset: 2px;
 }
+
+/* Connection source highlight during shift-click connection flow */
+.connecting-source {
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.5) !important;
+  animation: connecting-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes connecting-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.5); }
+  50% { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.3); }
+}

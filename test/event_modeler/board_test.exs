@@ -241,4 +241,163 @@ defmodule EventModeler.BoardTest do
     {:ok, cmd_id2} = Board.place_element(path, :command, "Cmd2")
     assert :ok = Board.connect_elements(path, cmd_id2, evt_id)
   end
+
+  # Disconnect elements
+
+  test "disconnect_elements removes a connection", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, cmd_id} = Board.place_element(path, :command, "Cmd")
+    {:ok, evt_id} = Board.place_element(path, :event, "Evt")
+
+    :ok = Board.connect_elements(path, cmd_id, evt_id)
+    assert :ok = Board.disconnect_elements(path, cmd_id, evt_id)
+
+    # Should be able to reconnect after disconnect
+    assert :ok = Board.connect_elements(path, cmd_id, evt_id)
+  end
+
+  test "disconnect_elements returns error for nonexistent connection", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, cmd_id} = Board.place_element(path, :command, "Cmd")
+    {:ok, evt_id} = Board.place_element(path, :event, "Evt")
+
+    assert {:error, "Connection not found"} = Board.disconnect_elements(path, cmd_id, evt_id)
+  end
+
+  test "disconnect persists through save", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, cmd_id} = Board.place_element(path, :command, "Cmd")
+    {:ok, evt_id} = Board.place_element(path, :event, "Evt")
+
+    :ok = Board.connect_elements(path, cmd_id, evt_id)
+    :ok = Board.disconnect_elements(path, cmd_id, evt_id)
+    :ok = Board.save(path)
+
+    # Verify the saved file contains the ElementsDisconnected event
+    content = File.read!(path)
+    assert content =~ "ElementsDisconnected"
+
+    # Verify connection is gone from state
+    {:ok, state} = Board.get_state(path)
+    refute {cmd_id, evt_id} in state.connections
+  end
+
+  # Slice removal
+
+  test "remove_slice moves elements to Unassigned", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, cmd_id} = Board.place_element(path, :command, "Cmd")
+    {:ok, evt_id} = Board.place_element(path, :event, "Evt")
+    :ok = Board.define_slice(path, "MySlice", [cmd_id, evt_id])
+
+    assert :ok = Board.remove_slice(path, "MySlice")
+
+    {:ok, state} = Board.get_state(path)
+    refute Enum.any?(state.prd.slices, &(&1.name == "MySlice"))
+
+    # Elements should be in Unassigned
+    unassigned = Enum.find(state.prd.slices, &(&1.name == "Unassigned"))
+    assert unassigned != nil
+    assert length(unassigned.steps) == 2
+  end
+
+  test "remove_slice returns error for nonexistent slice", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    assert {:error, "Slice not found"} = Board.remove_slice(path, "Nope")
+  end
+
+  # Remove element from slice
+
+  test "remove_element_from_slice moves element to Unassigned", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, cmd_id} = Board.place_element(path, :command, "Cmd")
+    {:ok, evt_id} = Board.place_element(path, :event, "Evt")
+    :ok = Board.define_slice(path, "MySlice", [cmd_id, evt_id])
+
+    assert :ok = Board.remove_element_from_slice(path, "MySlice", cmd_id)
+
+    {:ok, state} = Board.get_state(path)
+    slice = Enum.find(state.prd.slices, &(&1.name == "MySlice"))
+    assert length(slice.steps) == 1
+    refute Enum.any?(slice.steps, &(&1.id == cmd_id))
+
+    # Element should be in Unassigned
+    unassigned = Enum.find(state.prd.slices, &(&1.name == "Unassigned"))
+    assert unassigned != nil
+    assert Enum.any?(unassigned.steps, &(&1.id == cmd_id))
+  end
+
+  test "remove_element_from_slice returns error for wrong element", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, cmd_id} = Board.place_element(path, :command, "Cmd")
+    :ok = Board.define_slice(path, "MySlice", [cmd_id])
+
+    assert {:error, "Element not found in slice"} =
+             Board.remove_element_from_slice(path, "MySlice", "nonexistent")
+  end
+
+  # Scenario management
+
+  test "remove_scenario deletes a scenario from a slice", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, cmd_id} = Board.place_element(path, :command, "DoIt")
+    {:ok, evt_id} = Board.place_element(path, :event, "Done")
+    :ok = Board.define_slice(path, "DoSlice", [cmd_id, evt_id])
+    {:ok, _} = Board.generate_scenarios(path, "DoSlice")
+
+    assert :ok = Board.remove_scenario(path, "DoSlice", "DoSliceHappyPath")
+
+    {:ok, state} = Board.get_state(path)
+    slice = Enum.find(state.prd.slices, &(&1.name == "DoSlice"))
+    assert slice.tests == []
+  end
+
+  test "remove_scenario returns error for nonexistent scenario", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, cmd_id} = Board.place_element(path, :command, "DoIt")
+    :ok = Board.define_slice(path, "DoSlice", [cmd_id])
+
+    assert {:error, "Scenario not found"} =
+             Board.remove_scenario(path, "DoSlice", "NonexistentScenario")
+  end
+
+  test "update_scenario changes scenario name and clears auto_generated", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, cmd_id} = Board.place_element(path, :command, "DoIt")
+    {:ok, evt_id} = Board.place_element(path, :event, "Done")
+    :ok = Board.define_slice(path, "DoSlice", [cmd_id, evt_id])
+    {:ok, _} = Board.generate_scenarios(path, "DoSlice")
+
+    assert :ok =
+             Board.update_scenario(path, "DoSlice", "DoSliceHappyPath", %{
+               "name" => "DoSliceEdgeCase"
+             })
+
+    {:ok, state} = Board.get_state(path)
+    slice = Enum.find(state.prd.slices, &(&1.name == "DoSlice"))
+    scenario = hd(slice.tests)
+    assert scenario.name == "DoSliceEdgeCase"
+    assert scenario.auto_generated == false
+  end
+
+  test "add_scenario adds a manual scenario to a slice", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, cmd_id} = Board.place_element(path, :command, "DoIt")
+    :ok = Board.define_slice(path, "DoSlice", [cmd_id])
+
+    assert :ok =
+             Board.add_scenario(path, "DoSlice", %{
+               "name" => "ManualScenario",
+               "given" => [%{type: "e", label: "SomethingHappened", props: %{}}],
+               "when_clause" => [%{type: "c", label: "DoIt", props: %{}}],
+               "then_clause" => [%{type: "e", label: "ItWasDone", props: %{}}]
+             })
+
+    {:ok, state} = Board.get_state(path)
+    slice = Enum.find(state.prd.slices, &(&1.name == "DoSlice"))
+    assert length(slice.tests) == 1
+    scenario = hd(slice.tests)
+    assert scenario.name == "ManualScenario"
+    assert scenario.auto_generated == false
+  end
 end
