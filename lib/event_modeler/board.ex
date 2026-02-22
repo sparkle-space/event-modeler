@@ -10,7 +10,7 @@ defmodule EventModeler.Board do
 
   alias EventModeler.EventModel
   alias EventModeler.EventModel.{Element, Slice, EventStreamWriter}
-  alias EventModeler.Canvas.{Layout, HtmlRenderer, ConnectionRules}
+  alias EventModeler.Canvas.{Layout, HtmlRenderer, ConnectionRules, Swimlane}
   alias EventModeler.Workshop.ScenarioGenerator
   alias EventModeler.Workspace
 
@@ -176,11 +176,14 @@ defmodule EventModeler.Board do
   end
 
   def handle_call({:place_element, type, label, swimlane}, _from, state) do
+    resolved_swimlane =
+      swimlane || Swimlane.default_name(Swimlane.type_for_element(type))
+
     element = %Element{
       id: generate_id(),
       type: type,
       label: label,
-      swimlane: swimlane,
+      swimlane: resolved_swimlane,
       props: %{}
     }
 
@@ -214,19 +217,27 @@ defmodule EventModeler.Board do
   end
 
   def handle_call({:edit_element, element_id, changes}, _from, state) do
-    event_model = update_element_in_event_model(state.event_model, element_id, changes)
+    elem = find_element(state.event_model, element_id)
 
-    event_model =
-      EventStreamWriter.append(event_model, "ElementModified", "user", %{
-        "elementId" => element_id,
-        "changes" => inspect(changes)
-      })
+    if elem && changes["swimlane"] do
+      target_type = Swimlane.type_for_element(elem.type)
+      # Validate: the swimlane name is compatible if it already exists as a different type
+      existing_swimlane =
+        state
+        |> recompute_layout()
+        |> Map.get(:canvas_data)
+        |> Map.get(:swimlanes)
+        |> Enum.find(fn sl -> sl.name == changes["swimlane"] end)
 
-    state =
-      %{state | event_model: event_model, dirty: true}
-      |> recompute_layout()
-
-    {:reply, :ok, state, @inactivity_timeout}
+      if existing_swimlane && existing_swimlane.type != target_type do
+        {:reply, {:error, "Cannot place #{elem.type} in a #{existing_swimlane.type} swimlane"},
+         state, @inactivity_timeout}
+      else
+        do_edit_element(state, element_id, changes)
+      end
+    else
+      do_edit_element(state, element_id, changes)
+    end
   end
 
   def handle_call({:connect_elements, from_id, to_id}, _from, state) do
@@ -601,6 +612,22 @@ defmodule EventModeler.Board do
   end
 
   # Private helpers
+
+  defp do_edit_element(state, element_id, changes) do
+    event_model = update_element_in_event_model(state.event_model, element_id, changes)
+
+    event_model =
+      EventStreamWriter.append(event_model, "ElementModified", "user", %{
+        "elementId" => element_id,
+        "changes" => inspect(changes)
+      })
+
+    state =
+      %{state | event_model: event_model, dirty: true}
+      |> recompute_layout()
+
+    {:reply, :ok, state, @inactivity_timeout}
+  end
 
   defp recompute_layout(state) do
     layout = Layout.compute(state.event_model)

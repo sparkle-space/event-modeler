@@ -2,6 +2,7 @@ defmodule EventModelerWeb.BoardLive do
   use EventModelerWeb, :live_view
 
   alias EventModeler.Board
+  alias EventModeler.Canvas.Swimlane
 
   @impl true
   def mount(%{"path" => encoded_path}, _session, socket) do
@@ -126,6 +127,7 @@ defmodule EventModelerWeb.BoardLive do
 
       editing_data = %{
         label: elem.label,
+        type: elem.type,
         swimlane: elem[:swimlane] || "",
         props: Enum.map(props, fn {k, v} -> %{key: k, value: v} end)
       }
@@ -625,7 +627,10 @@ defmodule EventModelerWeb.BoardLive do
               <div
                 :for={sl <- @canvas_data.swimlanes}
                 style={"position: absolute; left: 0; top: #{sl.y}px; width: #{sl.width}px; height: #{sl.height}px;"}
-                class="bg-[var(--swimlane-bg)] border-y border-[var(--swimlane-border)]"
+                class={[
+                  "border-y border-[var(--swimlane-border)]",
+                  swimlane_bg_class(sl.type)
+                ]}
               >
                 <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-[var(--color-text-secondary)]">
                   {sl.name}
@@ -971,11 +976,13 @@ defmodule EventModelerWeb.BoardLive do
                   class="w-full text-sm border border-[var(--color-border)] rounded-[8px] px-2 py-1 mb-2 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
                 >
                   <option
-                    :for={sl <- @swimlane_options}
-                    value={sl}
-                    selected={sl == (@editing_element_data.swimlane || "")}
+                    :for={
+                      sl <- filtered_swimlane_options(@swimlane_options, @editing_element_data.type)
+                    }
+                    value={sl.name}
+                    selected={sl.name == (@editing_element_data.swimlane || "")}
                   >
-                    {sl || "Default"}
+                    {sl.name}
                   </option>
                   <option value="__new__">+ New swimlane...</option>
                 </select>
@@ -1078,9 +1085,21 @@ defmodule EventModelerWeb.BoardLive do
 
   defp existing_swimlanes(canvas_data) do
     canvas_data.swimlanes
-    |> Enum.map(& &1.name)
-    |> Enum.sort()
+    |> Enum.map(fn sl -> %{name: sl.name, type: sl.type} end)
+    |> Enum.sort_by(fn sl -> {Swimlane.sort_order(sl.type), sl.name} end)
   end
+
+  defp filtered_swimlane_options(swimlane_options, element_type) do
+    target_type = Swimlane.type_for_element(element_type)
+
+    swimlane_options
+    |> Enum.filter(fn sl -> sl.type == target_type end)
+  end
+
+  defp swimlane_bg_class(:trigger), do: "bg-[var(--swimlane-trigger-bg)]"
+  defp swimlane_bg_class(:command_view), do: "bg-[var(--swimlane-command-view-bg)]"
+  defp swimlane_bg_class(:event), do: "bg-[var(--swimlane-event-bg)]"
+  defp swimlane_bg_class(_), do: "bg-[var(--swimlane-command-view-bg)]"
 
   defp type_label(:command), do: "Command"
   defp type_label(:event), do: "Event"

@@ -187,7 +187,7 @@ defmodule EventModeler.BoardTest do
     assert scenario.name == "CreateBoardHappyPath"
     assert scenario.auto_generated == true
     assert length(scenario.when_clause) == 1
-    assert hd(scenario.when_clause).label == "CreateBoard"
+    assert hd(scenario.when_clause).label == "Processing/CreateBoard"
   end
 
   test "generate_scenarios returns error for unknown slice", %{path: path} do
