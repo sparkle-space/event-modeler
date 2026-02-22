@@ -1,20 +1,20 @@
-defmodule EventModeler.Prd.EventStreamWriter do
+defmodule EventModeler.EventModel.EventStreamWriter do
   @moduledoc """
-  Appends events to a `%Prd{}` struct's event stream.
+  Appends events to a `%EventModel{}` struct's event stream.
 
   Auto-increments sequence numbers and timestamps with UTC ISO 8601.
   """
 
-  alias EventModeler.Prd
-  alias EventModeler.Prd.EventEntry
+  alias EventModeler.EventModel
+  alias EventModeler.EventModel.EventEntry
 
   @doc """
-  Appends a new event to the PRD's event stream.
+  Appends a new event to the Event Model's event stream.
   Auto-assigns seq (next after last) and ts (current UTC time).
   """
-  @spec append(%Prd{}, String.t(), String.t(), map(), keyword()) :: %Prd{}
-  def append(%Prd{} = prd, type, actor, data, opts \\ []) do
-    next_seq = next_sequence(prd.event_stream)
+  @spec append(%EventModel{}, String.t(), String.t(), map(), keyword()) :: %EventModel{}
+  def append(%EventModel{} = event_model, type, actor, data, opts \\ []) do
+    next_seq = next_sequence(event_model.event_stream)
     now = DateTime.utc_now() |> DateTime.to_iso8601()
 
     entry = %EventEntry{
@@ -28,7 +28,7 @@ defmodule EventModeler.Prd.EventStreamWriter do
       note: Keyword.get(opts, :note)
     }
 
-    %{prd | event_stream: (prd.event_stream || []) ++ [entry]}
+    %{event_model | event_stream: (event_model.event_stream || []) ++ [entry]}
   end
 
   defp next_sequence(nil), do: 1

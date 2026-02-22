@@ -1,4 +1,4 @@
-defmodule EventModeler.Prd.Element do
+defmodule EventModeler.EventModel.Element do
   @moduledoc """
   Represents a single element (wireframe, command, event, view, exception) in a slice.
   """

@@ -2,9 +2,9 @@
 
 ## Project Overview
 
-EventModeler is a purpose-built collaborative canvas for designing information systems using Event Modeling. The core loop: **PRD in → Event Model → Refined PRD out**.
+EventModeler is a purpose-built collaborative canvas for designing information systems using Event Modeling. The core loop: **Event Model in → Event Model → Refined Event Model out**.
 
-Users import a Product Requirements Document (PRD), collaboratively build an event model on a visual canvas, then export a refined PRD enriched with slices, scenarios, and data flows.
+Users import an Event Model, collaboratively build an event model on a visual canvas, then export a refined Event Model enriched with slices, scenarios, and data flows.
 
 ## Architecture
 
@@ -70,7 +70,7 @@ mix phx.server        # localhost:4000
 
 ## Documentation Conventions
 
-### PRD Format
+### Event Model Format
 
 Markdown with YAML frontmatter. Sections: Overview, Key Ideas, Slices (emlang blocks), Scenarios, Data Flows, Dependencies, Sources, Event Stream.
 
@@ -78,17 +78,17 @@ See `docs/product-spec.md` for the full format definition.
 
 ### Emlang Notation
 
-Slices use [emlang](https://github.com/emlang-project/spec) v1.0.0 — a YAML DSL for event model slices. Embedded in PRDs as fenced `` ```emlang `` code blocks.
+Slices use [emlang](https://github.com/emlang-project/spec) v1.0.0 — a YAML DSL for event model slices. Embedded in Event Models as fenced `` ```emlang `` code blocks.
 
 ### Event Stream
 
-Append-only event log at the bottom of PRD files. Fenced `` ```eventstream `` YAML blocks with `seq`, `ts`, `type`, `actor`, `data` fields. Sentinel: `<!-- event-stream -->`.
+Append-only event log at the bottom of Event Model files. Fenced `` ```eventstream `` YAML blocks with `seq`, `ts`, `type`, `actor`, `data` fields. Sentinel: `<!-- event-stream -->`.
 
 ## Key Concepts
 
 - **Event Modeling** — A methodology for designing information systems around events. 7-step workshop: Brainstorm → Plot → Storyboard → Inputs → Outputs → Organize → Elaborate.
 - **Slice** — A vertical unit of work: Trigger → Command → Event → View. Named, testable, deliverable.
-- **PRD lifecycle** — draft → modeling → refined → approved. Import starts modeling; export produces refined.
+- **Event Model lifecycle** — draft → modeling → refined → approved. Import starts modeling; export produces refined.
 - **Two-level sync** — Ephemeral (GenServer + Channels for cursors/drags) + Persistent (event-sourced for model state).
 
 ## Visual Web Inspection
@@ -132,7 +132,7 @@ playwright-cli close
 | Skill | Description |
 |-------|-------------|
 | `/develop` | Core development patterns for Elixir/Phoenix/Commanded/LiveView |
-| `/prd-plan` | Event Modeling workshop guidance, PRD format reference, emlang notation |
+| `/event-model-plan` | Event Modeling workshop guidance, Event Model format reference, emlang notation |
 | `/research` | Web research and codebase analysis patterns |
 
 ## Agents

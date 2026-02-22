@@ -1,9 +1,9 @@
-defmodule EventModeler.Prd.EmlangParser do
+defmodule EventModeler.EventModel.EmlangParser do
   @moduledoc """
-  Finds and parses fenced `emlang` code blocks from PRD markdown.
+  Finds and parses fenced `emlang` code blocks from Event Model markdown.
   """
 
-  alias EventModeler.Prd.{Element, Slice}
+  alias EventModeler.EventModel.{Element, Slice}
 
   @doc """
   Extracts all emlang blocks from markdown and parses them into slices.

@@ -1,6 +1,6 @@
-defmodule EventModeler.Prd do
+defmodule EventModeler.EventModel do
   @moduledoc """
-  Core structs representing a parsed PRD (Product Requirements Document).
+  Core structs representing a parsed Event Model.
   """
 
   defstruct [
@@ -17,7 +17,7 @@ defmodule EventModeler.Prd do
     :slices,
     :scenarios,
     :data_flows,
-    :prd_dependencies,
+    :model_dependencies,
     :sources,
     :event_stream,
     :raw_markdown,
@@ -35,12 +35,12 @@ defmodule EventModeler.Prd do
           tags: [String.t()],
           overview: String.t() | nil,
           key_ideas: [String.t()],
-          slices: [EventModeler.Prd.Slice.t()],
+          slices: [EventModeler.EventModel.Slice.t()],
           scenarios: [map()],
           data_flows: String.t() | nil,
-          prd_dependencies: String.t() | nil,
+          model_dependencies: String.t() | nil,
           sources: String.t() | nil,
-          event_stream: [EventModeler.Prd.EventEntry.t()],
+          event_stream: [EventModeler.EventModel.EventEntry.t()],
           raw_markdown: String.t() | nil,
           sections: map()
         }

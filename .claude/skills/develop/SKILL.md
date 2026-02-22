@@ -13,13 +13,13 @@ You are working on EventModeler, a standalone Phoenix/LiveView application for c
 
 ```
 lib/event_modeler/           # Domain layer
-  aggregates/                # Commanded aggregates (Board, Element, Slice, Prd)
+  aggregates/                # Commanded aggregates (Board, Element, Slice, EventModel)
   commands/                  # Command structs
   events/                    # Event structs
   projectors/                # Ecto projectors for read models
   collaboration/             # BoardSession GenServer, Presence
   workshop/                  # StepConfig, workshop constraints
-  prd/                       # PRD parser, exporter, event stream handler
+  event_model/               # Event Model parser, exporter, event stream handler
 
 lib/event_modeler_web/       # Web layer
   live/                      # LiveView modules (Canvas, Board, Slice, Workshop)

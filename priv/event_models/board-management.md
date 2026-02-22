@@ -14,12 +14,12 @@ tags:
 
 ## Overview
 
-Board Management provides the core workflow for creating and managing event modeling boards in EventModeler. Users create boards from the dashboard, import PRDs into boards for visualization, and manage board lifecycle. This is the foundational feature that all other modeling capabilities build upon.
+Board Management provides the core workflow for creating and managing event modeling boards in EventModeler. Users create boards from the dashboard, import Event Models into boards for visualization, and manage board lifecycle. This is the foundational feature that all other modeling capabilities build upon.
 
 ## Key Ideas
 
-- **Board creation** -- Users create named boards as containers for event models. Each board is backed by a PRD file on disk.
-- **PRD import** -- Existing markdown PRDs can be imported into a board, parsing their structure into visual elements on the canvas.
+- **Board creation** -- Users create named boards as containers for event models. Each board is backed by an Event Model file on disk.
+- **Event Model import** -- Existing markdown Event Models can be imported into a board, parsing their structure into visual elements on the canvas.
 - **Canvas visualization** -- Imported or manually created elements render on an SVG canvas with proper Event Modeling visual conventions.
 
 ## Slices
@@ -54,42 +54,42 @@ slices:
 ```
 
 
-### Slice: ImportPrd
+### Slice: ImportEventModel
 
 **Wireframe:** Import dialog with file picker and paste area
 
 ```emlang
 slices:
-  ImportPrd:
+  ImportEventModel:
     steps:
       - t: User/ImportDialog
-      - c: ImportPrd
+      - c: ImportEventModel
         props:
           boardId: string
           markdownContent: string
-      - e: Prd/PrdImported
+      - e: EventModel/EventModelImported
         props:
           boardId: string
           keyIdeas: list
           overview: string
-          prdId: string
+          eventModelId: string
           title: string
       - v: BoardCanvasWithElements
     tests:
-      EmptyPrd:
+      EmptyEventModel:
         when:
-          - c: ImportPrd
+          - c: ImportEventModel
             props:
-              markdownContent: 
+              markdownContent:
         then:
-          - x: InvalidPrdContent
+          - x: InvalidEventModelContent
       WithValidContent:
         when:
-          - c: ImportPrd
+          - c: ImportEventModel
             props:
-              markdownContent: valid PRD content
+              markdownContent: valid Event Model content
         then:
-          - e: Prd/PrdImported
+          - e: EventModel/EventModelImported
 ```
 
 
@@ -101,16 +101,16 @@ slices:
 slices:
   VisualizeModel:
     steps:
-      - t: System/PrdFile
+      - t: System/EventModelFile
       - c: LoadModel
         props:
           mode: string
-          prdId: string
+          eventModelId: string
       - e: Board/ModelLoaded
         props:
           boardId: string
           elementCount: number
-          prdId: string
+          eventModelId: string
       - v: ReadOnlyCanvas
     tests:
       LoadAndRender:
@@ -131,25 +131,25 @@ slices:
 - **When** user clicks "New Board" and enters title "My Event Model"
 - **Then** a new board appears in the dashboard list and opens with an empty canvas
 
-### Scenario: Import PRD into Board
+### Scenario: Import Event Model into Board
 
 - **Given** a board "My Event Model" exists
-- **When** user opens import dialog and pastes a valid PRD markdown
-- **Then** the canvas shows elements parsed from the PRD with proper colors and connections
+- **When** user opens import dialog and pastes a valid Event Model markdown
+- **Then** the canvas shows elements parsed from the Event Model with proper colors and connections
 
-### Scenario: Import Invalid PRD
+### Scenario: Import Invalid Event Model
 
 - **Given** a board "My Event Model" exists
-- **When** user imports an empty string as PRD content
-- **Then** an error message "Invalid PRD content" is displayed
+- **When** user imports an empty string as Event Model content
+- **Then** an error message "Invalid Event Model content" is displayed
 
 ## Data Flows
 
 | Source | Enters as | Transforms via | Exits as |
 |--------|-----------|---------------|----------|
 | Dashboard UI | `CreateBoard` command | `BoardCreated` event | `BoardCanvas` view |
-| Import dialog | `ImportPrd` command | `PrdImported` event | `BoardCanvasWithElements` view |
-| PRD file | `LoadModel` command | `ModelLoaded` event | `ReadOnlyCanvas` view |
+| Import dialog | `ImportEventModel` command | `EventModelImported` event | `BoardCanvasWithElements` view |
+| Event Model file | `LoadModel` command | `ModelLoaded` event | `ReadOnlyCanvas` view |
 
 ## Dependencies
 
@@ -159,7 +159,7 @@ None -- this is a foundational feature.
 
 - [EventModeler Product Specification](../product-spec.md)
 - [EventModeler Technical Design](../technical-design.md)
-- [PRD Format Specification](../prd-format-spec.md)
+- [Event Model Format Specification](../event-model-format-spec.md)
 
 <!-- event-stream -->
 ## Event Stream
@@ -167,7 +167,7 @@ None -- this is a foundational feature.
 ```eventstream
 seq: 1
 ts: "2026-02-21T10:00:00Z"
-type: PrdCreated
+type: EventModelCreated
 actor: system
 data:
   status: "draft"
@@ -192,8 +192,8 @@ type: SliceAdded
 actor: system
 session: "initial-modeling"
 data:
-  elements: [ImportDialog, ImportPrd, PrdImported, BoardCanvasWithElements]
-  sliceName: "ImportPrd"
+  elements: [ImportDialog, ImportEventModel, EventModelImported, BoardCanvasWithElements]
+  sliceName: "ImportEventModel"
 ```
 
 ```eventstream
@@ -203,7 +203,7 @@ type: SliceAdded
 actor: system
 session: "initial-modeling"
 data:
-  elements: [PrdFile, LoadModel, ModelLoaded, ReadOnlyCanvas]
+  elements: [EventModelFile, LoadModel, ModelLoaded, ReadOnlyCanvas]
   sliceName: "VisualizeModel"
 ```
 

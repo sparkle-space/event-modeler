@@ -1,20 +1,20 @@
-defmodule EventModeler.Prd.ParserTest do
+defmodule EventModeler.EventModel.ParserTest do
   use ExUnit.Case, async: true
 
-  alias EventModeler.Prd
-  alias EventModeler.Prd.Parser
+  alias EventModeler.EventModel
+  alias EventModeler.EventModel.Parser
 
-  test "parses empty/minimal PRD" do
+  test "parses empty/minimal event model" do
     markdown = "# Minimal\n\n## Overview\n\nJust an overview."
 
-    assert {:ok, %Prd{} = prd} = Parser.parse(markdown)
-    assert prd.title == nil
-    assert prd.overview == "Just an overview."
-    assert prd.slices == []
-    assert prd.event_stream == []
+    assert {:ok, %EventModel{} = event_model} = Parser.parse(markdown)
+    assert event_model.title == nil
+    assert event_model.overview == "Just an overview."
+    assert event_model.slices == []
+    assert event_model.event_stream == []
   end
 
-  test "parses frontmatter-only PRD" do
+  test "parses frontmatter-only event model" do
     markdown = """
     ---
     title: "Test"
@@ -25,13 +25,13 @@ defmodule EventModeler.Prd.ParserTest do
     # Test
     """
 
-    assert {:ok, %Prd{} = prd} = Parser.parse(markdown)
-    assert prd.title == "Test"
-    assert prd.status == "draft"
-    assert prd.version == 1
+    assert {:ok, %EventModel{} = event_model} = Parser.parse(markdown)
+    assert event_model.title == "Test"
+    assert event_model.status == "draft"
+    assert event_model.version == 1
   end
 
-  test "parses PRD with emlang blocks" do
+  test "parses event model with emlang blocks" do
     markdown = """
     ---
     title: "Feature"
@@ -74,20 +74,20 @@ defmodule EventModeler.Prd.ParserTest do
     ```
     """
 
-    assert {:ok, %Prd{} = prd} = Parser.parse(markdown)
-    assert prd.title == "Feature"
-    assert prd.status == "modeling"
-    assert prd.overview == "A feature overview."
+    assert {:ok, %EventModel{} = event_model} = Parser.parse(markdown)
+    assert event_model.title == "Feature"
+    assert event_model.status == "modeling"
+    assert event_model.overview == "A feature overview."
 
-    assert length(prd.slices) == 1
-    [slice] = prd.slices
+    assert length(event_model.slices) == 1
+    [slice] = event_model.slices
     assert slice.name == "DoThing"
     assert slice.wireframe_description == "A form with input fields"
     assert length(slice.steps) == 4
     assert length(slice.tests) == 1
   end
 
-  test "parses PRD with event stream" do
+  test "parses event model with event stream" do
     markdown = """
     ---
     title: "Feature"
@@ -106,7 +106,7 @@ defmodule EventModeler.Prd.ParserTest do
     ```eventstream
     seq: 1
     ts: "2026-02-21T10:00:00Z"
-    type: PrdCreated
+    type: EventModelCreated
     actor: system
     data:
       title: "Feature"
@@ -114,30 +114,30 @@ defmodule EventModeler.Prd.ParserTest do
     ```
     """
 
-    assert {:ok, %Prd{} = prd} = Parser.parse(markdown)
-    assert length(prd.event_stream) == 1
-    assert hd(prd.event_stream).type == "PrdCreated"
+    assert {:ok, %EventModel{} = event_model} = Parser.parse(markdown)
+    assert length(event_model.event_stream) == 1
+    assert hd(event_model.event_stream).type == "EventModelCreated"
   end
 
-  test "parses full template PRD" do
-    template = File.read!("docs/templates/feature-prd.md")
+  test "parses full template event model" do
+    template = File.read!("docs/templates/feature-event-model.md")
 
-    assert {:ok, %Prd{} = prd} = Parser.parse(template)
-    assert prd.title == "Board Management"
-    assert prd.status == "draft"
-    assert prd.domain == "Board"
-    assert prd.version == 1
-    assert prd.overview != nil
-    assert length(prd.key_ideas) == 3
-    assert length(prd.slices) == 3
-    assert length(prd.event_stream) == 4
+    assert {:ok, %EventModel{} = event_model} = Parser.parse(template)
+    assert event_model.title == "Board Management"
+    assert event_model.status == "draft"
+    assert event_model.domain == "Board"
+    assert event_model.version == 1
+    assert event_model.overview != nil
+    assert length(event_model.key_ideas) == 3
+    assert length(event_model.slices) == 3
+    assert length(event_model.event_stream) == 4
 
-    slice_names = Enum.map(prd.slices, & &1.name)
+    slice_names = Enum.map(event_model.slices, & &1.name)
     assert "CreateBoard" in slice_names
-    assert "ImportPrd" in slice_names
+    assert "ImportEventModel" in slice_names
     assert "VisualizeModel" in slice_names
 
-    create_board = Enum.find(prd.slices, &(&1.name == "CreateBoard"))
+    create_board = Enum.find(event_model.slices, &(&1.name == "CreateBoard"))
     assert length(create_board.steps) == 4
     assert length(create_board.tests) == 1
   end
@@ -153,8 +153,8 @@ defmodule EventModeler.Prd.ParserTest do
   test "preserves raw_markdown" do
     markdown = "# Simple\n\n## Overview\n\nContent."
 
-    assert {:ok, prd} = Parser.parse(markdown)
-    assert prd.raw_markdown == markdown
+    assert {:ok, event_model} = Parser.parse(markdown)
+    assert event_model.raw_markdown == markdown
   end
 
   test "parses scenarios section" do
@@ -175,10 +175,10 @@ defmodule EventModeler.Prd.ParserTest do
     - **Then** dashboard is shown
     """
 
-    assert {:ok, prd} = Parser.parse(markdown)
-    assert length(prd.scenarios) == 1
+    assert {:ok, event_model} = Parser.parse(markdown)
+    assert length(event_model.scenarios) == 1
 
-    [scenario] = prd.scenarios
+    [scenario] = event_model.scenarios
     assert scenario.name == "Happy Path Flow"
     assert scenario.given =~ "a user exists"
     assert scenario.when_clause =~ "user logs in"

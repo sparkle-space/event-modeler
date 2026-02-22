@@ -2,12 +2,12 @@ defmodule EventModeler.Canvas.LayoutTest do
   use ExUnit.Case, async: true
 
   alias EventModeler.Canvas.Layout
-  alias EventModeler.Prd
-  alias EventModeler.Prd.{Slice, Element}
+  alias EventModeler.EventModel
+  alias EventModeler.EventModel.{Slice, Element}
 
-  test "computes layout for empty PRD" do
-    prd = %Prd{slices: []}
-    result = Layout.compute(prd)
+  test "computes layout for empty event model" do
+    event_model = %EventModel{slices: []}
+    result = Layout.compute(event_model)
 
     assert result.elements == []
     assert result.connections == []
@@ -16,7 +16,7 @@ defmodule EventModeler.Canvas.LayoutTest do
   end
 
   test "computes layout for single slice with 4 steps" do
-    prd = %Prd{
+    event_model = %EventModel{
       slices: [
         %Slice{
           name: "CreateBoard",
@@ -30,7 +30,7 @@ defmodule EventModeler.Canvas.LayoutTest do
       ]
     }
 
-    result = Layout.compute(prd)
+    result = Layout.compute(event_model)
 
     assert length(result.elements) == 4
     assert length(result.connections) == 3
@@ -49,7 +49,7 @@ defmodule EventModeler.Canvas.LayoutTest do
   end
 
   test "computes connections between consecutive elements" do
-    prd = %Prd{
+    event_model = %EventModel{
       slices: [
         %Slice{
           name: "Test",
@@ -62,7 +62,7 @@ defmodule EventModeler.Canvas.LayoutTest do
       ]
     }
 
-    result = Layout.compute(prd)
+    result = Layout.compute(event_model)
 
     assert length(result.connections) == 2
     [conn1, conn2] = result.connections
@@ -73,7 +73,7 @@ defmodule EventModeler.Canvas.LayoutTest do
   end
 
   test "assigns different swimlane rows" do
-    prd = %Prd{
+    event_model = %EventModel{
       slices: [
         %Slice{
           name: "Test",
@@ -85,7 +85,7 @@ defmodule EventModeler.Canvas.LayoutTest do
       ]
     }
 
-    result = Layout.compute(prd)
+    result = Layout.compute(event_model)
 
     swimlane_names = Enum.map(result.swimlanes, & &1.name)
     assert "User" in swimlane_names
@@ -97,7 +97,7 @@ defmodule EventModeler.Canvas.LayoutTest do
   end
 
   test "canvas width accommodates multi-element slices" do
-    prd = %Prd{
+    event_model = %EventModel{
       slices: [
         %Slice{
           name: "BigSlice",
@@ -111,7 +111,7 @@ defmodule EventModeler.Canvas.LayoutTest do
       ]
     }
 
-    result = Layout.compute(prd)
+    result = Layout.compute(event_model)
 
     # The rightmost element's right edge should be within the canvas width
     rightmost = result.elements |> Enum.map(&(&1.x + &1.width)) |> Enum.max()
@@ -131,7 +131,7 @@ defmodule EventModeler.Canvas.LayoutTest do
   end
 
   test "includes slice labels" do
-    prd = %Prd{
+    event_model = %EventModel{
       slices: [
         %Slice{
           name: "RegisterUser",
@@ -140,7 +140,7 @@ defmodule EventModeler.Canvas.LayoutTest do
       ]
     }
 
-    result = Layout.compute(prd)
+    result = Layout.compute(event_model)
     assert length(result.slice_labels) == 1
     assert hd(result.slice_labels).name == "RegisterUser"
   end

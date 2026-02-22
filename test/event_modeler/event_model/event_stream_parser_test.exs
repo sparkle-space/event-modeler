@@ -1,7 +1,7 @@
-defmodule EventModeler.Prd.EventStreamParserTest do
+defmodule EventModeler.EventModel.EventStreamParserTest do
   use ExUnit.Case, async: true
 
-  alias EventModeler.Prd.EventStreamParser
+  alias EventModeler.EventModel.EventStreamParser
 
   test "parses event stream entries" do
     markdown = """
@@ -17,7 +17,7 @@ defmodule EventModeler.Prd.EventStreamParserTest do
     ```eventstream
     seq: 1
     ts: "2026-02-21T10:00:00Z"
-    type: PrdCreated
+    type: EventModelCreated
     actor: facilitator@example.com
     data:
       title: "Test"
@@ -40,7 +40,7 @@ defmodule EventModeler.Prd.EventStreamParserTest do
 
     [first, second] = entries
     assert first.seq == 1
-    assert first.type == "PrdCreated"
+    assert first.type == "EventModelCreated"
     assert first.actor == "facilitator@example.com"
     assert first.data["title"] == "Test"
     assert first.session == nil
@@ -74,7 +74,7 @@ defmodule EventModeler.Prd.EventStreamParserTest do
     ```eventstream
     seq: 1
     ts: "2026-02-21T10:00:00Z"
-    type: PrdCreated
+    type: EventModelCreated
     actor: system
     data:
       title: Test
@@ -94,7 +94,7 @@ defmodule EventModeler.Prd.EventStreamParserTest do
     ```eventstream
     seq: 1
     ts: "2026-02-21T10:00:00Z"
-    type: PrdCreated
+    type: EventModelCreated
     actor: system
     data:
       title: Test

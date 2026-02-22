@@ -1,14 +1,14 @@
 defmodule EventModeler.Workspace do
   @moduledoc """
-  Module for file operations on PRD files within a workspace directory.
+  Module for file operations on Event Model files within a workspace directory.
   """
 
-  alias EventModeler.Prd
-  alias EventModeler.Prd.{Parser, Serializer, EventEntry}
+  alias EventModeler.EventModel
+  alias EventModeler.EventModel.{Parser, Serializer, EventEntry}
 
   @doc """
   Returns the configured workspace directory.
-  Defaults to `priv/prds/` within the application.
+  Defaults to `priv/event_models/` within the application.
   """
   @spec workspace_dir() :: String.t()
   def workspace_dir do
@@ -16,16 +16,16 @@ defmodule EventModeler.Workspace do
   end
 
   defp default_workspace_dir do
-    Path.join(:code.priv_dir(:event_modeler) |> to_string(), "prds")
+    Path.join(:code.priv_dir(:event_modeler) |> to_string(), "event_models")
   end
 
   @doc """
-  Lists PRD files in the workspace directory.
+  Lists Event Model files in the workspace directory.
   Returns a list of maps with path, title, and status from frontmatter.
   """
-  @spec list_prds() :: [map()]
-  @spec list_prds(String.t()) :: [map()]
-  def list_prds(dir \\ nil) do
+  @spec list_event_models() :: [map()]
+  @spec list_event_models(String.t()) :: [map()]
+  def list_event_models(dir \\ nil) do
     dir = dir || workspace_dir()
 
     case File.ls(dir) do
@@ -46,7 +46,7 @@ defmodule EventModeler.Workspace do
   defp quick_parse(path, filename) do
     case File.read(path) do
       {:ok, content} ->
-        case Prd.FrontmatterParser.parse(content) do
+        case EventModel.FrontmatterParser.parse(content) do
           {:ok, fm, _rest} ->
             %{
               path: path,
@@ -65,10 +65,10 @@ defmodule EventModeler.Workspace do
   end
 
   @doc """
-  Reads and fully parses a PRD file.
+  Reads and fully parses an Event Model file.
   """
-  @spec read_prd(String.t()) :: {:ok, Prd.t()} | {:error, String.t()}
-  def read_prd(path) do
+  @spec read_event_model(String.t()) :: {:ok, EventModel.t()} | {:error, String.t()}
+  def read_event_model(path) do
     case File.read(path) do
       {:ok, content} -> Parser.parse(content)
       {:error, reason} -> {:error, "Cannot read file: #{reason}"}
@@ -76,12 +76,12 @@ defmodule EventModeler.Workspace do
   end
 
   @doc """
-  Serializes a `%Prd{}` and writes it to disk.
+  Serializes a `%EventModel{}` and writes it to disk.
   Updates frontmatter timestamps on save.
   """
-  @spec write_prd(String.t(), Prd.t()) :: :ok | {:error, String.t()}
-  def write_prd(path, %Prd{} = prd) do
-    content = Serializer.serialize_for_save(prd)
+  @spec write_event_model(String.t(), EventModel.t()) :: :ok | {:error, String.t()}
+  def write_event_model(path, %EventModel{} = event_model) do
+    content = Serializer.serialize_for_save(event_model)
 
     case File.write(path, content) do
       :ok -> :ok
@@ -90,10 +90,10 @@ defmodule EventModeler.Workspace do
   end
 
   @doc """
-  Creates a new PRD file from the template with the given title.
+  Creates a new Event Model file from the template with the given title.
   """
-  @spec create_prd(String.t(), String.t()) :: {:ok, String.t()} | {:error, String.t()}
-  def create_prd(dir \\ nil, title) do
+  @spec create_event_model(String.t(), String.t()) :: {:ok, String.t()} | {:error, String.t()}
+  def create_event_model(dir \\ nil, title) do
     dir = dir || workspace_dir()
     File.mkdir_p!(dir)
 
@@ -105,7 +105,7 @@ defmodule EventModeler.Workspace do
     else
       now = DateTime.utc_now() |> DateTime.to_iso8601()
 
-      prd = %Prd{
+      event_model = %EventModel{
         title: title,
         status: "draft",
         version: 1,
@@ -121,14 +121,14 @@ defmodule EventModeler.Workspace do
           %EventEntry{
             seq: 1,
             ts: now,
-            type: "PrdCreated",
+            type: "EventModelCreated",
             actor: "system",
             data: %{"title" => title, "status" => "draft"}
           }
         ]
       }
 
-      case write_prd(path, prd) do
+      case write_event_model(path, event_model) do
         :ok -> {:ok, path}
         error -> error
       end

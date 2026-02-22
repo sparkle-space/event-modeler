@@ -1,12 +1,12 @@
-defmodule EventModeler.Prd.EventStreamWriterTest do
+defmodule EventModeler.EventModel.EventStreamWriterTest do
   use ExUnit.Case, async: true
 
-  alias EventModeler.Prd
-  alias EventModeler.Prd.{EventStreamWriter, EventEntry}
+  alias EventModeler.EventModel
+  alias EventModeler.EventModel.{EventStreamWriter, EventEntry}
 
   test "appends event to empty stream" do
-    prd = %Prd{event_stream: []}
-    result = EventStreamWriter.append(prd, "ElementAdded", "user", %{"label" => "Test"})
+    event_model = %EventModel{event_stream: []}
+    result = EventStreamWriter.append(event_model, "ElementAdded", "user", %{"label" => "Test"})
 
     assert length(result.event_stream) == 1
     [entry] = result.event_stream
@@ -17,12 +17,12 @@ defmodule EventModeler.Prd.EventStreamWriterTest do
   end
 
   test "auto-increments sequence number" do
-    prd = %Prd{
+    event_model = %EventModel{
       event_stream: [
         %EventEntry{
           seq: 1,
           ts: "2026-01-01T00:00:00Z",
-          type: "PrdCreated",
+          type: "EventModelCreated",
           actor: "system",
           data: %{}
         },
@@ -36,15 +36,15 @@ defmodule EventModeler.Prd.EventStreamWriterTest do
       ]
     }
 
-    result = EventStreamWriter.append(prd, "ElementAdded", "user", %{})
+    result = EventStreamWriter.append(event_model, "ElementAdded", "user", %{})
     assert List.last(result.event_stream).seq == 3
   end
 
   test "supports optional fields" do
-    prd = %Prd{event_stream: []}
+    event_model = %EventModel{event_stream: []}
 
     result =
-      EventStreamWriter.append(prd, "SliceAdded", "user", %{"name" => "Test"},
+      EventStreamWriter.append(event_model, "SliceAdded", "user", %{"name" => "Test"},
         session: "workshop-1",
         ref: "slice-123",
         note: "First slice"
@@ -57,8 +57,8 @@ defmodule EventModeler.Prd.EventStreamWriterTest do
   end
 
   test "handles nil event_stream" do
-    prd = %Prd{event_stream: nil}
-    result = EventStreamWriter.append(prd, "PrdCreated", "system", %{})
+    event_model = %EventModel{event_stream: nil}
+    result = EventStreamWriter.append(event_model, "EventModelCreated", "system", %{})
     assert length(result.event_stream) == 1
     assert hd(result.event_stream).seq == 1
   end

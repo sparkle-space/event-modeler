@@ -1,6 +1,6 @@
-defmodule EventModeler.Prd.FrontmatterParser do
+defmodule EventModeler.EventModel.FrontmatterParser do
   @moduledoc """
-  Extracts and parses YAML frontmatter from PRD markdown.
+  Extracts and parses YAML frontmatter from Event Model markdown.
   """
 
   @doc """

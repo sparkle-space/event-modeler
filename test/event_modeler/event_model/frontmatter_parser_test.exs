@@ -1,7 +1,7 @@
-defmodule EventModeler.Prd.FrontmatterParserTest do
+defmodule EventModeler.EventModel.FrontmatterParserTest do
   use ExUnit.Case, async: true
 
-  alias EventModeler.Prd.FrontmatterParser
+  alias EventModeler.EventModel.FrontmatterParser
 
   test "parses YAML frontmatter" do
     markdown = """

@@ -1,9 +1,9 @@
-defmodule EventModeler.Prd.EventStreamParser do
+defmodule EventModeler.EventModel.EventStreamParser do
   @moduledoc """
   Finds the `<!-- event-stream -->` sentinel and extracts `eventstream` blocks.
   """
 
-  alias EventModeler.Prd.EventEntry
+  alias EventModeler.EventModel.EventEntry
 
   @doc """
   Parses event stream entries from markdown.

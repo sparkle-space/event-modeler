@@ -1,6 +1,6 @@
-defmodule EventModeler.Prd.EventEntry do
+defmodule EventModeler.EventModel.EventEntry do
   @moduledoc """
-  Represents a single entry in the PRD's append-only event stream.
+  Represents a single entry in the Event Model's append-only event stream.
   """
 
   defstruct [

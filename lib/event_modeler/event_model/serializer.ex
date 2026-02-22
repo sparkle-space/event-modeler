@@ -1,30 +1,30 @@
-defmodule EventModeler.Prd.Serializer do
+defmodule EventModeler.EventModel.Serializer do
   @moduledoc """
-  Converts a `%Prd{}` struct back to markdown string.
+  Converts a `%EventModel{}` struct back to markdown string.
 
   Renders frontmatter as YAML, sections in order, slices as emlang blocks,
   and event stream entries as eventstream blocks.
   """
 
-  alias EventModeler.Prd
-  alias EventModeler.Prd.{Element, EventEntry}
+  alias EventModeler.EventModel
+  alias EventModeler.EventModel.{Element, EventEntry}
 
   @doc """
-  Serializes a `%Prd{}` struct to a PRD markdown string.
+  Serializes a `%EventModel{}` struct to an Event Model markdown string.
   """
-  @spec serialize(%Prd{}) :: String.t()
-  def serialize(%Prd{} = prd) do
+  @spec serialize(%EventModel{}) :: String.t()
+  def serialize(%EventModel{} = event_model) do
     [
-      render_frontmatter(prd),
-      render_title(prd),
-      render_section("Overview", prd.overview),
-      render_key_ideas(prd.key_ideas),
-      render_slices(prd.slices),
-      render_scenarios(prd.scenarios),
-      render_data_flows(prd),
-      render_section("Dependencies", prd.prd_dependencies),
-      render_section("Sources", prd.sources),
-      render_event_stream(prd.event_stream)
+      render_frontmatter(event_model),
+      render_title(event_model),
+      render_section("Overview", event_model.overview),
+      render_key_ideas(event_model.key_ideas),
+      render_slices(event_model.slices),
+      render_scenarios(event_model.scenarios),
+      render_data_flows(event_model),
+      render_section("Dependencies", event_model.model_dependencies),
+      render_section("Sources", event_model.sources),
+      render_event_stream(event_model.event_stream)
     ]
     |> Enum.reject(&is_nil/1)
     |> Enum.join("\n")
@@ -36,41 +36,43 @@ defmodule EventModeler.Prd.Serializer do
   Serializes with updated frontmatter for a save operation.
   Updates `status` to "refined" and `updated` to current timestamp.
   """
-  @spec serialize_for_save(%Prd{}) :: String.t()
-  def serialize_for_save(%Prd{} = prd) do
+  @spec serialize_for_save(%EventModel{}) :: String.t()
+  def serialize_for_save(%EventModel{} = event_model) do
     now = DateTime.utc_now() |> DateTime.to_iso8601()
 
-    prd
+    event_model
     |> Map.put(:updated, now)
     |> maybe_update_status()
     |> serialize()
   end
 
-  defp maybe_update_status(%Prd{status: "draft"} = prd) do
+  defp maybe_update_status(%EventModel{status: "draft"} = event_model) do
     # Only promote to "refined" if we have slices with scenarios
-    has_scenarios = Enum.any?(prd.slices || [], fn s -> s.tests != nil and s.tests != [] end)
-    if has_scenarios, do: %{prd | status: "refined"}, else: prd
+    has_scenarios =
+      Enum.any?(event_model.slices || [], fn s -> s.tests != nil and s.tests != [] end)
+
+    if has_scenarios, do: %{event_model | status: "refined"}, else: event_model
   end
 
-  defp maybe_update_status(prd), do: prd
+  defp maybe_update_status(event_model), do: event_model
 
-  defp render_frontmatter(%Prd{} = prd) do
+  defp render_frontmatter(%EventModel{} = event_model) do
     fm = %{}
-    fm = if prd.title, do: Map.put(fm, "title", prd.title), else: fm
-    fm = if prd.status, do: Map.put(fm, "status", prd.status), else: fm
-    fm = if prd.domain, do: Map.put(fm, "domain", prd.domain), else: fm
-    fm = if prd.version, do: Map.put(fm, "version", prd.version), else: fm
-    fm = if prd.created, do: Map.put(fm, "created", prd.created), else: fm
-    fm = if prd.updated, do: Map.put(fm, "updated", prd.updated), else: fm
+    fm = if event_model.title, do: Map.put(fm, "title", event_model.title), else: fm
+    fm = if event_model.status, do: Map.put(fm, "status", event_model.status), else: fm
+    fm = if event_model.domain, do: Map.put(fm, "domain", event_model.domain), else: fm
+    fm = if event_model.version, do: Map.put(fm, "version", event_model.version), else: fm
+    fm = if event_model.created, do: Map.put(fm, "created", event_model.created), else: fm
+    fm = if event_model.updated, do: Map.put(fm, "updated", event_model.updated), else: fm
 
     fm =
-      if prd.dependencies != nil and prd.dependencies != [],
-        do: Map.put(fm, "dependencies", prd.dependencies),
+      if event_model.dependencies != nil and event_model.dependencies != [],
+        do: Map.put(fm, "dependencies", event_model.dependencies),
         else: fm
 
     fm =
-      if prd.tags != nil and prd.tags != [],
-        do: Map.put(fm, "tags", prd.tags),
+      if event_model.tags != nil and event_model.tags != [],
+        do: Map.put(fm, "tags", event_model.tags),
         else: fm
 
     if map_size(fm) == 0 do
@@ -81,8 +83,8 @@ defmodule EventModeler.Prd.Serializer do
     end
   end
 
-  defp render_title(%Prd{title: nil}), do: nil
-  defp render_title(%Prd{title: title}), do: "# #{title}\n"
+  defp render_title(%EventModel{title: nil}), do: nil
+  defp render_title(%EventModel{title: title}), do: "# #{title}\n"
 
   defp render_section(_name, nil), do: nil
   defp render_section(_name, ""), do: nil
@@ -209,12 +211,12 @@ defmodule EventModeler.Prd.Serializer do
     ["        #{name}:" | clause_lines]
   end
 
-  defp render_data_flows(%Prd{data_flows: data_flows})
+  defp render_data_flows(%EventModel{data_flows: data_flows})
        when is_binary(data_flows) and data_flows != "" do
     "## Data Flows\n\n#{data_flows}\n"
   end
 
-  defp render_data_flows(%Prd{slices: slices}) when is_list(slices) and slices != [] do
+  defp render_data_flows(%EventModel{slices: slices}) when is_list(slices) and slices != [] do
     rows = generate_data_flow_rows(slices)
 
     if rows == [] do
@@ -231,7 +233,7 @@ defmodule EventModeler.Prd.Serializer do
     end
   end
 
-  defp render_data_flows(_prd), do: nil
+  defp render_data_flows(_event_model), do: nil
 
   defp generate_data_flow_rows(slices) do
     Enum.flat_map(slices, fn slice ->

@@ -1,6 +1,6 @@
-defmodule EventModeler.Prd.Slice do
+defmodule EventModeler.EventModel.Slice do
   @moduledoc """
-  Represents a named slice within a PRD, containing steps and tests.
+  Represents a named slice within an Event Model, containing steps and tests.
   """
 
   defstruct [
@@ -14,7 +14,7 @@ defmodule EventModeler.Prd.Slice do
   @type t :: %__MODULE__{
           name: String.t(),
           wireframe_description: String.t() | nil,
-          steps: [EventModeler.Prd.Element.t()],
+          steps: [EventModeler.EventModel.Element.t()],
           tests: [map()],
           raw_emlang: String.t() | nil
         }

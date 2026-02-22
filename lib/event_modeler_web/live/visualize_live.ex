@@ -1,20 +1,20 @@
 defmodule EventModelerWeb.VisualizeLive do
   use EventModelerWeb, :live_view
 
-  alias EventModeler.Prd.Parser
+  alias EventModeler.EventModel.Parser
   alias EventModeler.Canvas.{Layout, SvgRenderer}
 
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
      assign(socket,
-       page_title: "Visualize PRD",
+       page_title: "Event Model Visualizer",
        markdown_input: "",
        file_path_input: "",
        svg_data: nil,
        parse_error: nil,
-       prd_title: nil,
-       prd_status: nil,
+       event_model_title: nil,
+       event_model_status: nil,
        slice_names: []
      )}
   end
@@ -48,16 +48,16 @@ defmodule EventModelerWeb.VisualizeLive do
 
   defp visualize_markdown(socket, markdown) do
     case Parser.parse(markdown) do
-      {:ok, prd} ->
-        layout = Layout.compute(prd)
+      {:ok, event_model} ->
+        layout = Layout.compute(event_model)
         svg_data = SvgRenderer.render(layout)
 
         assign(socket,
           svg_data: svg_data,
           parse_error: nil,
-          prd_title: prd.title,
-          prd_status: prd.status,
-          slice_names: Enum.map(prd.slices, & &1.name),
+          event_model_title: event_model.title,
+          event_model_status: event_model.status,
+          slice_names: Enum.map(event_model.slices, & &1.name),
           markdown_input: markdown
         )
 
@@ -71,7 +71,7 @@ defmodule EventModelerWeb.VisualizeLive do
     ~H"""
     <div class="min-h-screen bg-gray-50">
       <div class="max-w-7xl mx-auto px-4 py-6">
-        <h1 class="text-2xl font-bold text-gray-900 mb-6">PRD Visualizer</h1>
+        <h1 class="text-2xl font-bold text-gray-900 mb-6">Event Model Visualizer</h1>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <%!-- Input panel --%>
@@ -98,14 +98,14 @@ defmodule EventModelerWeb.VisualizeLive do
 
             <%!-- Paste markdown --%>
             <div class="bg-white rounded-lg shadow p-4">
-              <h2 class="text-sm font-semibold text-gray-700 mb-2">Paste PRD Markdown</h2>
+              <h2 class="text-sm font-semibold text-gray-700 mb-2">Paste Event Model Markdown</h2>
               <form phx-submit="visualize">
                 <textarea
                   name="markdown"
                   phx-change="update_markdown"
                   rows="16"
                   class="w-full text-xs font-mono border border-gray-300 rounded p-2 resize-y"
-                  placeholder="Paste your PRD markdown here..."
+                  placeholder="Paste your Event Model markdown here..."
                 >{@markdown_input}</textarea>
                 <button
                   type="submit"
@@ -137,12 +137,14 @@ defmodule EventModelerWeb.VisualizeLive do
             <div :if={@svg_data} class="bg-white rounded-lg shadow">
               <%!-- Header --%>
               <div class="px-4 py-3 border-b border-gray-200 flex items-center gap-4">
-                <h2 :if={@prd_title} class="font-semibold text-gray-900">{@prd_title}</h2>
+                <h2 :if={@event_model_title} class="font-semibold text-gray-900">
+                  {@event_model_title}
+                </h2>
                 <span
-                  :if={@prd_status}
+                  :if={@event_model_status}
                   class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600"
                 >
-                  {@prd_status}
+                  {@event_model_status}
                 </span>
               </div>
 
@@ -257,7 +259,7 @@ defmodule EventModelerWeb.VisualizeLive do
               class="bg-white rounded-lg shadow p-12 text-center"
             >
               <p class="text-gray-400 text-lg">
-                Paste a PRD or load a file to visualize the event model.
+                Paste an Event Model or load a file to visualize it.
               </p>
             </div>
           </div>

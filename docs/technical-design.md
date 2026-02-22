@@ -6,9 +6,9 @@
 
 ## Overview
 
-EventModeler is a standalone Phoenix/LiveView application for collaborative event modeling. This document describes the architecture, data model, canvas design, collaboration strategy, and PRD import/export pipeline.
+EventModeler is a standalone Phoenix/LiveView application for collaborative event modeling. This document describes the architecture, data model, canvas design, collaboration strategy, and Event Model import/export pipeline.
 
-For the product vision, feature set, and PRD format definition, see the [Product Specification](product-spec.md).
+For the product vision, feature set, and Event Model format definition, see the [Product Specification](product-spec.md).
 
 ## Repository Structure
 
@@ -63,7 +63,7 @@ scope "/", MyAppWeb do
 end
 ```
 
-`event_modeler/2` is a macro that generates routes for the board listing, board canvas, slice detail, PRD import/export, and workshop mode LiveViews.
+`event_modeler/2` is a macro that generates routes for the board listing, board canvas, slice detail, Event Model import/export, and workshop mode LiveViews.
 
 ### Authentication Adapter
 
@@ -98,11 +98,11 @@ end
 | Component | Description |
 |-----------|-------------|
 | `EventModeler.Router` | Router macro generating all routes |
-| `EventModeler.Live.*` | LiveView modules for board, canvas, slices, workshop, PRD import/export |
+| `EventModeler.Live.*` | LiveView modules for board, canvas, slices, workshop, Event Model import/export |
 | `EventModeler.Hooks` | Phoenix LiveView JS hooks for canvas interaction |
 | `EventModeler.Assets` | CSS and JS bundles (served via `Plug.Static` or esbuild plugin) |
 | `EventModeler.Ecto.Migrations` | Migration modules the host app runs via `mix ecto.migrate` |
-| `EventModeler.Aggregates.*` | Commanded aggregates for Board, Element, Slice, PRD |
+| `EventModeler.Aggregates.*` | Commanded aggregates for Board, Element, Slice, EventModel |
 | `EventModeler.Projectors.*` | Ecto projectors for read models |
 | `EventModeler.Collaboration.*` | GenServer sessions, Registry, Presence for real-time sync |
 
@@ -147,7 +147,7 @@ Commands:
   DefineSwimlane {board_id, swimlane_id, label, actor, position}
   ReorderSwimlanes {board_id, swimlane_ids}
   RemoveSwimlane {board_id, swimlane_id}
-  ImportPrd {board_id, prd_id, markdown_content}
+  ImportEventModel {board_id, event_model_id, markdown_content}
   ArchiveBoard {board_id}
 
 Events:
@@ -156,7 +156,7 @@ Events:
   SwimlaneDefined {board_id, swimlane_id, label, actor, position}
   SwimlanesReordered {board_id, swimlane_ids}
   SwimlaneRemoved {board_id, swimlane_id}
-  PrdImported {board_id, prd_id, title, overview, key_ideas}
+  EventModelImported {board_id, event_model_id, title, overview, key_ideas}
   BoardArchived {board_id, archived_at}
 ```
 
@@ -228,29 +228,29 @@ Events:
   SliceRemoved {slice_id}
 ```
 
-#### PRD Aggregate
+#### EventModel Aggregate
 
-Tracks an imported PRD and its refinement through the modeling process.
+Tracks an imported Event Model and its refinement through the modeling process.
 
 ```
-Stream: EventModeler.PrdAggregate-{prd_id}
+Stream: EventModeler.EventModelAggregate-{event_model_id}
 
 Commands:
-  ImportPrd {prd_id, board_id, markdown_content, frontmatter}
-  RefinePrd {prd_id, refinements}
-  ExportPrd {prd_id, format}
+  ImportEventModel {event_model_id, board_id, markdown_content, frontmatter}
+  RefineEventModel {event_model_id, refinements}
+  ExportEventModel {event_model_id, format}
 
 Events:
-  PrdImported {prd_id, board_id, title, overview, key_ideas, raw_markdown}
-  PrdRefined {prd_id, added_slices, added_scenarios, added_data_flows}
-  PrdExported {prd_id, format, exported_at}
+  EventModelImported {event_model_id, board_id, title, overview, key_ideas, raw_markdown}
+  EventModelRefined {event_model_id, added_slices, added_scenarios, added_data_flows}
+  EventModelExported {event_model_id, format, exported_at}
 ```
 
 ### Read Models (Projections)
 
 ```
 boards
-  id, title, owner_id, swimlanes (jsonb), prd_id, status, inserted_at, updated_at
+  id, title, owner_id, swimlanes (jsonb), event_model_id, status, inserted_at, updated_at
 
 elements
   id, board_id, type, label, description, fields (jsonb),
@@ -263,7 +263,7 @@ scenarios
   id, slice_id, given (jsonb), when_clause, then_clause (jsonb),
   auto_generated (boolean), inserted_at, updated_at
 
-prds
+event_models
   id, board_id, title, overview, key_ideas (jsonb), raw_markdown,
   status, exported_at, inserted_at, updated_at
 ```
@@ -312,7 +312,7 @@ The modeling surface uses SVG rather than HTML Canvas because event models are c
 │                                                              │
 │  ┌─ Sidebar ──────────────────────────────────────────────┐  │
 │  │  Element palette, slice list, scenario editor,         │  │
-│  │  PRD panel, workshop step indicator                    │  │
+│  │  Event Model panel, workshop step indicator            │  │
 │  └────────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -409,14 +409,14 @@ Following the [tier system](https://github.com/sparkle-space/masterplan/blob/mai
 | Edit element label | 1 | `%{element | label: new_label}` |
 | Place new element | 2 | Construct element struct from params + returned ID |
 | Remove element | 2 | `Enum.reject` from element list |
-| Import PRD | 3 | Loading state + PubSub reload when import completes |
+| Import Event Model | 3 | Loading state + PubSub reload when import completes |
 
-## PRD Import/Export Pipeline
+## Event Model Import/Export Pipeline
 
 ### Import Flow
 
 ```
-Markdown PRD (input)
+Markdown Event Model (input)
       │
       ▼
 ┌─────────────┐
@@ -453,7 +453,7 @@ Markdown PRD (input)
 ┌─────────────────────────────────────────────┐
 │ Position &    │  Arrange elements on timeline (left to right)
 │ Dispatch      │  Assign swimlanes from prefixes or defaults
-│               │  ImportPrd command → PrdImported event
+│               │  ImportEventModel command → EventModelImported event
 │               │  PlaceElement commands for each element
 │               │  DefineSlice commands for each named slice
 │               │  AddScenario commands for each test
@@ -473,7 +473,7 @@ Board (read model)
       ▼
 ┌─────────────┐
 │ Collect      │  Load all elements, connections, slices, scenarios
-│ Board State  │  Load original PRD if imported
+│ Board State  │  Load original Event Model if imported
 └──────┬──────┘
        │
        ▼
@@ -495,7 +495,7 @@ Board (read model)
        ▼
 ┌─────────────┐
 │ Assemble     │  YAML frontmatter (title, status: refined, domain)
-│ PRD          │  Preserved: Overview, Key Ideas, Sources (from import)
+│ Event Model  │  Preserved: Overview, Key Ideas, Sources (from import)
 │              │  Generated: Slices (emlang), Scenarios, Data Flows
 └──────┬──────┘
        │
@@ -505,16 +505,16 @@ Board (read model)
 
 ### Round-Trip Fidelity
 
-When a PRD is imported and then exported:
+When an Event Model is imported and then exported:
 
 - **Preserved verbatim:** Overview, Key Ideas, Sources, Dependencies (from the original)
 - **Added by model:** Slices section, Scenarios section, Data Flows section
 - **Updated:** Frontmatter status changes from `draft` to `refined`
-- **Re-importable:** The exported PRD can be re-imported into a new board, with existing slices and scenarios restored
+- **Re-importable:** The exported Event Model can be re-imported into a new board, with existing slices and scenarios restored
 
 ### Event Stream Parser/Writer
 
-The PRD event stream is an append-only log embedded at the bottom of the markdown file. The parser reads it on import; the writer appends to it during modeling sessions.
+The Event Model event stream is an append-only log embedded at the bottom of the markdown file. The parser reads it on import; the writer appends to it during modeling sessions.
 
 #### Parse Algorithm
 
@@ -524,7 +524,7 @@ The PRD event stream is an append-only log embedded at the bottom of the markdow
 4. **Validate sequence** — verify `seq` values are monotonically increasing with no gaps
 5. **Return** — list of parsed event structs, ordered by `seq`
 
-If no sentinel is found, the event stream is empty (new PRD).
+If no sentinel is found, the event stream is empty (new Event Model).
 
 #### Write Algorithm
 
@@ -533,7 +533,7 @@ If no sentinel is found, the event stream is empty (new PRD).
 3. **Format block** — render the event as a fenced `` ```eventstream `` YAML block
 4. **Append** — write the new block at the end of the file (after all existing event blocks)
 
-During modeling sessions, events are held in-memory by the `BoardSession` GenServer. They are flushed to the PRD file on save or session end, not on every individual action. This batches disk writes and keeps the append operation atomic.
+During modeling sessions, events are held in-memory by the `BoardSession` GenServer. They are flushed to the Event Model file on save or session end, not on every individual action. This batches disk writes and keeps the append operation atomic.
 
 ## Workshop Step Enforcement
 
@@ -661,7 +661,7 @@ Wireframes use plain ASCII art rather than images or visual editors. Three benef
 
 1. **Keeps focus on event model design, not visual design** — wireframes in Event Modeling are low-fidelity sketches showing what data appears on screen, not pixel-perfect mockups.
 2. **Zero storage overhead** — wireframe content is plain text in the `fields` jsonb column. No binary storage, no file uploads, no external URLs.
-3. **Makes PRD files self-contained** — wireframes embed inline as text in the exported markdown.
+3. **Makes Event Model files self-contained** — wireframes embed inline as text in the exported markdown.
 
 ### Data Model
 
@@ -707,9 +707,9 @@ Wireframe connection rules (also reflected in the Element Aggregate invariants a
 | wireframe → event | No | Wireframes don't connect directly to events |
 | wireframe → automation | No | Wireframes don't connect to automations |
 
-### PRD Export
+### Event Model Export
 
-Wireframe ASCII art is included inline in the exported PRD markdown as a fenced code block under each slice, making the PRD a complete self-contained document:
+Wireframe ASCII art is included inline in the exported Event Model markdown as a fenced code block under each slice, making the Event Model a complete self-contained document:
 
 ````markdown
 ### Slice: Register User
@@ -751,12 +751,12 @@ The [Reservation pattern](https://github.com/sparkle-space/masterplan/blob/main/
 
 ### TODO List Pattern — Async Export
 
-The [TODO List pattern](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/todo-list-pattern.md) handles PRD export generation:
+The [TODO List pattern](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/todo-list-pattern.md) handles Event Model export generation:
 
-- `ExportPrd` command → `PrdExported` event
-- Projector adds export request to `prd_export_todos` table
-- Scheduler picks up the todo, assembles the PRD markdown/JSON from read models
-- Worker dispatches `PrdExportCompleted` with the generated content
+- `ExportEventModel` command → `EventModelExported` event
+- Projector adds export request to `event_model_export_todos` table
+- Scheduler picks up the todo, assembles the Event Model markdown/JSON from read models
+- Worker dispatches `EventModelExportCompleted` with the generated content
 - Projector removes the todo and stores the export
 
 This ensures export generation is crash-resilient and retryable.
@@ -813,7 +813,7 @@ Standalone server deployment targets Kubernetes (see [Hosting Architecture](http
 
 ## References
 
-- [Product Specification](product-spec.md) — Feature set and PRD format
+- [Product Specification](product-spec.md) — Feature set and Event Model format
 - [Event Modeling](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/event-modeling.md) — Core methodology
 - [Event Sourcing & CQRS](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/event-sourcing-cqrs.md) — Architecture foundation
 - [Collaboration Architecture](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/collaboration-architecture.md) — Two-level sync pattern (adapted)
@@ -823,5 +823,5 @@ Standalone server deployment targets Kubernetes (see [Hosting Architecture](http
 - [TODO List Pattern](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/todo-list-pattern.md) — Async export
 - [Event Enrichment](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/event-enrichment.md) — Projection consistency
 - [Elixir/Phoenix/LiveView](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/elixir-phoenix-liveview.md) — Stack rationale
-- [Emlang spec v1.0.0](https://github.com/emlang-project/spec) — Slice notation DSL (used in PRD import/export)
+- [Emlang spec v1.0.0](https://github.com/emlang-project/spec) — Slice notation DSL (used in Event Model import/export)
 - [Emlang CLI](https://github.com/emlang-project/emlang) — Linting and diagram generation

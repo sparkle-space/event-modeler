@@ -1,13 +1,13 @@
-# PRD Format Specification
+# Event Model Format Specification
 
 **Version:** 1.0
 **Date:** 2026-02-21
 
-This document defines the structured PRD (Product Requirements Document) format used by EventModeler. PRD files are self-contained markdown documents with YAML frontmatter, emlang slice definitions, and an append-only event stream.
+This document defines the structured Event Model format used by EventModeler. Event Model files are self-contained markdown documents with YAML frontmatter, emlang slice definitions, and an append-only event stream.
 
 ## File Structure
 
-A PRD file is a markdown document with this structure:
+An Event Model file is a markdown document with this structure:
 
 ```
 ---
@@ -42,7 +42,7 @@ The document begins with a YAML frontmatter block delimited by `---`:
 | `version` | integer | no | Document version number (starts at 1) |
 | `created` | ISO 8601 date | no | Creation date |
 | `updated` | ISO 8601 date | no | Last modification date |
-| `dependencies` | list of strings | no | Paths to other PRD files this depends on |
+| `dependencies` | list of strings | no | Paths to other Event Model files this depends on |
 | `tags` | list of strings | no | Categorization tags |
 
 ### Example
@@ -56,7 +56,7 @@ version: 1
 created: "2026-02-21"
 updated: "2026-02-21"
 dependencies:
-  - "email-verification-prd.md"
+  - "email-verification-event-model.md"
 tags:
   - event-modeling
   - identity
@@ -65,7 +65,7 @@ tags:
 
 ### Status Lifecycle
 
-- **draft** -- Initial state when a PRD is created or imported
+- **draft** -- Initial state when an Event Model is created or imported
 - **modeling** -- Active modeling session in progress
 - **refined** -- Modeling complete, slices and scenarios generated
 - **approved** -- Stakeholder sign-off received
@@ -142,7 +142,7 @@ A table describing what data enters, transforms within, and exits the system.
 
 ### Dependencies
 
-Links to other PRD files this feature depends on.
+Links to other Event Model files this feature depends on.
 
 ### Sources
 
@@ -213,15 +213,15 @@ Each test has a PascalCase name and optional `given`, required `when`, and requi
 
 ### Extraction
 
-Extract all emlang blocks from a PRD for linting or processing:
+Extract all emlang blocks from an Event Model for linting or processing:
 
 ```bash
-awk '/^```emlang/{p=1; print "---"; next} /^```/{p=0; next} p' feature-prd.md | emlang lint -
+awk '/^```emlang/{p=1; print "---"; next} /^```/{p=0; next} p' feature-event-model.md | emlang lint -
 ```
 
 ## Event Stream
 
-The event stream is an append-only log embedded at the bottom of the PRD file. It records every modeling action, making the PRD self-describing.
+The event stream is an append-only log embedded at the bottom of the Event Model file. It records every modeling action, making the Event Model self-describing.
 
 ### Placement
 
@@ -252,7 +252,7 @@ One fenced `eventstream` block per event. Each block contains YAML:
 
 | Category | Event Types |
 |----------|-------------|
-| PRD lifecycle | `PrdCreated`, `PrdStatusChanged`, `PrdMetadataUpdated`, `PrdExported` |
+| Event Model lifecycle | `EventModelCreated`, `EventModelStatusChanged`, `EventModelMetadataUpdated`, `EventModelExported` |
 | Session | `SessionStarted`, `SessionEnded` |
 | Slices | `SliceAdded`, `SliceRenamed`, `SliceRemoved`, `SliceReordered` |
 | Elements | `ElementAdded`, `ElementModified`, `ElementRemoved`, `ElementsConnected` |
@@ -270,7 +270,7 @@ One fenced `eventstream` block per event. Each block contains YAML:
 ```eventstream
 seq: 1
 ts: "2026-02-21T10:00:00Z"
-type: PrdCreated
+type: EventModelCreated
 actor: facilitator@example.com
 data:
   title: "User Registration"
@@ -291,15 +291,15 @@ data:
 
 ### Extraction
 
-Extract all event stream entries from a PRD:
+Extract all event stream entries from an Event Model:
 
 ```bash
-awk '/^```eventstream/{p=1; print "---"; next} /^```/{p=0; next} p' feature-prd.md
+awk '/^```eventstream/{p=1; print "---"; next} /^```/{p=0; next} p' feature-event-model.md
 ```
 
 ## Validation Rules
 
-1. **Frontmatter required:** A valid PRD must have YAML frontmatter with at least `title` and `status`.
+1. **Frontmatter required:** A valid Event Model must have YAML frontmatter with at least `title` and `status`.
 2. **Status values:** Must be one of `draft`, `modeling`, `refined`, `approved`.
 3. **Emlang blocks:** Must be valid YAML. Each block must have a `slices:` top-level key.
 4. **Step ordering:** Within a slice, steps should follow the logical flow: trigger -> command -> event -> view.
@@ -308,7 +308,7 @@ awk '/^```eventstream/{p=1; print "---"; next} /^```/{p=0; next} p' feature-prd.
 
 ## Input vs Output Format
 
-| Section | Input PRD | Output PRD |
+| Section | Input Event Model | Output Event Model |
 |---------|-----------|------------|
 | Frontmatter | Optional | Always present |
 | Overview | Required | Preserved from input |

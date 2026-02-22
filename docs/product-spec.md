@@ -7,11 +7,11 @@
 
 ## Vision & Positioning
 
-EventModeler is a purpose-built collaborative canvas for designing information systems using [Event Modeling](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/event-modeling.md). It targets mixed audiences — developers, domain experts, business analysts, and workshop facilitators — with a workflow centered on Product Requirements Documents (PRDs).
+EventModeler is a purpose-built collaborative canvas for designing information systems using [Event Modeling](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/event-modeling.md). It targets mixed audiences — developers, domain experts, business analysts, and workshop facilitators — with a workflow centered on Event Models.
 
-The core loop: **PRD in → Event Model → Refined PRD out**.
+The core loop: **Event Model in → Event Model → Refined Event Model out**.
 
-Users import a PRD, collaboratively build an event model from it on a visual canvas, then export a refined PRD enriched with slices, scenarios, and data flows derived from the model. Teams that start without a PRD still get one: the act of modeling generates a structured requirements document.
+Users import an Event Model, collaboratively build an event model from it on a visual canvas, then export a refined Event Model enriched with slices, scenarios, and data flows derived from the model. Teams that start without an Event Model still get one: the act of modeling generates a structured specification.
 
 EventModeler is built as a **standalone Phoenix/LiveView application** — a local server you run alongside your codebase. Once the core is mature and the API surface is stable, the reusable parts will be extracted into an **Elixir hex package** (`event_modeler`) that mounts into any Phoenix app. sparkle.space will dogfood the tool to design its own system.
 
@@ -25,16 +25,16 @@ EventModeler is built as a **standalone Phoenix/LiveView application** — a loc
 
 | Differentiator | Why it matters |
 |----------------|----------------|
-| **PRD integration** | No existing tool connects requirements documents to visual event models bidirectionally. EventModeler treats the PRD as a first-class artifact — import it, model from it, export a refined version. |
+| **Event Model integration** | No existing tool connects structured specifications to visual event models bidirectionally. EventModeler treats the Event Model as a first-class artifact — import it, model from it, export a refined version. |
 | **Embeddable** | Designed for eventual extraction as an embeddable hex module. The library will live alongside the code it describes, making models living documentation. No competitor offers this. |
 | **Non-technical accessibility** | Guided 7-step workshop facilitation mode designed for domain experts, not just developers. Enforces Event Modeling syntax (e.g., Commands cannot connect directly to Views) to prevent invalid models without requiring methodology expertise. |
-| **Facilitation-to-delivery pipeline** | Full journey from PRD → event model → slices → Given/When/Then scenarios → exportable tickets. Most tools stop at the whiteboard. |
+| **Facilitation-to-delivery pipeline** | Full journey from Event Model → event model → slices → Given/When/Then scenarios → exportable tickets. Most tools stop at the whiteboard. |
 | **Test-case derivation** | Auto-generate Given/When/Then acceptance criteria from slices. The model is the test spec. |
 | **Affordable** | Open-source when the hex module is extracted. Purpose-built event modeling at zero cost, compared to prooph board (EUR 250/month) and generic whiteboards (Miro). |
 
-## PRD Format Definition
+## Event Model Format Definition
 
-EventModeler defines a structured PRD format in markdown with YAML frontmatter. The format is machine-readable enough for import/export and human-readable enough to review in a markdown editor or git diff.
+EventModeler defines a structured Event Model format in markdown with YAML frontmatter. The format is machine-readable enough for import/export and human-readable enough to review in a markdown editor or git diff.
 
 ### Slice Notation: Emlang
 
@@ -47,14 +47,14 @@ Slice definitions use [emlang](https://github.com/emlang-project/spec) (Event Mo
 - **GWT tests** (`tests:`) attached to slices with given/when/then constraints
 - **Linting** via the `emlang` CLI (10 rules enforcing Event Modeling best practices)
 
-Slices are embedded in PRD markdown as fenced `` ```emlang `` code blocks -- one block per slice, directly beneath its `### Slice:` heading. This makes the blocks extractable for linting and diagram generation:
+Slices are embedded in Event Model markdown as fenced `` ```emlang `` code blocks -- one block per slice, directly beneath its `### Slice:` heading. This makes the blocks extractable for linting and diagram generation:
 
 ```bash
-# Extract all emlang blocks from a PRD and lint them
-awk '/^```emlang/{p=1; print "---"; next} /^```/{p=0; next} p' feature-prd.md | emlang lint -
+# Extract all emlang blocks from an Event Model and lint them
+awk '/^```emlang/{p=1; print "---"; next} /^```/{p=0; next} p' feature-event-model.md | emlang lint -
 ```
 
-For the full rationale and comparison with alternative DSLs, see the [emlang PRD format proposal](https://github.com/sparkle-space/masterplan/blob/main/00-scratchpad/emlang-prd-format/prd-format-proposal.md).
+For the full rationale and comparison with alternative DSLs, see the [emlang Event Model format proposal](https://github.com/sparkle-space/masterplan/blob/main/00-scratchpad/emlang-prd-format/prd-format-proposal.md).
 
 ### Format
 
@@ -65,7 +65,7 @@ status: draft | modeling | refined | approved
 domain: "Bounded Context"
 version: 1
 dependencies:
-  - "other-feature-prd.md"
+  - "other-feature-event-model.md"
 tags:
   - event-modeling
   - domain-name
@@ -151,7 +151,7 @@ What data enters, transforms within, and exits the system.
 
 ## Dependencies
 
-- [Other PRD](other-feature-prd.md) -- depends on user authentication
+- [Other Event Model](other-feature-event-model.md) -- depends on user authentication
 
 ## Sources
 
@@ -159,11 +159,11 @@ What data enters, transforms within, and exits the system.
 - Stakeholder interviews (date)
 ````
 
-### Relationship to Existing PRD Format
+### Relationship to Existing Event Model Format
 
 The existing format in `00-scratchpad/prd-ideas/` (Overview + Key Ideas + Sources) is the **input format** — the starting point before modeling. The extended format above is the **output format** — what EventModeler produces after a modeling session. The import pipeline accepts either format; the export pipeline always produces the extended format.
 
-| Section | Input PRD | Output PRD |
+| Section | Input Event Model | Output Event Model |
 |---------|-----------|------------|
 | Frontmatter | Optional | Always present |
 | Overview | Required | Preserved from input |
@@ -177,9 +177,9 @@ The existing format in `00-scratchpad/prd-ideas/` (Overview + Key Ideas + Source
 
 ### Event Stream
 
-PRD files carry an append-only event stream that records every modeling action. This makes the PRD self-describing: it contains not just the current model, but the history of how the model was built.
+Event Model files carry an append-only event stream that records every modeling action. This makes the Event Model self-describing: it contains not just the current model, but the history of how the model was built.
 
-**Placement:** Bottom of the PRD file, after all content sections. An HTML comment sentinel `<!-- event-stream -->` marks the start, followed by a `## Event Stream` heading.
+**Placement:** Bottom of the Event Model file, after all content sections. An HTML comment sentinel `<!-- event-stream -->` marks the start, followed by a `## Event Stream` heading.
 
 **Format:** One fenced `` ```eventstream `` block per event (same pattern as `` ```emlang ``). Each block contains YAML with the following schema:
 
@@ -200,7 +200,7 @@ PRD files carry an append-only event stream that records every modeling action. 
 
 | Category | Event Types |
 |----------|-------------|
-| PRD lifecycle | `PrdCreated`, `PrdStatusChanged`, `PrdMetadataUpdated`, `PrdExported` |
+| Event Model lifecycle | `EventModelCreated`, `EventModelStatusChanged`, `EventModelMetadataUpdated`, `EventModelExported` |
 | Session | `SessionStarted`, `SessionEnded` |
 | Slices | `SliceAdded`, `SliceRenamed`, `SliceRemoved`, `SliceReordered` |
 | Elements | `ElementAdded`, `ElementModified`, `ElementRemoved`, `ElementsConnected` |
@@ -212,7 +212,7 @@ PRD files carry an append-only event stream that records every modeling action. 
 **Extraction:** Same pattern as emlang blocks:
 
 ```bash
-awk '/^```eventstream/{p=1; print "---"; next} /^```/{p=0; next} p' feature-prd.md
+awk '/^```eventstream/{p=1; print "---"; next} /^```/{p=0; next} p' feature-event-model.md
 ```
 
 **Example:**
@@ -224,7 +224,7 @@ awk '/^```eventstream/{p=1; print "---"; next} /^```/{p=0; next} p' feature-prd.
 ```eventstream
 seq: 1
 ts: "2026-02-21T10:00:00Z"
-type: PrdCreated
+type: EventModelCreated
 actor: facilitator@example.com
 data:
   title: "User Registration"
@@ -245,7 +245,7 @@ data:
 
 ## EventModeler's Own Event Model
 
-EventModeler models itself. The slices below describe the core workflows of the event_modeler application, defined in emlang notation. This serves as both documentation and a dogfood test of the PRD format.
+EventModeler models itself. The slices below describe the core workflows of the event_modeler application, defined in emlang notation. This serves as both documentation and a dogfood test of the Event Model format.
 
 ### Slice: CreateBoard
 
@@ -276,22 +276,22 @@ slices:
           - e: Board/BoardCreated
 ```
 
-### Slice: ImportPrd
+### Slice: ImportEventModel
 
-User imports a markdown PRD into a board.
+User imports a markdown Event Model into a board.
 
 ```emlang
 slices:
-  ImportPrd:
+  ImportEventModel:
     steps:
       - t: User/ImportDialog
-      - c: ImportPrd
+      - c: ImportEventModel
         props:
           boardId: string
           markdownContent: string
-      - e: Prd/PrdImported
+      - e: EventModel/EventModelImported
         props:
-          prdId: string
+          eventModelId: string
           boardId: string
           title: string
           overview: string
@@ -300,18 +300,18 @@ slices:
     tests:
       WithEmlangBlocks:
         when:
-          - c: ImportPrd
+          - c: ImportEventModel
             props:
               markdownContent: "---\ntitle: Feature\n---\n## Slices\n```emlang\nslices:\n  Register:\n    steps:\n      - c: Register\n```"
         then:
-          - e: Prd/PrdImported
-      EmptyPrd:
+          - e: EventModel/EventModelImported
+      EmptyEventModel:
         when:
-          - c: ImportPrd
+          - c: ImportEventModel
             props:
               markdownContent: ""
         then:
-          - x: InvalidPrdContent
+          - x: InvalidEventModelContent
 ```
 
 ### Slice: ModelOnCanvas
@@ -432,54 +432,54 @@ slices:
           - e: Slice/ScenarioAdded
 ```
 
-### Slice: ExportPrd
+### Slice: ExportEventModel
 
-Export a refined PRD with slices, scenarios, data flows, and event stream.
+Export a refined Event Model with slices, scenarios, data flows, and event stream.
 
 ```emlang
 slices:
-  ExportPrd:
+  ExportEventModel:
     steps:
       - t: User/ExportDialog
-      - c: ExportPrd
+      - c: ExportEventModel
         props:
-          prdId: string
+          eventModelId: string
           format: string
-      - e: Prd/PrdExported
+      - e: EventModel/EventModelExported
         props:
-          prdId: string
+          eventModelId: string
           format: string
           exportedAt: string
       - v: ExportDownload
     tests:
       MarkdownExport:
         given:
-          - e: Prd/PrdImported
+          - e: EventModel/EventModelImported
         when:
-          - c: ExportPrd
+          - c: ExportEventModel
             props:
               format: "markdown"
         then:
-          - e: Prd/PrdExported
+          - e: EventModel/EventModelExported
 ```
 
 ### Slice: VisualizeModel
 
-Read-only rendering of a PRD's event model — no editing, just visualization.
+Read-only rendering of an Event Model's event model -- no editing, just visualization.
 
 ```emlang
 slices:
   VisualizeModel:
     steps:
-      - t: System/PrdFile
+      - t: System/EventModelFile
       - c: LoadModel
         props:
-          prdId: string
+          eventModelId: string
           mode: string
       - e: Board/ModelLoaded
         props:
           boardId: string
-          prdId: string
+          eventModelId: string
           elementCount: number
       - v: ReadOnlyCanvas
     tests:
@@ -494,10 +494,10 @@ slices:
 
 ## MVP Feature Set
 
-### PRD Import & Export
+### Event Model Import & Export
 
-- **Import:** Parse markdown PRD (input format or extended format), extract key ideas, suggest initial element placement on the canvas
-- **Export markdown:** Traverse the board, collect slices with their elements, generate structured PRD in the extended format
+- **Import:** Parse markdown Event Model (input format or extended format), extract key ideas, suggest initial element placement on the canvas
+- **Export markdown:** Traverse the board, collect slices with their elements, generate structured Event Model in the extended format
 - **Export JSON:** Machine-readable export for integration with external tools
 - **Round-trip fidelity:** Imported content (overview, key ideas, sources) is preserved in the export; model-derived sections (slices, scenarios, data flows) are added alongside
 
@@ -537,7 +537,7 @@ Standard [Event Modeling](https://github.com/sparkle-space/masterplan/blob/main/
 
 - Auto-generate Given/When/Then from slices: Events become Givens, Commands become Whens, resulting Events/Views become Thens
 - Manual scenario editing for edge cases and cross-slice scenarios
-- Scenarios are attached to slices and exported in the PRD
+- Scenarios are attached to slices and exported in the Event Model
 
 ### Workshop Mode
 
@@ -563,7 +563,7 @@ Each step constrains available tools (server-enforced, not just UI) and validate
 
 ### Read-Only Visualization Mode
 
-Render a PRD's event model as a non-editable canvas. The system loads a PRD (or board state), renders the canvas, and disables all editing controls.
+Render an Event Model's event model as a non-editable canvas. The system loads an Event Model (or board state), renders the canvas, and disables all editing controls.
 
 - **Use cases:** Self-documentation in running systems, embedding model views in wikis/dashboards, sharing models with stakeholders who don't need editing access
 - **Event stream replay:** "Time-travel" slider replays the event stream to show how the model evolved over time
@@ -587,7 +587,7 @@ This is the target architecture, not the initial one. The standalone app is buil
 - **Ticket integration** — Export slices to Jira or Linear as tickets
 - **Version history** — Board versioning with visual model diffing
 - **Template library** — Pre-built event model patterns (user registration, e-commerce checkout, etc.)
-- **LLM-assisted PRD generation** — LLMs generate PRDs externally; event_modeler imports and validates them. The verification loop: event_modeler checks completeness, LLM iterates based on feedback. Integration surface is PRD import/export — LLMs run external, not embedded. Keeping LLMs external preserves scope and avoids coupling; the PRD format IS the interface
+- **LLM-assisted Event Model generation** — LLMs generate Event Models externally; event_modeler imports and validates them. The verification loop: event_modeler checks completeness, LLM iterates based on feedback. Integration surface is Event Model import/export — LLMs run external, not embedded. Keeping LLMs external preserves scope and avoids coupling; the Event Model format IS the interface
 - **Information completeness checker (full)** — Per-board aggregate score and cross-board tracing (per-element and per-slice checking is MVP)
 - **Time collapsing** — Collapse regions of the timeline to manage large models
 
@@ -597,10 +597,10 @@ This is the target architecture, not the initial one. The standalone app is buil
 
 As a facilitator, I want to guide my team through a structured Event Modeling workshop so that we produce a complete, validated event model from our requirements.
 
-- I create a new board and import our PRD
+- I create a new board and import our Event Model
 - I step the team through the 7-step workshop process
 - At each step, the tool shows what we should focus on and validates our progress
-- After the workshop, I export the refined PRD with slices and scenarios
+- After the workshop, I export the refined Event Model with slices and scenarios
 
 ### Domain Expert (Non-Technical)
 
@@ -622,18 +622,18 @@ As a developer, I want to use the event model as a living specification so that 
 
 ### Product Owner
 
-As a product owner, I want to import a PRD, model it with the team, and get back a refined PRD with concrete slices I can prioritize and schedule.
+As a product owner, I want to import an Event Model, model it with the team, and get back a refined Event Model with concrete slices I can prioritize and schedule.
 
-- I import our markdown PRD into a new board
+- I import our markdown Event Model into a new board
 - After the team models it, I review the slices derived from the model
 - I prioritize and reorder slices for delivery planning
-- I export the refined PRD with slices and scenarios for stakeholders
+- I export the refined Event Model with slices and scenarios for stakeholders
 
 ### System Architect
 
 As an architect, I want to embed a read-only view of our event model in our internal docs so that the team always sees the current system design.
 
-- I point the read-only visualization at our PRD file
+- I point the read-only visualization at our Event Model file
 - The model renders as an interactive (but non-editable) canvas
 - When the model is updated, the visualization reflects the changes
 - I can replay the event stream to show how the design evolved
@@ -644,7 +644,7 @@ As an architect, I want to embed a read-only view of our event model in our inte
 
 | Tool | Strengths | Gaps |
 |------|-----------|------|
-| **ONote / Evident Design** | Browser-based, real-time collaboration, syntax enforcement (prevents invalid connections), "time collapsing" for large models | No PRD integration, no embeddable library, no code generation, pricing unclear |
+| **ONote / Evident Design** | Browser-based, real-time collaboration, syntax enforcement (prevents invalid connections), "time collapsing" for large models | No Event Model integration, no embeddable library, no code generation, pricing unclear |
 | **Modellution** | Jira/ClickUp integration, code generation | Beta status, limited deployment examples |
 | **Qlerify** | AI assistance for modeling | Limited feature information, no embeddable option |
 
@@ -652,7 +652,7 @@ As an architect, I want to embed a read-only view of our event model in our inte
 
 | Tool | Strengths | Gaps |
 |------|-----------|------|
-| **Miro / Mural** | Widely adopted, familiar UX, community Event Modeling templates, Nebulit plugin adds code generation and completeness checking | Generic tool — no syntax enforcement, no slice management, no scenario generation, no PRD integration |
+| **Miro / Mural** | Widely adopted, familiar UX, community Event Modeling templates, Nebulit plugin adds code generation and completeness checking | Generic tool — no syntax enforcement, no slice management, no scenario generation, no Event Model integration |
 | **PlantUML / Mermaid** | Version-controlled alongside code, "docs-as-code" approach | Cannot capture full Event Model complexity (swimlanes, connections, wireframes), no collaboration |
 
 ### Open-Source
@@ -666,11 +666,11 @@ As an architect, I want to embed a read-only view of our event model in our inte
 
 EventModeler occupies a unique position:
 
-- **vs. ONote/Evident Design:** Adds PRD integration, scenario generation, read-only visualization mode, and a path to an embeddable hex module.
+- **vs. ONote/Evident Design:** Adds Event Model integration, scenario generation, read-only visualization mode, and a path to an embeddable hex module.
 - **vs. Miro:** Purpose-built with syntax enforcement, slice management, and structured export — not a generic canvas with templates.
 - **vs. PlantUML/Mermaid:** Visual, collaborative, and interactive while still being embeddable in a codebase.
 - **vs. all competitors:** Only tool designed for eventual extraction as an embeddable library for dogfooding inside your own application. Embeddable read-only visualization of event models — no competitor offers this.
-- **Forward-looking:** LLM-ready PRD format enables external AI tools to generate and iterate on PRDs using event_modeler's import/export pipeline as the integration surface.
+- **Forward-looking:** LLM-ready Event Model format enables external AI tools to generate and iterate on Event Models using event_modeler's import/export pipeline as the integration surface.
 
 ## References
 
@@ -681,6 +681,6 @@ EventModeler occupies a unique position:
 - [Optimistic UI Updates](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/optimistic-ui-updates.md) — UI update tier system
 - [Emlang spec v1.0.0](https://github.com/emlang-project/spec) — Slice notation DSL
 - [Emlang CLI](https://github.com/emlang-project/emlang) — Linting and diagram generation
-- [Emlang PRD format proposal](https://github.com/sparkle-space/masterplan/blob/main/00-scratchpad/emlang-prd-format/prd-format-proposal.md) — DSL comparison and format proposal
-- `00-scratchpad/prd-ideas/` — Existing PRD format (input for format definition)
+- [Emlang Event Model format proposal](https://github.com/sparkle-space/masterplan/blob/main/00-scratchpad/emlang-prd-format/prd-format-proposal.md) — DSL comparison and format proposal
+- `00-scratchpad/prd-ideas/` — Existing Event Model format (input for format definition)
 - `00-scratchpad/event-modelling/` — Competitive research
