@@ -310,12 +310,31 @@ The modeling surface uses SVG rather than HTML Canvas because event models are c
 │  │                                                        │  │
 │  └────────────────────────────────────────────────────────┘  │
 │                                                              │
-│  ┌─ Sidebar ──────────────────────────────────────────────┐  │
-│  │  Element palette, slice list, scenario editor,         │  │
-│  │  Event Model panel, workshop step indicator            │  │
+│  ┌─ Panels (contextual, not always visible) ──────────────┐  │
+│  │  Left panel: Element palette (hidden by default)       │  │
+│  │  Right panel: Element editor (1/3 width, on click)     │  │
+│  │  Bottom sheet: Slice details (overlays canvas)         │  │
+│  │  Modal: Event model description (overlay)              │  │
+│  │  Top bar: Slice dropdown, description, add element     │  │
 │  └────────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────┘
 ```
+
+### Board Interaction Modes
+
+The board uses implicit functional modes — the UI adapts based on user actions rather than explicit mode toggles. The canvas maximizes screen space by default and panels appear only when needed.
+
+| Mode | Trigger | UI State |
+|------|---------|----------|
+| Overview/Browse | Default state | No panels visible. Canvas fills screen. Floating "+" button and top bar controls available. |
+| Add Element | Click "+" button or top bar "+ Add" | Left palette slides in (192px). Element type buttons with colored indicators. Close to dismiss. |
+| Description | Click "Description" in top bar | Modal overlay (70vw) shows full event model overview, key ideas, data flows, sources. Read-only. |
+| Slice Navigation | Select slice from top bar dropdown | Bottom sheet slides up from canvas bottom. Shows elements list, scenarios, generate button. Canvas pans to slice. |
+| Edit Element | Single-click an element | Right panel appears at 1/3 screen width. Canvas zooms to element. Previous viewport saved and restored on close. |
+
+**Viewport preservation:** When entering Edit Element mode, the JS hook saves the current `translateX`, `translateY`, and `scale`. On exit (cancel, update, or background click), the viewport animates back to the saved state.
+
+**Escape key unwinding:** Escape closes the topmost active mode in priority order: description modal → element editor → palette → slice details.
 
 ### JS Hook Responsibilities
 
@@ -327,8 +346,10 @@ The `EventModelerCanvas` hook handles interactions that require client-side resp
 | Zoom | Client-side viewBox scaling; no server round-trip |
 | Drag element | Client-side position during drag; `pushEvent("element_moved", ...)` on drop |
 | Draw connection | Client-side rubber-band line; `pushEvent("elements_connected", ...)` on release |
-| Select element | Client-side highlight; `pushEvent("element_selected", ...)` for sidebar update |
+| Select element | Single-click opens edit mode; `pushEvent("element_selected", ...)` triggers viewport save + zoom + right panel |
 | Text editing | Client-side input; `pushEvent("element_edited", ...)` on blur |
+| Viewport save/restore | `save_viewport` / `restore_viewport` server events; animates between edit and browse states |
+| Zoom to element | `zoom_to_element` server event; centers element accounting for right panel width |
 
 The server remains authoritative: every mutation dispatches a Commanded command, and the resulting event is broadcast to all connected users. Client-side state is optimistic and reconciled on server confirmation.
 

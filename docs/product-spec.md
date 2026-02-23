@@ -525,6 +525,17 @@ Standard [Event Modeling](https://github.com/sparkle-space/masterplan/blob/main/
 - **Swimlanes:** Horizontal lanes for bounded contexts, actors, or subsystems
 - **Timeline:** Horizontal chronological layout (left to right)
 - **Connections:** Arrows linking Commands → Events → Views, with connection validation (e.g., Commands cannot connect directly to Views)
+- **Contextual panels:** Side panels and overlays appear/disappear based on user actions. The canvas maximizes screen space by default.
+
+### Board Interaction Modes
+
+The board adapts its UI implicitly based on user actions:
+
+- **Overview/Browse:** Default state. No side panels. Canvas fills the screen. Top bar provides slice dropdown, description button, and element palette toggle.
+- **Add Element:** Left palette slides in when user clicks the floating "+" button or the top bar "+ Add" button. Contains element type buttons. Closes when dismissed.
+- **Description:** Modal overlay shows the full event model description (overview, key ideas, data flows, sources). Triggered from the top bar. Read-only.
+- **Slice Navigation:** Bottom sheet overlays the canvas bottom when a slice is selected from the dropdown. Shows elements list, scenarios, and generate button. Canvas pans to the selected slice.
+- **Edit Element:** Single-clicking an element zooms the canvas to that element and opens a right panel (1/3 screen width) with the element editor. The previous viewport state is preserved and restored on close.
 
 ### Slice Management
 
