@@ -103,6 +103,7 @@ defmodule EventModeler.EventModel.EmlangParser do
       {"e", label} -> {"e", to_string(label)}
       {"v", label} -> {"v", to_string(label)}
       {"x", label} -> {"x", to_string(label)}
+      {"a", label} -> {"a", to_string(label)}
       _ -> nil
     end)
   end

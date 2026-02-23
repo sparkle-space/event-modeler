@@ -166,6 +166,7 @@ playwright-cli close
 | `/develop` | Core development patterns for Elixir/Phoenix/Commanded/LiveView |
 | `/event-model-plan` | Event Modeling workshop guidance, Event Model format reference, emlang notation |
 | `/research` | Web research and codebase analysis patterns |
+| `/screenshot-models` | Generate Event Model files from descriptions and take high-resolution screenshots |
 
 ## Agents
 
