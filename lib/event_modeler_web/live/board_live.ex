@@ -36,7 +36,11 @@ defmodule EventModelerWeb.BoardLive do
                    editing_scenario_data: nil,
                    adding_scenario: false,
                    new_scenario_name: "",
-                   swimlane_options: existing_swimlanes(state.canvas_data)
+                   swimlane_options: existing_swimlanes(state.canvas_data),
+                   # Implicit mode state
+                   show_description: false,
+                   show_palette: false,
+                   pre_edit_viewport: nil
                  )}
 
               {:error, reason} ->
@@ -76,7 +80,7 @@ defmodule EventModelerWeb.BoardLive do
   end
 
   def handle_event("clear_palette", _params, socket) do
-    {:noreply, assign(socket, palette_type: nil)}
+    {:noreply, assign(socket, palette_type: nil, show_palette: false)}
   end
 
   def handle_event("place_element", %{"x" => _x, "y" => _y}, socket) do
@@ -115,27 +119,48 @@ defmodule EventModelerWeb.BoardLive do
 
       {:noreply, assign(socket, slice_selection: updated)}
     else
-      {:noreply, assign(socket, selected_element: id)}
+      # Single click enters edit mode with zoom
+      elem = Enum.find(socket.assigns.canvas_data.elements, &(&1.id == id))
+
+      if elem do
+        props = elem[:props] || %{}
+
+        editing_data = %{
+          label: elem.label,
+          type: elem.type,
+          swimlane: elem[:swimlane] || "",
+          props: Enum.map(props, fn {k, v} -> %{key: k, value: v} end)
+        }
+
+        # Approximate 1/3 screen width for the panel
+        panel_width = 400
+
+        socket =
+          socket
+          |> assign(
+            selected_element: id,
+            editing_element: id,
+            editing_element_data: editing_data
+          )
+          |> push_event("save_viewport", %{})
+          |> push_event("zoom_to_element", %{
+            x: elem.x,
+            y: elem.y,
+            width: elem.width,
+            height: elem.height,
+            panel_width: panel_width
+          })
+
+        {:noreply, socket}
+      else
+        {:noreply, assign(socket, selected_element: id)}
+      end
     end
   end
 
-  def handle_event("element_dblclick", %{"element_id" => id}, socket) do
-    elem = Enum.find(socket.assigns.canvas_data.elements, &(&1.id == id))
-
-    if elem do
-      props = elem[:props] || %{}
-
-      editing_data = %{
-        label: elem.label,
-        type: elem.type,
-        swimlane: elem[:swimlane] || "",
-        props: Enum.map(props, fn {k, v} -> %{key: k, value: v} end)
-      }
-
-      {:noreply, assign(socket, editing_element: id, editing_element_data: editing_data)}
-    else
-      {:noreply, socket}
-    end
+  def handle_event("element_dblclick", %{"element_id" => _id}, socket) do
+    # No-op: single click now handles edit mode
+    {:noreply, socket}
   end
 
   def handle_event("edit_element", params, socket) do
@@ -158,13 +183,38 @@ defmodule EventModelerWeb.BoardLive do
 
     Board.edit_element(socket.assigns.file_path, id, changes)
 
+    socket =
+      if socket.assigns.pre_edit_viewport do
+        push_event(socket, "restore_viewport", socket.assigns.pre_edit_viewport)
+      else
+        socket
+      end
+
     {:noreply,
      refresh_state(socket)
-     |> assign(editing_element: nil, editing_element_data: nil)}
+     |> assign(
+       editing_element: nil,
+       editing_element_data: nil,
+       pre_edit_viewport: nil,
+       selected_element: nil
+     )}
   end
 
   def handle_event("cancel_edit", _params, socket) do
-    {:noreply, assign(socket, editing_element: nil, editing_element_data: nil)}
+    socket =
+      if socket.assigns.pre_edit_viewport do
+        push_event(socket, "restore_viewport", socket.assigns.pre_edit_viewport)
+      else
+        socket
+      end
+
+    {:noreply,
+     assign(socket,
+       editing_element: nil,
+       editing_element_data: nil,
+       pre_edit_viewport: nil,
+       selected_element: nil
+     )}
   end
 
   def handle_event("swimlane_select_changed", %{"swimlane_select" => "__new__"}, socket) do
@@ -238,7 +288,13 @@ defmodule EventModelerWeb.BoardLive do
     case Enum.find(socket.assigns.canvas_data.slice_labels, &(&1.name == name)) do
       %{x: x, width: width, y: y, height: height} ->
         {:noreply,
-         push_event(socket, "pan_to_slice", %{x: x, width: width, y: y, height: height})}
+         push_event(socket, "pan_to_slice", %{
+           x: x,
+           width: width,
+           y: y,
+           height: height,
+           bottom_offset: 250
+         })}
 
       nil ->
         {:noreply, socket}
@@ -460,6 +516,125 @@ defmodule EventModelerWeb.BoardLive do
     end
   end
 
+  # Mode toggle handlers
+
+  def handle_event("toggle_description", _params, socket) do
+    {:noreply, assign(socket, show_description: !socket.assigns.show_description)}
+  end
+
+  def handle_event("toggle_palette", _params, socket) do
+    showing = !socket.assigns.show_palette
+
+    if showing do
+      {:noreply, assign(socket, show_palette: true)}
+    else
+      {:noreply, assign(socket, show_palette: false, palette_type: nil)}
+    end
+  end
+
+  def handle_event("close_right_panel", _params, socket) do
+    socket =
+      if socket.assigns.pre_edit_viewport do
+        push_event(socket, "restore_viewport", socket.assigns.pre_edit_viewport)
+      else
+        socket
+      end
+
+    {:noreply,
+     assign(socket,
+       editing_element: nil,
+       editing_element_data: nil,
+       pre_edit_viewport: nil,
+       selected_element: nil
+     )}
+  end
+
+  def handle_event("select_slice_from_dropdown", %{"slice" => ""}, socket) do
+    {:noreply, assign(socket, selected_slice: nil)}
+  end
+
+  def handle_event("select_slice_from_dropdown", %{"slice" => name}, socket) do
+    socket = assign(socket, selected_slice: name)
+
+    case Enum.find(socket.assigns.canvas_data.slice_labels, &(&1.name == name)) do
+      %{x: x, width: width, y: y, height: height} ->
+        {:noreply,
+         push_event(socket, "pan_to_slice", %{
+           x: x,
+           width: width,
+           y: y,
+           height: height,
+           bottom_offset: 250
+         })}
+
+      nil ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("viewport_saved", params, socket) do
+    viewport = %{
+      translateX: params["translateX"] || 0,
+      translateY: params["translateY"] || 0,
+      scale: params["scale"] || 1
+    }
+
+    {:noreply, assign(socket, pre_edit_viewport: viewport)}
+  end
+
+  def handle_event("canvas_background_clicked", _params, socket) do
+    socket =
+      if socket.assigns.editing_element && socket.assigns.pre_edit_viewport do
+        push_event(socket, "restore_viewport", socket.assigns.pre_edit_viewport)
+      else
+        socket
+      end
+
+    {:noreply,
+     assign(socket,
+       editing_element: nil,
+       editing_element_data: nil,
+       pre_edit_viewport: nil,
+       selected_element: nil
+     )}
+  end
+
+  def handle_event("close_slice_details", _params, socket) do
+    {:noreply, assign(socket, selected_slice: nil)}
+  end
+
+  def handle_event("escape_pressed", _params, socket) do
+    cond do
+      socket.assigns.show_description ->
+        {:noreply, assign(socket, show_description: false)}
+
+      socket.assigns.editing_element ->
+        socket =
+          if socket.assigns.pre_edit_viewport do
+            push_event(socket, "restore_viewport", socket.assigns.pre_edit_viewport)
+          else
+            socket
+          end
+
+        {:noreply,
+         assign(socket,
+           editing_element: nil,
+           editing_element_data: nil,
+           pre_edit_viewport: nil,
+           selected_element: nil
+         )}
+
+      socket.assigns.show_palette ->
+        {:noreply, assign(socket, show_palette: false, palette_type: nil)}
+
+      socket.assigns.selected_slice ->
+        {:noreply, assign(socket, selected_slice: nil)}
+
+      true ->
+        {:noreply, socket}
+    end
+  end
+
   defp refresh_state(socket) do
     case Board.get_state(socket.assigns.file_path) do
       {:ok, state} ->
@@ -498,7 +673,12 @@ defmodule EventModelerWeb.BoardLive do
         </div>
       </div>
 
-      <div :if={assigns[:canvas_data]} class="h-screen flex flex-col">
+      <div
+        :if={assigns[:canvas_data]}
+        class="h-screen flex flex-col"
+        phx-window-keydown="escape_pressed"
+        phx-key="Escape"
+      >
         <%!-- Header --%>
         <div class="bg-[var(--color-surface)] border-b border-[var(--color-border)] px-4 py-3 flex items-center justify-between shrink-0">
           <div class="flex items-center gap-4">
@@ -518,6 +698,50 @@ defmodule EventModelerWeb.BoardLive do
               {@event_model.status}
             </span>
             <span :if={@dirty} class="text-xs text-warning font-medium">Unsaved changes</span>
+          </div>
+          <%!-- Center controls: Slices dropdown, Description, Add Element --%>
+          <div class="flex items-center gap-2">
+            <form phx-change="select_slice_from_dropdown">
+              <select
+                name="slice"
+                class="text-sm bg-[var(--color-surface-alt)] border border-[var(--color-border)] rounded-[var(--radius-element)] px-3 py-1.5 text-[var(--color-text-primary)] cursor-pointer"
+              >
+                <option value="">Slices ({length(@slice_names)})</option>
+                <option
+                  :for={name <- @slice_names}
+                  value={name}
+                  selected={@selected_slice == name}
+                >
+                  {name}
+                </option>
+              </select>
+            </form>
+            <button
+              phx-click="toggle_description"
+              class={[
+                "px-3 py-1.5 rounded-[var(--radius-element)] text-sm transition-opacity border",
+                if(@show_description,
+                  do: "bg-primary text-primary-content border-primary",
+                  else:
+                    "bg-[var(--color-surface-alt)] text-[var(--color-text-primary)] border-[var(--color-border)] hover:opacity-80"
+                )
+              ]}
+            >
+              Description
+            </button>
+            <button
+              phx-click="toggle_palette"
+              class={[
+                "px-3 py-1.5 rounded-[var(--radius-element)] text-sm transition-opacity border",
+                if(show_left_panel?(assigns),
+                  do: "bg-primary text-primary-content border-primary",
+                  else:
+                    "bg-[var(--color-surface-alt)] text-[var(--color-text-primary)] border-[var(--color-border)] hover:opacity-80"
+                )
+              ]}
+            >
+              + Add
+            </button>
           </div>
           <div class="flex items-center gap-2">
             <span :if={@event_model.updated} class="text-xs text-[var(--color-text-secondary)]">
@@ -543,7 +767,7 @@ defmodule EventModelerWeb.BoardLive do
         <%!-- Flash message --%>
         <div
           :if={@flash_message}
-          class="bg-warning/10 border-b border-warning/20 px-4 py-2 flex items-center justify-between"
+          class="bg-warning/10 border-b border-warning/20 px-4 py-2 flex items-center justify-between shrink-0"
         >
           <p class="text-sm text-warning">{@flash_message}</p>
           <button
@@ -556,55 +780,72 @@ defmodule EventModelerWeb.BoardLive do
 
         <%!-- Main content --%>
         <div class="flex-1 flex overflow-hidden">
-          <%!-- Left sidebar: Element palette --%>
-          <div class="w-48 bg-[var(--color-surface)] border-r border-[var(--color-border)] p-3 shrink-0 overflow-y-auto">
-            <h2 class="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-2">
-              Add Element
-            </h2>
-            <div class="space-y-1">
-              <button
-                :for={
-                  {type, label, color, shadow_var} <- [
-                    {:event, "Event", "bg-[#F97316]", "--shadow-event"},
-                    {:command, "Command", "bg-[#3B82F6]", "--shadow-command"},
-                    {:view, "View", "bg-[#22C55E]", "--shadow-view"},
-                    {:wireframe, "Wireframe", "bg-[#9CA3AF]", "--shadow-wireframe"},
-                    {:automation, "Automation", "bg-[#8B5CF6]", "--shadow-automation"},
-                    {:exception, "Exception", "bg-[#EF4444]", "--shadow-exception"}
-                  ]
-                }
-                phx-click="select_palette"
-                phx-value-type={type}
-                class={[
-                  "w-full text-left px-3 py-2 rounded-[var(--radius-element)] text-sm flex items-center gap-2 transition-colors",
-                  if(@palette_type == type,
-                    do: "bg-[var(--color-surface-alt)] ring-2 ring-primary",
-                    else: "hover:bg-[var(--color-surface-alt)]"
-                  )
-                ]}
-              >
-                <span
-                  class={"w-3 h-3 rounded-sm #{color}"}
-                  style={"box-shadow: var(#{shadow_var})"}
+          <%!-- Left sidebar: Element palette (collapsible) --%>
+          <div class={[
+            "bg-[var(--color-surface)] border-r border-[var(--color-border)] shrink-0 overflow-hidden transition-all duration-300 ease-in-out",
+            if(show_left_panel?(assigns),
+              do: "w-48 opacity-100",
+              else: "w-0 opacity-0 border-r-0"
+            )
+          ]}>
+            <div class="w-48 p-3">
+              <div class="flex items-center justify-between mb-2">
+                <h2 class="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
+                  Add Element
+                </h2>
+                <button
+                  phx-click="toggle_palette"
+                  class="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors text-sm"
+                  title="Close palette"
                 >
-                </span>
-                <span class="text-[var(--color-text-primary)]">{label}</span>
+                  &times;
+                </button>
+              </div>
+              <div class="space-y-1">
+                <button
+                  :for={
+                    {type, label, color, shadow_var} <- [
+                      {:event, "Event", "bg-[#F97316]", "--shadow-event"},
+                      {:command, "Command", "bg-[#3B82F6]", "--shadow-command"},
+                      {:view, "View", "bg-[#22C55E]", "--shadow-view"},
+                      {:wireframe, "Wireframe", "bg-[#9CA3AF]", "--shadow-wireframe"},
+                      {:automation, "Automation", "bg-[#8B5CF6]", "--shadow-automation"},
+                      {:exception, "Exception", "bg-[#EF4444]", "--shadow-exception"}
+                    ]
+                  }
+                  phx-click="select_palette"
+                  phx-value-type={type}
+                  class={[
+                    "w-full text-left px-3 py-2 rounded-[var(--radius-element)] text-sm flex items-center gap-2 transition-colors",
+                    if(@palette_type == type,
+                      do: "bg-[var(--color-surface-alt)] ring-2 ring-primary",
+                      else: "hover:bg-[var(--color-surface-alt)]"
+                    )
+                  ]}
+                >
+                  <span
+                    class={"w-3 h-3 rounded-sm #{color}"}
+                    style={"box-shadow: var(#{shadow_var})"}
+                  >
+                  </span>
+                  <span class="text-[var(--color-text-primary)]">{label}</span>
+                </button>
+              </div>
+
+              <button
+                :if={@palette_type}
+                phx-click="clear_palette"
+                class="mt-2 w-full text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+              >
+                Cancel placement
               </button>
-            </div>
 
-            <button
-              :if={@palette_type}
-              phx-click="clear_palette"
-              class="mt-2 w-full text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
-            >
-              Cancel placement
-            </button>
-
-            <div class="mt-6 text-xs text-[var(--color-text-secondary)] space-y-1">
-              <p>Click canvas to place</p>
-              <p>Shift+click to connect</p>
-              <p>Double-click to edit</p>
-              <p>Delete to remove</p>
+              <div class="mt-6 text-xs text-[var(--color-text-secondary)] space-y-1">
+                <p>Click canvas to place</p>
+                <p>Shift+click to connect</p>
+                <p>Click element to edit</p>
+                <p>Delete to remove</p>
+              </div>
             </div>
           </div>
 
@@ -620,6 +861,16 @@ defmodule EventModelerWeb.BoardLive do
             phx-value-x="100"
             phx-value-y="100"
           >
+            <%!-- Floating add button when palette is hidden --%>
+            <button
+              :if={!show_left_panel?(assigns)}
+              phx-click="toggle_palette"
+              class="absolute top-3 left-3 z-10 w-10 h-10 bg-primary text-primary-content rounded-full flex items-center justify-center shadow-lg hover:opacity-90 transition-opacity text-xl font-light"
+              title="Add element"
+            >
+              +
+            </button>
+
             <div
               id="canvas-world"
               style={"width: #{@canvas_data.canvas_width}px; height: #{@canvas_data.canvas_height}px; position: relative; transform-origin: 0 0;"}
@@ -714,13 +965,247 @@ defmodule EventModelerWeb.BoardLive do
                 {sl.name}
               </div>
             </div>
+
+            <%!-- Bottom sheet for slice details --%>
+            <div
+              :if={@selected_slice}
+              class="absolute bottom-0 left-0 right-0 z-20 transition-transform duration-300 ease-in-out"
+            >
+              <% slice = Enum.find(@slices, &(&1.name == @selected_slice)) %>
+              <div
+                :if={slice}
+                class="bg-[var(--color-surface)] border-t border-[var(--color-border)] rounded-t-[var(--radius-card)] shadow-lg max-h-[40vh] overflow-y-auto"
+              >
+                <div class="px-4 py-3">
+                  <%!-- Header with close button --%>
+                  <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-3">
+                      <h3 class="text-sm font-semibold text-[var(--color-text-primary)]">
+                        {slice.name}
+                      </h3>
+                      <span class="text-xs text-[var(--color-text-secondary)]">
+                        {length(slice.steps)} elements
+                      </span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <button
+                        :if={!@defining_slice}
+                        phx-click="start_define_slice"
+                        class="text-xs text-primary hover:text-primary/80 transition-colors"
+                      >
+                        + Define New
+                      </button>
+                      <button
+                        phx-click="close_slice_details"
+                        class="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors text-lg"
+                        title="Close"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  </div>
+
+                  <%!-- Define Slice mode (inline in bottom sheet) --%>
+                  <div
+                    :if={@defining_slice}
+                    class="mb-3 bg-primary/10 border border-primary/20 rounded-[var(--radius-element)] p-3"
+                  >
+                    <h3 class="text-xs font-semibold text-primary mb-2">
+                      Define New Slice
+                    </h3>
+                    <form phx-change="set_slice_name">
+                      <input
+                        type="text"
+                        name="name"
+                        placeholder="Slice name"
+                        value={@new_slice_name}
+                        class="w-full text-sm border border-primary/30 rounded-[8px] px-2 py-1 mb-2 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
+                      />
+                    </form>
+                    <p class="text-xs text-primary/80 mb-2">
+                      Click elements on the canvas to select them.
+                      Selected: {length(@slice_selection)}
+                    </p>
+                    <div class="flex gap-2">
+                      <button
+                        phx-click="confirm_define_slice"
+                        class="flex-1 bg-primary text-primary-content px-2 py-1 rounded-[8px] text-xs"
+                      >
+                        Create
+                      </button>
+                      <button
+                        phx-click="cancel_define_slice"
+                        class="flex-1 bg-[var(--color-surface-alt)] text-[var(--color-text-primary)] px-2 py-1 rounded-[8px] text-xs"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+
+                  <%!-- Slice content in horizontal layout --%>
+                  <div class="flex gap-6">
+                    <%!-- Elements list --%>
+                    <div class="flex-1 min-w-0">
+                      <h4 class="text-xs font-semibold text-[var(--color-text-secondary)] mb-1">
+                        Elements
+                      </h4>
+                      <div :if={slice.steps != []} class="space-y-0.5">
+                        <div
+                          :for={elem <- slice.steps}
+                          class="flex items-center justify-between text-xs py-0.5 group/elem"
+                        >
+                          <span class="text-[var(--color-text-primary)] truncate">
+                            {elem.label}
+                            <span class="text-[var(--color-text-secondary)]">
+                              ({type_label(elem.type)})
+                            </span>
+                          </span>
+                          <button
+                            phx-click="remove_element_from_slice"
+                            phx-value-slice={slice.name}
+                            phx-value-element_id={elem.id}
+                            class="text-error/60 hover:text-error opacity-0 group-hover/elem:opacity-100 transition-opacity text-xs shrink-0 ml-1"
+                            title="Remove from slice"
+                          >
+                            &times;
+                          </button>
+                        </div>
+                      </div>
+                      <button
+                        phx-click="generate_scenarios"
+                        phx-value-slice={slice.name}
+                        class="mt-2 bg-success text-success-content px-3 py-1 rounded-[8px] text-xs hover:opacity-90 transition-opacity"
+                      >
+                        Generate Scenarios
+                      </button>
+                    </div>
+
+                    <%!-- Scenarios --%>
+                    <div class="flex-1 min-w-0">
+                      <h4 class="text-xs font-semibold text-[var(--color-text-secondary)] mb-1">
+                        Scenarios
+                      </h4>
+                      <div :if={slice.tests != nil and slice.tests != []}>
+                        <div
+                          :for={scenario <- slice.tests}
+                          class="text-xs bg-[var(--color-surface-alt)] rounded-[8px] p-2 mb-1 border border-[var(--color-border)]"
+                        >
+                          <div class="flex items-center justify-between group/sc">
+                            <%= if @editing_scenario && @editing_scenario.slice == slice.name && @editing_scenario.name == scenario.name do %>
+                              <form phx-submit="save_scenario" class="flex gap-1 flex-1">
+                                <input
+                                  type="text"
+                                  name="name"
+                                  value={@editing_scenario_data.name}
+                                  class="flex-1 text-xs border border-primary/30 rounded px-1 py-0.5 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
+                                  autofocus
+                                />
+                                <button type="submit" class="text-xs text-primary">
+                                  Save
+                                </button>
+                                <button
+                                  type="button"
+                                  phx-click="cancel_edit_scenario"
+                                  class="text-xs text-[var(--color-text-secondary)]"
+                                >
+                                  Cancel
+                                </button>
+                              </form>
+                            <% else %>
+                              <p class="font-medium text-[var(--color-text-primary)] flex-1">
+                                {scenario.name}
+                              </p>
+                              <div class="flex gap-1 opacity-0 group-hover/sc:opacity-100 transition-opacity">
+                                <button
+                                  phx-click="start_edit_scenario"
+                                  phx-value-slice={slice.name}
+                                  phx-value-scenario={scenario.name}
+                                  class="text-primary/60 hover:text-primary text-[10px]"
+                                  title="Rename"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  phx-click="remove_scenario"
+                                  phx-value-slice={slice.name}
+                                  phx-value-scenario={scenario.name}
+                                  class="text-error/60 hover:text-error text-[10px]"
+                                  title="Delete"
+                                >
+                                  &times;
+                                </button>
+                              </div>
+                            <% end %>
+                          </div>
+                          <div :if={scenario.given != []} class="mt-1">
+                            <span class="text-[var(--color-text-secondary)]">Given:</span>
+                            <span :for={g <- scenario.given} class="ml-1 text-warning">
+                              {g.label}
+                            </span>
+                          </div>
+                          <div class="mt-0.5">
+                            <span class="text-[var(--color-text-secondary)]">When:</span>
+                            <span :for={w <- scenario.when_clause} class="ml-1 text-info">
+                              {w.label}
+                            </span>
+                          </div>
+                          <div :if={scenario.then_clause != []} class="mt-0.5">
+                            <span class="text-[var(--color-text-secondary)]">Then:</span>
+                            <span :for={t <- scenario.then_clause} class="ml-1 text-success">
+                              {t.label}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div :if={slice.tests == nil or slice.tests == []}>
+                        <p class="text-xs text-[var(--color-text-secondary)] italic">
+                          No scenarios yet.
+                        </p>
+                      </div>
+                      <%!-- Add scenario --%>
+                      <%= if @adding_scenario == slice.name do %>
+                        <form phx-submit="confirm_add_scenario" class="mt-2 flex gap-1">
+                          <input
+                            type="text"
+                            name="name"
+                            placeholder="Scenario name"
+                            value={@new_scenario_name}
+                            class="flex-1 text-xs border border-primary/30 rounded-[6px] px-1.5 py-0.5 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
+                            autofocus
+                          />
+                          <button type="submit" class="text-xs text-primary">Add</button>
+                          <button
+                            type="button"
+                            phx-click="cancel_add_scenario"
+                            class="text-xs text-[var(--color-text-secondary)]"
+                          >
+                            Cancel
+                          </button>
+                        </form>
+                      <% else %>
+                        <button
+                          phx-click="start_add_scenario"
+                          phx-value-slice={slice.name}
+                          class="mt-1 text-xs text-primary hover:text-primary/80 transition-colors"
+                        >
+                          + Add Scenario
+                        </button>
+                      <% end %>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <%!-- Right sidebar --%>
-          <div class="w-64 bg-[var(--color-surface)] border-l border-[var(--color-border)] p-4 overflow-y-auto shrink-0">
-            <%!-- Define Slice mode --%>
+          <%!-- Right sidebar: Element editor (only when editing) --%>
+          <div
+            :if={show_right_panel?(assigns)}
+            class="bg-[var(--color-surface)] border-l border-[var(--color-border)] p-4 overflow-y-auto shrink-0 transition-all duration-300 ease-in-out w-[33vw] min-w-80 max-w-xl"
+          >
+            <%!-- Define Slice mode (when no selected slice to host bottom sheet) --%>
             <div
-              :if={@defining_slice}
+              :if={@defining_slice && !@selected_slice}
               class="mb-4 bg-primary/10 border border-primary/20 rounded-[var(--radius-element)] p-3"
             >
               <h3 class="text-xs font-semibold text-primary mb-2">Define New Slice</h3>
@@ -753,232 +1238,50 @@ defmodule EventModelerWeb.BoardLive do
               </div>
             </div>
 
-            <%!-- Slices list --%>
-            <div class="flex items-center justify-between mb-3">
-              <h2 class="text-sm font-semibold text-[var(--color-text-primary)]">Slices</h2>
-              <button
-                :if={!@defining_slice}
-                phx-click="start_define_slice"
-                class="text-xs text-primary hover:text-primary/80 transition-colors"
-              >
-                + Define
-              </button>
-            </div>
-
-            <div :if={@slice_names == []} class="text-sm text-[var(--color-text-secondary)] mb-4">
-              No slices defined.
-            </div>
-
-            <ul class="space-y-1 mb-4">
-              <li
-                :for={name <- @slice_names}
-                phx-click="select_slice"
-                phx-value-name={name}
-                class={[
-                  "text-sm text-[var(--color-text-primary)] flex items-center gap-2 px-2 py-1 rounded-[8px] cursor-pointer transition-colors group",
-                  if(@selected_slice == name,
-                    do: "bg-primary/10 ring-1 ring-primary/20",
-                    else: "hover:bg-[var(--color-surface-alt)]"
-                  )
-                ]}
-              >
-                <span class="w-2 h-2 bg-primary rounded-full shrink-0"></span>
-                <span class="truncate flex-1">{name}</span>
-                <button
-                  :if={name != "Unassigned"}
-                  phx-click="remove_slice"
-                  phx-value-name={name}
-                  class="text-xs text-error/60 hover:text-error opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                  title="Delete slice"
-                >
-                  &times;
-                </button>
-              </li>
-            </ul>
-
-            <%!-- Selected slice details --%>
-            <div :if={@selected_slice} class="mb-4">
-              <% slice = Enum.find(@slices, &(&1.name == @selected_slice)) %>
-              <div
-                :if={slice}
-                class="bg-[var(--color-surface-alt)] rounded-[var(--radius-element)] p-3"
-              >
-                <div class="flex items-center justify-between mb-2">
-                  <h3 class="text-xs font-semibold text-[var(--color-text-primary)]">{slice.name}</h3>
-                  <span class="text-xs text-[var(--color-text-secondary)]">
-                    {length(slice.steps)} elements
-                  </span>
-                </div>
-
-                <%!-- Elements in slice --%>
-                <div :if={slice.steps != []} class="mb-2">
-                  <div
-                    :for={elem <- slice.steps}
-                    class="flex items-center justify-between text-xs py-0.5 group/elem"
-                  >
-                    <span class="text-[var(--color-text-primary)] truncate">
-                      {elem.label}
-                      <span class="text-[var(--color-text-secondary)]">
-                        ({type_label(elem.type)})
-                      </span>
-                    </span>
-                    <button
-                      phx-click="remove_element_from_slice"
-                      phx-value-slice={slice.name}
-                      phx-value-element_id={elem.id}
-                      class="text-error/60 hover:text-error opacity-0 group-hover/elem:opacity-100 transition-opacity text-xs shrink-0 ml-1"
-                      title="Remove from slice"
-                    >
-                      &times;
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  phx-click="generate_scenarios"
-                  phx-value-slice={slice.name}
-                  class="w-full bg-success text-success-content px-2 py-1 rounded-[8px] text-xs mb-2 hover:opacity-90 transition-opacity"
-                >
-                  Generate Scenarios
-                </button>
-
-                <%!-- Scenarios list --%>
-                <div :if={slice.tests != nil and slice.tests != []}>
-                  <h4 class="text-xs font-semibold text-[var(--color-text-secondary)] mb-1">
-                    Scenarios
-                  </h4>
-                  <div
-                    :for={scenario <- slice.tests}
-                    class="text-xs bg-[var(--color-surface)] rounded-[8px] p-2 mb-1 border border-[var(--color-border)]"
-                  >
-                    <%!-- Scenario header with edit/delete --%>
-                    <div class="flex items-center justify-between group/sc">
-                      <%= if @editing_scenario && @editing_scenario.slice == slice.name && @editing_scenario.name == scenario.name do %>
-                        <form phx-submit="save_scenario" class="flex gap-1 flex-1">
-                          <input
-                            type="text"
-                            name="name"
-                            value={@editing_scenario_data.name}
-                            class="flex-1 text-xs border border-primary/30 rounded px-1 py-0.5 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
-                            autofocus
-                          />
-                          <button type="submit" class="text-xs text-primary">Save</button>
-                          <button
-                            type="button"
-                            phx-click="cancel_edit_scenario"
-                            class="text-xs text-[var(--color-text-secondary)]"
-                          >
-                            Cancel
-                          </button>
-                        </form>
-                      <% else %>
-                        <p class="font-medium text-[var(--color-text-primary)] flex-1">
-                          {scenario.name}
-                        </p>
-                        <div class="flex gap-1 opacity-0 group-hover/sc:opacity-100 transition-opacity">
-                          <button
-                            phx-click="start_edit_scenario"
-                            phx-value-slice={slice.name}
-                            phx-value-scenario={scenario.name}
-                            class="text-primary/60 hover:text-primary text-[10px]"
-                            title="Rename"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            phx-click="remove_scenario"
-                            phx-value-slice={slice.name}
-                            phx-value-scenario={scenario.name}
-                            class="text-error/60 hover:text-error text-[10px]"
-                            title="Delete"
-                          >
-                            &times;
-                          </button>
-                        </div>
-                      <% end %>
-                    </div>
-                    <div :if={scenario.given != []} class="mt-1">
-                      <span class="text-[var(--color-text-secondary)]">Given:</span>
-                      <span :for={g <- scenario.given} class="ml-1 text-warning">{g.label}</span>
-                    </div>
-                    <div class="mt-0.5">
-                      <span class="text-[var(--color-text-secondary)]">When:</span>
-                      <span :for={w <- scenario.when_clause} class="ml-1 text-info">
-                        {w.label}
-                      </span>
-                    </div>
-                    <div :if={scenario.then_clause != []} class="mt-0.5">
-                      <span class="text-[var(--color-text-secondary)]">Then:</span>
-                      <span :for={t <- scenario.then_clause} class="ml-1 text-success">
-                        {t.label}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div :if={slice.tests == nil or slice.tests == []}>
-                  <p class="text-xs text-[var(--color-text-secondary)] italic">No scenarios yet.</p>
-                </div>
-
-                <%!-- Add scenario --%>
-                <%= if @adding_scenario == slice.name do %>
-                  <form phx-submit="confirm_add_scenario" class="mt-2 flex gap-1">
-                    <input
-                      type="text"
-                      name="name"
-                      placeholder="Scenario name"
-                      value={@new_scenario_name}
-                      class="flex-1 text-xs border border-primary/30 rounded-[6px] px-1.5 py-0.5 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
-                      autofocus
-                    />
-                    <button type="submit" class="text-xs text-primary">Add</button>
-                    <button
-                      type="button"
-                      phx-click="cancel_add_scenario"
-                      class="text-xs text-[var(--color-text-secondary)]"
-                    >
-                      Cancel
-                    </button>
-                  </form>
-                <% else %>
-                  <button
-                    phx-click="start_add_scenario"
-                    phx-value-slice={slice.name}
-                    class="mt-1 text-xs text-primary hover:text-primary/80 transition-colors"
-                  >
-                    + Add Scenario
-                  </button>
-                <% end %>
-              </div>
-            </div>
-
             <%!-- Element editor --%>
             <div
               :if={@editing_element && @editing_element_data}
-              class="mt-4 bg-[var(--color-surface-alt)] rounded-[var(--radius-element)] p-3"
+              class="bg-[var(--color-surface-alt)] rounded-[var(--radius-element)] p-4"
             >
-              <h3 class="text-xs font-semibold text-[var(--color-text-secondary)] mb-2">
-                Edit Element
-              </h3>
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-semibold text-[var(--color-text-primary)]">
+                  Edit Element
+                </h3>
+                <button
+                  phx-click="close_right_panel"
+                  class="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors text-lg"
+                  title="Close"
+                >
+                  &times;
+                </button>
+              </div>
               <form phx-submit="edit_element">
-                <label class="block text-xs text-[var(--color-text-secondary)] mb-1">Label</label>
+                <label class="block text-xs text-[var(--color-text-secondary)] mb-1">
+                  Label
+                </label>
                 <input
                   type="text"
                   name="label"
                   value={@editing_element_data.label}
-                  class="w-full text-sm border border-[var(--color-border)] rounded-[8px] px-2 py-1 mb-2 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
+                  class="w-full text-sm border border-[var(--color-border)] rounded-[8px] px-3 py-2 mb-3 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
                   autofocus
                 />
 
-                <label class="block text-xs text-[var(--color-text-secondary)] mb-1">Swimlane</label>
+                <label class="block text-xs text-[var(--color-text-secondary)] mb-1">
+                  Swimlane
+                </label>
                 <select
                   name="swimlane_select"
                   phx-change="swimlane_select_changed"
-                  class="w-full text-sm border border-[var(--color-border)] rounded-[8px] px-2 py-1 mb-2 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
+                  class="w-full text-sm border border-[var(--color-border)] rounded-[8px] px-3 py-2 mb-3 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
                 >
                   <option
                     :for={
-                      sl <- filtered_swimlane_options(@swimlane_options, @editing_element_data.type)
+                      sl <-
+                        filtered_swimlane_options(
+                          @swimlane_options,
+                          @editing_element_data.type
+                        )
                     }
                     value={sl.name}
                     selected={sl.name == (@editing_element_data.swimlane || "")}
@@ -994,7 +1297,7 @@ defmodule EventModelerWeb.BoardLive do
                   value={@editing_element_data[:custom_swimlane_value] || ""}
                   placeholder="Enter new swimlane name"
                   autofocus
-                  class="w-full text-sm border border-[var(--color-border)] rounded-[8px] px-2 py-1 mb-2 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
+                  class="w-full text-sm border border-[var(--color-border)] rounded-[8px] px-3 py-2 mb-3 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
                 />
                 <input
                   :if={!@editing_element_data[:custom_swimlane]}
@@ -1003,7 +1306,7 @@ defmodule EventModelerWeb.BoardLive do
                   value={@editing_element_data.swimlane}
                 />
 
-                <div class="flex items-center justify-between mb-1">
+                <div class="flex items-center justify-between mb-2">
                   <label class="text-xs text-[var(--color-text-secondary)]">Fields</label>
                   <button
                     type="button"
@@ -1016,7 +1319,7 @@ defmodule EventModelerWeb.BoardLive do
 
                 <div
                   :for={{row, idx} <- Enum.with_index(@editing_element_data.props)}
-                  class="flex items-center gap-1 mb-1"
+                  class="flex items-center gap-2 mb-2"
                 >
                   <input
                     type="text"
@@ -1025,7 +1328,7 @@ defmodule EventModelerWeb.BoardLive do
                     phx-blur="update_prop"
                     phx-value-index={idx}
                     phx-value-field="key"
-                    class="flex-1 text-xs border border-[var(--color-border)] rounded-[6px] px-1.5 py-0.5 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
+                    class="flex-1 text-sm border border-[var(--color-border)] rounded-[8px] px-2 py-1.5 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
                   />
                   <input
                     type="text"
@@ -1034,13 +1337,13 @@ defmodule EventModelerWeb.BoardLive do
                     phx-blur="update_prop"
                     phx-value-index={idx}
                     phx-value-field="value"
-                    class="flex-1 text-xs border border-[var(--color-border)] rounded-[6px] px-1.5 py-0.5 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
+                    class="flex-1 text-sm border border-[var(--color-border)] rounded-[8px] px-2 py-1.5 bg-[var(--color-surface)] text-[var(--color-text-primary)]"
                   />
                   <button
                     type="button"
                     phx-click="remove_prop"
                     phx-value-index={idx}
-                    class="text-xs text-error hover:text-error/80 px-1 transition-colors"
+                    class="text-sm text-error hover:text-error/80 px-1 transition-colors"
                   >
                     &times;
                   </button>
@@ -1048,40 +1351,130 @@ defmodule EventModelerWeb.BoardLive do
 
                 <div
                   :if={@editing_element_data.props == []}
-                  class="text-xs text-[var(--color-text-secondary)] italic mb-2"
+                  class="text-xs text-[var(--color-text-secondary)] italic mb-3"
                 >
                   No fields defined.
                 </div>
 
-                <div class="flex gap-2 mt-2">
+                <div class="flex gap-2 mt-3">
                   <button
                     type="submit"
-                    class="flex-1 bg-primary text-primary-content px-2 py-1 rounded-[8px] text-sm"
+                    class="flex-1 bg-primary text-primary-content px-3 py-2 rounded-[8px] text-sm"
                   >
                     Update
                   </button>
                   <button
                     type="button"
                     phx-click="cancel_edit"
-                    class="flex-1 bg-[var(--color-surface)] text-[var(--color-text-primary)] px-2 py-1 rounded-[8px] text-sm border border-[var(--color-border)]"
+                    class="flex-1 bg-[var(--color-surface)] text-[var(--color-text-primary)] px-3 py-2 rounded-[8px] text-sm border border-[var(--color-border)]"
                   >
                     Cancel
                   </button>
                 </div>
               </form>
             </div>
+          </div>
+        </div>
 
-            <div :if={@event_model.overview} class="mt-6">
-              <h2 class="text-sm font-semibold text-[var(--color-text-primary)] mb-2">Overview</h2>
-              <p class="text-xs text-[var(--color-text-secondary)]">
-                {String.slice(@event_model.overview || "", 0..200)}
-              </p>
+        <%!-- Description modal overlay --%>
+        <div
+          :if={@show_description}
+          class="fixed inset-0 z-50 flex items-center justify-center"
+        >
+          <%!-- Backdrop --%>
+          <div
+            class="absolute inset-0 bg-black/40"
+            phx-click="toggle_description"
+          />
+          <%!-- Modal content --%>
+          <div class="relative bg-[var(--color-surface)] rounded-[var(--radius-card)] shadow-2xl w-[70vw] max-h-[80vh] overflow-hidden flex flex-col">
+            <%!-- Modal header --%>
+            <div class="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)] shrink-0">
+              <h2 class="text-lg font-semibold text-[var(--color-text-primary)]">
+                Event Model Description
+              </h2>
+              <button
+                phx-click="toggle_description"
+                class="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors text-xl"
+              >
+                &times;
+              </button>
+            </div>
+            <%!-- Modal body --%>
+            <div class="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+              <div :if={@event_model.overview}>
+                <h3 class="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-2">
+                  Overview
+                </h3>
+                <div class="text-sm text-[var(--color-text-primary)] whitespace-pre-wrap leading-relaxed">
+                  {@event_model.overview}
+                </div>
+              </div>
+
+              <div :if={@event_model.key_ideas && @event_model.key_ideas != []}>
+                <h3 class="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-2">
+                  Key Ideas
+                </h3>
+                <ul class="list-disc list-inside space-y-1">
+                  <li
+                    :for={idea <- @event_model.key_ideas}
+                    class="text-sm text-[var(--color-text-primary)]"
+                  >
+                    {idea}
+                  </li>
+                </ul>
+              </div>
+
+              <div :if={@event_model.data_flows}>
+                <h3 class="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-2">
+                  Data Flows
+                </h3>
+                <div class="text-sm text-[var(--color-text-primary)] whitespace-pre-wrap">
+                  {@event_model.data_flows}
+                </div>
+              </div>
+
+              <div :if={@event_model.model_dependencies}>
+                <h3 class="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-2">
+                  Dependencies
+                </h3>
+                <div class="text-sm text-[var(--color-text-primary)] whitespace-pre-wrap">
+                  {@event_model.model_dependencies}
+                </div>
+              </div>
+
+              <div :if={@event_model.sources}>
+                <h3 class="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-2">
+                  Sources
+                </h3>
+                <div class="text-sm text-[var(--color-text-primary)] whitespace-pre-wrap">
+                  {@event_model.sources}
+                </div>
+              </div>
+
+              <div :if={
+                !@event_model.overview && (!@event_model.key_ideas || @event_model.key_ideas == []) &&
+                  !@event_model.data_flows && !@event_model.sources &&
+                  !@event_model.model_dependencies
+              }>
+                <p class="text-sm text-[var(--color-text-secondary)] italic">
+                  No description available for this event model.
+                </p>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
     """
+  end
+
+  defp show_left_panel?(assigns) do
+    assigns.show_palette || assigns.palette_type != nil
+  end
+
+  defp show_right_panel?(assigns) do
+    assigns.editing_element != nil || assigns.defining_slice
   end
 
   defp existing_swimlanes(canvas_data) do

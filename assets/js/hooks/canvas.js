@@ -7,6 +7,7 @@
  * - Select: click element -> pushEvent (handled by phx-click)
  * - Connect: shift+click source, shift+click target -> pushEvent
  * - Delete: Delete/Backspace -> pushEvent for selected element
+ * - Viewport save/restore for element edit zoom
  */
 const MIN_SCALE = 0.1
 const MAX_SCALE = 5
@@ -23,6 +24,7 @@ const EventModelerCanvas = {
     this.isPanning = false
     this.panStart = null
     this.connectSource = null
+    this.savedViewport = null
 
     this.viewport.addEventListener("mousedown", (e) => this.onMouseDown(e))
     this.viewport.addEventListener("mousemove", (e) => this.onMouseMove(e))
@@ -31,14 +33,10 @@ const EventModelerCanvas = {
       passive: false,
     })
 
-    // Double-click on element to edit label, on empty canvas to zoom in
+    // Double-click on empty canvas to zoom in (element edit is now single-click)
     this.viewport.addEventListener("dblclick", (e) => {
       const elem = e.target.closest("[data-element-id]")
-      if (elem) {
-        this.pushEvent("element_dblclick", {
-          element_id: elem.dataset.elementId,
-        })
-      } else {
+      if (!elem) {
         const rect = this.viewport.getBoundingClientRect()
         const px = e.clientX - rect.left
         const py = e.clientY - rect.top
@@ -55,15 +53,57 @@ const EventModelerCanvas = {
       if (
         (e.key === "Delete" || e.key === "Backspace") &&
         e.target.tagName !== "INPUT" &&
-        e.target.tagName !== "TEXTAREA"
+        e.target.tagName !== "TEXTAREA" &&
+        e.target.tagName !== "SELECT"
       ) {
         this.onDelete()
       }
     })
 
-    // Listen for server-pushed pan_to_slice events
+    // Listen for server-pushed events
     this.handleEvent("pan_to_slice", (payload) => {
-      this.panToSlice(payload.x, payload.y, payload.width, payload.height)
+      this.panToSlice(
+        payload.x,
+        payload.y,
+        payload.width,
+        payload.height,
+        payload.bottom_offset || 0
+      )
+    })
+
+    this.handleEvent("save_viewport", () => {
+      this.savedViewport = {
+        translateX: this.translateX,
+        translateY: this.translateY,
+        scale: this.scale,
+      }
+      this.pushEvent("viewport_saved", {
+        translateX: this.translateX,
+        translateY: this.translateY,
+        scale: this.scale,
+      })
+    })
+
+    this.handleEvent("zoom_to_element", (payload) => {
+      this.zoomToElement(
+        payload.x,
+        payload.y,
+        payload.width,
+        payload.height,
+        payload.panel_width || 0
+      )
+    })
+
+    this.handleEvent("restore_viewport", (payload) => {
+      this.translateX = payload.translateX || 0
+      this.translateY = payload.translateY || 0
+      this.scale = payload.scale || 1
+      this.savedViewport = null
+      this.world.style.transition = "transform 0.3s ease-out"
+      this.applyTransform()
+      setTimeout(() => {
+        this.world.style.transition = ""
+      }, 300)
     })
   },
 
@@ -90,26 +130,54 @@ const EventModelerCanvas = {
     this.viewport.style.cursor = "crosshair"
   },
 
-  panToSlice(sliceX, sliceY, sliceWidth, sliceHeight) {
+  panToSlice(sliceX, sliceY, sliceWidth, sliceHeight, bottomOffset = 0) {
     const vp = this.viewport.getBoundingClientRect()
     const padding = 80
+    // Account for bottom sheet overlay when calculating available space
+    const availableHeight = vp.height - bottomOffset
 
-    // Calculate scale to fit the slice bounding box in the viewport
+    // Calculate scale to fit the slice bounding box in the visible area
     const scaleX = vp.width / (sliceWidth + padding)
-    const scaleY = vp.height / (sliceHeight + padding)
+    const scaleY = availableHeight / (sliceHeight + padding)
     const fitScale = Math.min(scaleX, scaleY)
 
     // Clamp: minimum zoom floor for readability, cap at MAX_SCALE
     const MIN_FIT_SCALE = 0.3
     this.scale = Math.max(MIN_FIT_SCALE, Math.min(fitScale, MAX_SCALE))
 
-    // Center the bounding box in the viewport
+    // Center the bounding box in the visible area (above bottom sheet)
     const centerX = sliceX + sliceWidth / 2
     const centerY = sliceY + sliceHeight / 2
     this.translateX = vp.width / 2 - centerX * this.scale
-    this.translateY = vp.height / 2 - centerY * this.scale
+    this.translateY = availableHeight / 2 - centerY * this.scale
 
     // Smooth transition, then remove so manual pan stays responsive
+    this.world.style.transition = "transform 0.3s ease-out"
+    this.applyTransform()
+    setTimeout(() => {
+      this.world.style.transition = ""
+    }, 300)
+  },
+
+  zoomToElement(elemX, elemY, elemWidth, elemHeight, panelWidth) {
+    const vp = this.viewport.getBoundingClientRect()
+    // Available canvas width accounts for the right panel that will appear
+    const availableWidth = vp.width - panelWidth
+    const padding = 120
+
+    // Calculate scale to fit element comfortably
+    const scaleX = availableWidth / (elemWidth + padding * 2)
+    const scaleY = vp.height / (elemHeight + padding * 2)
+    const fitScale = Math.min(scaleX, scaleY, 2.5) // Cap at 2.5x
+
+    this.scale = Math.max(0.5, fitScale)
+
+    // Center the element in the available canvas area (not the full viewport)
+    const centerX = elemX + elemWidth / 2
+    const centerY = elemY + elemHeight / 2
+    this.translateX = availableWidth / 2 - centerX * this.scale
+    this.translateY = vp.height / 2 - centerY * this.scale
+
     this.world.style.transition = "transform 0.3s ease-out"
     this.applyTransform()
     setTimeout(() => {
@@ -148,6 +216,10 @@ const EventModelerCanvas = {
     } else if (!elem) {
       // Click on empty canvas clears connection mode
       this.clearConnectSource()
+
+      // Notify server that background was clicked (clears editing state)
+      this.pushEvent("canvas_background_clicked", {})
+
       // Pan mode
       this.isPanning = true
       this.panStart = { x: e.clientX, y: e.clientY }
