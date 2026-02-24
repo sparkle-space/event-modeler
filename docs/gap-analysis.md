@@ -79,8 +79,9 @@ The project is a **working, file-based prototype** with a functional collaborati
 
 | Gap | Spec Reference |
 |-----|---------------|
-| No JSON export format | Product Spec §Export Flow |
 | No data flow table generation (Source → Enters as → Transforms via → Exits as) | Product Spec §Data Flows |
+
+**Decision:** JSON export is not needed. Markdown + emlang is the canonical format.
 
 ### 7. Information Completeness Checking
 
