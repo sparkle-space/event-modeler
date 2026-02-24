@@ -400,4 +400,147 @@ defmodule EventModeler.BoardTest do
     assert scenario.name == "ManualScenario"
     assert scenario.auto_generated == false
   end
+
+  # Slice reordering
+
+  test "reorder_slice moves slice up", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, cmd1} = Board.place_element(path, :command, "Cmd1")
+    {:ok, cmd2} = Board.place_element(path, :command, "Cmd2")
+    :ok = Board.define_slice(path, "SliceA", [cmd1])
+    :ok = Board.define_slice(path, "SliceB", [cmd2])
+
+    {:ok, state_before} = Board.get_state(path)
+    names_before = Enum.map(state_before.event_model.slices, & &1.name)
+    idx_a = Enum.find_index(names_before, &(&1 == "SliceA"))
+    idx_b = Enum.find_index(names_before, &(&1 == "SliceB"))
+    assert idx_b > idx_a
+
+    :ok = Board.reorder_slice(path, "SliceB", :up)
+
+    {:ok, state_after} = Board.get_state(path)
+    names_after = Enum.map(state_after.event_model.slices, & &1.name)
+    new_idx_a = Enum.find_index(names_after, &(&1 == "SliceA"))
+    new_idx_b = Enum.find_index(names_after, &(&1 == "SliceB"))
+    assert new_idx_b < new_idx_a
+  end
+
+  test "reorder_slice returns error at boundary", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, cmd1} = Board.place_element(path, :command, "Cmd1")
+    :ok = Board.define_slice(path, "SliceA", [cmd1])
+
+    {:ok, state} = Board.get_state(path)
+    first_name = hd(state.event_model.slices).name
+    assert {:error, _} = Board.reorder_slice(path, first_name, :up)
+  end
+
+  # Set slice order
+
+  test "set_slice_order reorders slices by name list", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, cmd1} = Board.place_element(path, :command, "Cmd1")
+    {:ok, cmd2} = Board.place_element(path, :command, "Cmd2")
+    {:ok, cmd3} = Board.place_element(path, :command, "Cmd3")
+    :ok = Board.define_slice(path, "Alpha", [cmd1])
+    :ok = Board.define_slice(path, "Beta", [cmd2])
+    :ok = Board.define_slice(path, "Gamma", [cmd3])
+
+    {:ok, state_before} = Board.get_state(path)
+    current_names = Enum.map(state_before.event_model.slices, & &1.name)
+    reversed = Enum.reverse(current_names)
+
+    :ok = Board.set_slice_order(path, reversed)
+
+    {:ok, state} = Board.get_state(path)
+    names = Enum.map(state.event_model.slices, & &1.name)
+    assert names == reversed
+  end
+
+  # Undo/Redo
+
+  test "undo reverses last mutation", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+
+    {:ok, state_before} = Board.get_state(path)
+
+    elem_count_before =
+      Enum.flat_map(state_before.event_model.slices, & &1.steps) |> length()
+
+    {:ok, _id} = Board.place_element(path, :command, "ToUndo")
+
+    {:ok, state_mid} = Board.get_state(path)
+
+    elem_count_mid =
+      Enum.flat_map(state_mid.event_model.slices, & &1.steps) |> length()
+
+    assert elem_count_mid == elem_count_before + 1
+
+    :ok = Board.undo(path)
+
+    {:ok, state_after} = Board.get_state(path)
+
+    elem_count_after =
+      Enum.flat_map(state_after.event_model.slices, & &1.steps) |> length()
+
+    assert elem_count_after == elem_count_before
+  end
+
+  test "redo restores undone mutation", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, _id} = Board.place_element(path, :command, "ToRedo")
+
+    {:ok, state_mid} = Board.get_state(path)
+
+    elem_count_mid =
+      Enum.flat_map(state_mid.event_model.slices, & &1.steps) |> length()
+
+    :ok = Board.undo(path)
+    :ok = Board.redo(path)
+
+    {:ok, state_after} = Board.get_state(path)
+
+    elem_count_after =
+      Enum.flat_map(state_after.event_model.slices, & &1.steps) |> length()
+
+    assert elem_count_after == elem_count_mid
+  end
+
+  test "undo on empty stack returns error", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    assert {:error, "Nothing to undo"} = Board.undo(path)
+  end
+
+  test "redo on empty stack returns error", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    assert {:error, "Nothing to redo"} = Board.redo(path)
+  end
+
+  test "new mutation clears redo stack", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+    {:ok, _id} = Board.place_element(path, :command, "First")
+    :ok = Board.undo(path)
+
+    # Redo should work now
+    {:ok, {_, can_redo}} = Board.can_undo_redo(path)
+    assert can_redo
+
+    # New mutation clears redo stack
+    {:ok, _id2} = Board.place_element(path, :event, "Second")
+
+    {:ok, {_, can_redo_after}} = Board.can_undo_redo(path)
+    refute can_redo_after
+  end
+
+  test "can_undo_redo reports correct state", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+
+    assert {:ok, {false, false}} = Board.can_undo_redo(path)
+
+    {:ok, _id} = Board.place_element(path, :command, "Test")
+    assert {:ok, {true, false}} = Board.can_undo_redo(path)
+
+    :ok = Board.undo(path)
+    assert {:ok, {false, true}} = Board.can_undo_redo(path)
+  end
 end
