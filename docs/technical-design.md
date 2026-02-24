@@ -2,7 +2,7 @@
 
 **Status:** Concept
 **Date:** 2026-02-17
-**Depends on:** [Product Specification](product-spec.md), [Event Modeling](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/event-modeling.md), [Event Sourcing & CQRS](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/event-sourcing-cqrs.md), [Collaboration Architecture](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/collaboration-architecture.md)
+**Depends on:** [Product Specification](product-spec.md), [Event Modeling](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/event-modeling.md), [Collaboration Architecture](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/collaboration-architecture.md)
 
 ## Overview
 
@@ -27,7 +27,7 @@ event_modeler/
 │   └── event_modeler.ex
 ├── assets/                     # JS/CSS for canvas
 ├── priv/
-│   └── repo/migrations/
+│   └── event_models/          # Sample Event Model markdown files
 ├── test/
 ├── config/
 ├── docs/
@@ -41,7 +41,7 @@ The application is a standard Phoenix project. Once the core is mature, the reus
 
 ## Future: Hex Module Extraction
 
-When the standalone app is mature, the core will be extracted into a hex package following the Phoenix library pattern established by `phoenix_live_dashboard` and `live_storybook`: a self-contained package that brings its own routes, LiveView modules, JS hooks, CSS, Ecto schemas, and migrations. The host app would provide authentication, user context, Ecto Repo, and PubSub.
+When the standalone app is mature, the core will be extracted into a hex package following the Phoenix library pattern established by `phoenix_live_dashboard` and `live_storybook`: a self-contained package that brings its own routes, LiveView modules, JS hooks, and CSS. The host app would provide authentication, user context, and PubSub. No database required — persistence is file-based (Event Model markdown files).
 
 The design below describes the target hex module architecture. During the standalone app phase, these same components exist but are not yet packaged for external consumption.
 
@@ -57,7 +57,7 @@ scope "/", MyAppWeb do
   pipe_through [:browser, :require_authenticated_user]
 
   event_modeler "/event-model",
-    repo: MyApp.Repo,
+    event_models_path: "priv/event_models",
     pubsub: MyApp.PubSub,
     auth: MyAppWeb.EventModelerAuth
 end
@@ -101,19 +101,17 @@ end
 | `EventModeler.Live.*` | LiveView modules for board, canvas, slices, workshop, Event Model import/export |
 | `EventModeler.Hooks` | Phoenix LiveView JS hooks for canvas interaction |
 | `EventModeler.Assets` | CSS and JS bundles (served via `Plug.Static` or esbuild plugin) |
-| `EventModeler.Ecto.Migrations` | Migration modules the host app runs via `mix ecto.migrate` |
-| `EventModeler.Aggregates.*` | Commanded aggregates for Board, Element, Slice, EventModel |
-| `EventModeler.Projectors.*` | Ecto projectors for read models |
+| `EventModeler.EventModel.*` | Parser, serializer, emlang, event stream — file-based persistence |
 | `EventModeler.Collaboration.*` | GenServer sessions, Registry, Presence for real-time sync |
 
 ### What the Host App Provides
 
 | Component | Description |
 |-----------|-------------|
-| Ecto Repo | Database access (PostgreSQL) |
 | PubSub | Phoenix PubSub instance for broadcasts |
 | Auth adapter | User identity and authorization |
 | Endpoint | WebSocket and HTTP serving |
+| File system | Directory for Event Model markdown files |
 
 ## Stack
 
@@ -123,150 +121,61 @@ The technology choices align with the sparkle.space ecosystem:
 |-------|------------|-----------|
 | Language | Elixir | [Elixir/Phoenix/LiveView](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/elixir-phoenix-liveview.md) |
 | Web framework | Phoenix + LiveView | [Elixir/Phoenix/LiveView](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/elixir-phoenix-liveview.md) |
-| Database | PostgreSQL | [Hosting Architecture](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/hosting/hosting-architecture.md) |
-| Event sourcing | Commanded + Eventstore | [Event Sourcing & CQRS](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/event-sourcing-cqrs.md) |
+| Persistence | File system (Event Model markdown) | — |
+| State management | Board GenServer (in-memory during sessions) | — |
 | Real-time | Phoenix Channels + Presence | [Collaboration Architecture](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/collaboration-architecture.md) |
 | Canvas rendering | SVG (via LiveView + JS hooks) | — |
 
 ## Data Model
 
-EventModeler is event-sourced using Commanded. The write model consists of aggregates; the read model consists of Ecto projections.
+EventModeler uses file-based persistence. Event Models are stored as markdown files in the file system. During a modeling session, the Board GenServer loads the Event Model into memory, holds all state (elements, slices, scenarios, connections), and writes back to the file on save.
 
-### Aggregates
+### In-Memory State (Board GenServer)
 
-#### Board Aggregate
+Each open board has a GenServer (`EventModeler.Board`) holding the complete session state:
 
-The root aggregate representing an event modeling canvas.
-
-```
-Stream: EventModeler.BoardAggregate-{board_id}
-
-Commands:
-  CreateBoard {board_id, title, owner_id}
-  RenameBoard {board_id, title}
-  DefineSwimlane {board_id, swimlane_id, label, actor, position}
-  ReorderSwimlanes {board_id, swimlane_ids}
-  RemoveSwimlane {board_id, swimlane_id}
-  ImportEventModel {board_id, event_model_id, markdown_content}
-  ArchiveBoard {board_id}
-
-Events:
-  BoardCreated {board_id, title, owner_id, created_at}
-  BoardRenamed {board_id, title}
-  SwimlaneDefined {board_id, swimlane_id, label, actor, position}
-  SwimlanesReordered {board_id, swimlane_ids}
-  SwimlaneRemoved {board_id, swimlane_id}
-  EventModelImported {board_id, event_model_id, title, overview, key_ideas}
-  BoardArchived {board_id, archived_at}
+```elixir
+%{
+  file_path: String.t(),          # Path to the Event Model markdown file
+  event_model: %EventModel{},     # Parsed Event Model struct (slices, elements, scenarios, etc.)
+  layout: %LayoutResult{},        # Computed element positions (pure function of event_model)
+  canvas_data: map(),             # Rendered canvas data for LiveView
+  connections: [{String.t(), String.t()}],  # Active connections [{from_id, to_id}]
+  dirty: boolean()                # Whether unsaved changes exist
+}
 ```
 
-#### Element Aggregate
+### Core Domain Structs
 
-Represents a single modeling element (Command, Event, View, Automation, Wireframe) on the canvas.
-
-```
-Stream: EventModeler.ElementAggregate-{element_id}
-
-Commands:
-  PlaceElement {element_id, board_id, type, label, x, y, swimlane_id}
-  MoveElement {element_id, x, y, swimlane_id}
-  EditElement {element_id, label, description, fields}
-  ConnectElements {element_id, target_element_id, connection_type}
-  DisconnectElements {element_id, target_element_id}
-  RemoveElement {element_id}
-
-Events:
-  ElementPlaced {element_id, board_id, type, label, x, y, swimlane_id}
-  ElementMoved {element_id, x, y, swimlane_id}
-  ElementEdited {element_id, label, description, fields}
-  ElementsConnected {element_id, target_element_id, connection_type}
-  ElementsDisconnected {element_id, target_element_id}
-  ElementRemoved {element_id}
-
-Invariants:
-  - type must be one of: :command, :event, :view, :automation, :wireframe
-  - Connection validation:
-      command→event (valid)
-      event→view (valid)
-      event→automation (valid)
-      automation→command (valid)
-      wireframe→command (valid: "this screen submits this command")
-      wireframe→view (valid: "this screen displays this view data")
-      command→view (rejected)
-      wireframe→event (rejected)
-      wireframe→automation (rejected)
-      All other wireframe connections (rejected)
+```elixir
+%EventModel{title, status, domain, version, slices, scenarios, event_stream, sections, ...}
+%Slice{name, steps: [%Element{}], tests: [...], raw_emlang}
+%Element{id, type, label, swimlane, props: %{}}
+%EventEntry{seq, ts, type, actor, data, session, ref, note}
 ```
 
-#### Slice Aggregate
+### Persistence Flow
 
-A named vertical slice grouping Command → Event → View chains.
+1. **Load:** `Workspace.read_event_model(path)` → `Parser.parse(markdown)` → `%EventModel{}`
+2. **Edit:** Board GenServer mutates the in-memory `%EventModel{}` struct
+3. **Save:** `Serializer.serialize_for_save(event_model)` → write markdown to file
+4. **Layout:** `Layout.compute(event_model)` → `%LayoutResult{}` (pure computation, no persistence)
 
-```
-Stream: EventModeler.SliceAggregate-{slice_id}
+### Connection Validation
 
-Commands:
-  DefineSlice {slice_id, board_id, name, element_ids}
-  RenameSlice {slice_id, name}
-  AddElementToSlice {slice_id, element_id}
-  RemoveElementFromSlice {slice_id, element_id}
-  AddScenario {slice_id, scenario_id, given, when_clause, then_clause}
-  EditScenario {slice_id, scenario_id, given, when_clause, then_clause}
-  RemoveScenario {slice_id, scenario_id}
-  SetSlicePosition {slice_id, position}
-  RemoveSlice {slice_id}
+Connection rules are enforced in `ConnectionRules`:
 
-Events:
-  SliceDefined {slice_id, board_id, name, element_ids}
-  SliceRenamed {slice_id, name}
-  ElementAddedToSlice {slice_id, element_id}
-  ElementRemovedFromSlice {slice_id, element_id}
-  ScenarioAdded {slice_id, scenario_id, given, when_clause, then_clause}
-  ScenarioEdited {slice_id, scenario_id, given, when_clause, then_clause}
-  ScenarioRemoved {slice_id, scenario_id}
-  SlicePositionSet {slice_id, position}
-  SliceRemoved {slice_id}
-```
-
-#### EventModel Aggregate
-
-Tracks an imported Event Model and its refinement through the modeling process.
-
-```
-Stream: EventModeler.EventModelAggregate-{event_model_id}
-
-Commands:
-  ImportEventModel {event_model_id, board_id, markdown_content, frontmatter}
-  RefineEventModel {event_model_id, refinements}
-  ExportEventModel {event_model_id, format}
-
-Events:
-  EventModelImported {event_model_id, board_id, title, overview, key_ideas, raw_markdown}
-  EventModelRefined {event_model_id, added_slices, added_scenarios, added_data_flows}
-  EventModelExported {event_model_id, format, exported_at}
-```
-
-### Read Models (Projections)
-
-```
-boards
-  id, title, owner_id, swimlanes (jsonb), event_model_id, status, inserted_at, updated_at
-
-elements
-  id, board_id, type, label, description, fields (jsonb),
-  x, y, swimlane_id, connections (jsonb), inserted_at, updated_at
-
-slices
-  id, board_id, name, element_ids (jsonb), position, inserted_at, updated_at
-
-scenarios
-  id, slice_id, given (jsonb), when_clause, then_clause (jsonb),
-  auto_generated (boolean), inserted_at, updated_at
-
-event_models
-  id, board_id, title, overview, key_ideas (jsonb), raw_markdown,
-  status, exported_at, inserted_at, updated_at
-```
+| Connection | Valid | Meaning |
+|------------|-------|---------|
+| command → event | Yes | Command produces event |
+| command → exception | Yes | Command may fail |
+| event → view | Yes | Event updates read model |
+| event → automation | Yes | Event triggers automation |
+| automation → command | Yes | Automation dispatches command |
+| wireframe → command | Yes | Screen submits command |
+| wireframe → view | Yes | Screen displays view data |
+| command → view | No | Commands don't connect directly to views |
+| wireframe → event | No | Wireframes don't connect to events |
 
 ## Canvas Architecture
 
@@ -351,16 +260,16 @@ The `EventModelerCanvas` hook handles interactions that require client-side resp
 | Viewport save/restore | `save_viewport` / `restore_viewport` server events; animates between edit and browse states |
 | Zoom to element | `zoom_to_element` server event; centers element accounting for right panel width |
 
-The server remains authoritative: every mutation dispatches a Commanded command, and the resulting event is broadcast to all connected users. Client-side state is optimistic and reconciled on server confirmation.
+The server remains authoritative: every mutation is handled by the Board GenServer, which validates the action and updates the in-memory state. Changes are broadcast to connected users via PubSub. Client-side state is optimistic and reconciled on server confirmation.
 
 ### Rendering Flow
 
-1. LiveView mounts, loads board read model (elements, connections, swimlanes)
+1. LiveView mounts, Board GenServer loads Event Model from file and computes layout
 2. SVG is rendered server-side with all elements positioned
 3. JS hook initializes pan/zoom and attaches drag listeners
 4. User drags element → client moves SVG node → drop fires `pushEvent`
-5. Server dispatches `MoveElement` command → `ElementMoved` event
-6. Event broadcast via PubSub → all connected LiveViews update assigns
+5. Board GenServer updates in-memory state, records event in event stream
+6. State change broadcast via PubSub → all connected LiveViews update assigns
 7. LiveView diffs → minimal SVG attribute updates sent to other clients
 
 ## Real-Time Collaboration
@@ -372,7 +281,7 @@ Adapted from the [Collaboration Architecture](https://github.com/sparkle-space/m
 | Level | Purpose | Technology | Persistence |
 |-------|---------|------------|-------------|
 | **Ephemeral** | Real-time element dragging, cursor positions, selection state | GenServer per board + Phoenix Channels | None (in-memory only) |
-| **Persistent** | Element placement, connections, slice definitions, scenarios | Commanded event sourcing | PostgreSQL event store |
+| **Persistent** | Element placement, connections, slice definitions, scenarios | Event Model markdown file | File system |
 
 ### BoardSession GenServer
 
@@ -391,7 +300,7 @@ Each active board has a GenServer (`EventModeler.Collaboration.BoardSession`) ho
 **Key behaviors:**
 - `handle_call(:drag_start, ...)` — Lock element to user, broadcast drag start
 - `handle_call(:drag_move, ...)` — Update ephemeral position, broadcast to peers (throttled)
-- `handle_call(:drag_end, ...)` — Release lock, dispatch `MoveElement` command for persistence
+- `handle_call(:drag_end, ...)` — Release lock, update Board GenServer state for persistence
 - `handle_call(:join, ...)` — Add participant, return current board state
 - `handle_call(:leave, ...)` — Remove participant, release any held locks
 - `handle_info(:timeout, ...)` — Shut down after all participants leave
@@ -417,8 +326,8 @@ Phoenix Presence tracks per-board participant state:
 |---------------|------------|
 | Two users drag same element | First lock wins; second user sees element locked |
 | Concurrent element edits (text) | Last-write-wins on `ElementEdited` (short text fields; merge not needed) |
-| Concurrent slice definition | Both succeed — slices are independent aggregates |
-| Concurrent connection drawing | Both succeed if valid; aggregate rejects invalid connections |
+| Concurrent slice definition | Both succeed — slices are independent units |
+| Concurrent connection drawing | Both succeed if valid; Board GenServer rejects invalid connections |
 
 ### Optimistic UI Updates
 
@@ -520,8 +429,7 @@ Board (read model)
 │              │  Generated: Slices (emlang), Scenarios, Data Flows
 └──────┬──────┘
        │
-       ├──→ Markdown (.md) — with ```emlang slice blocks
-       └──→ JSON (.json)
+       └──→ Markdown (.md) — with ```emlang slice blocks
 ```
 
 ### Round-Trip Fidelity
@@ -558,7 +466,7 @@ During modeling sessions, events are held in-memory by the `BoardSession` GenSer
 
 ## Workshop Step Enforcement
 
-The 7-step workshop mode constrains available tools at each step to guide participants through the Event Modeling process. Enforcement is server-authoritative — the `BoardSession` GenServer and Commanded aggregates reject disallowed actions. The UI hides unavailable tools as a convenience, but the server is the gate.
+The 7-step workshop mode constrains available tools at each step to guide participants through the Event Modeling process. Enforcement is server-authoritative — the Board GenServer rejects disallowed actions based on the current step. The UI hides unavailable tools as a convenience, but the server is the gate.
 
 ### Design Principles
 
@@ -595,9 +503,9 @@ defmodule EventModeler.Workshop.StepConfig do
 end
 ```
 
-Commands that carry board mutations (`PlaceElement`, `ConnectElements`, `DefineSwimlane`, `DefineSlice`, `AddScenario`) include an optional `workshop_step` field. When present, the aggregate validates the action against `StepConfig` before accepting the command. When `nil` (free mode), all actions are accepted.
+Board mutations (place element, connect elements, define swimlane, define slice, add scenario) are validated against `StepConfig` when `workshop_step` is set. When `nil` (free mode), all actions are accepted.
 
-The `BoardSession` GenServer holds the current step and exposes:
+The Board GenServer holds the current step and exposes:
 - `advance_step/2` — checks advance criteria, increments step (facilitator only)
 - `go_back/2` — decrements step (facilitator only)
 - `skip_step/2` — advances without checking criteria (facilitator only)
@@ -672,7 +580,7 @@ View field → source Event field → source Command field → user input (termi
 
 ### MVP Scope
 
-Per-element and per-slice checking only. No cross-board tracing. No per-board aggregate score.
+Per-element and per-slice checking only. No cross-board tracing. No per-board overall score.
 
 ## Wireframe Handling
 
@@ -681,12 +589,12 @@ Per-element and per-slice checking only. No cross-board tracing. No per-board ag
 Wireframes use plain ASCII art rather than images or visual editors. Three benefits:
 
 1. **Keeps focus on event model design, not visual design** — wireframes in Event Modeling are low-fidelity sketches showing what data appears on screen, not pixel-perfect mockups.
-2. **Zero storage overhead** — wireframe content is plain text in the `fields` jsonb column. No binary storage, no file uploads, no external URLs.
+2. **Zero storage overhead** — wireframe content is plain text in the element's `props` map. No binary storage, no file uploads, no external URLs.
 3. **Makes Event Model files self-contained** — wireframes embed inline as text in the exported markdown.
 
 ### Data Model
 
-Wireframes are elements with `type: :wireframe`. The wireframe content lives in `fields` as structured data:
+Wireframes are elements with `type: :wireframe`. The wireframe content lives in the element's `props` map:
 
 ```json
 {
@@ -715,11 +623,11 @@ Inline monospace `<textarea>` on the canvas. No special drawing tools needed for
 
 ### Commands
 
-No new aggregate commands needed beyond the existing `PlaceElement` and `EditElement`. Wireframe content is element data edited via `EditElement`. This eliminates the need for `AttachWireframe`, `ReplaceWireframe`, `ResizeElement`, and the entire Storage behaviour dependency.
+No special handling needed beyond the existing `place_element` and `edit_element` Board GenServer calls. Wireframe content is element data stored in `props`.
 
 ### Connection Rules
 
-Wireframe connection rules (also reflected in the Element Aggregate invariants above):
+Wireframe connection rules (also reflected in the connection validation rules above):
 
 | Connection | Valid | Meaning |
 |------------|-------|---------|
@@ -756,41 +664,23 @@ Wireframe ASCII art is included inline in the exported Event Model markdown as a
 
 ### DCB Pattern — Cross-Board Constraints
 
-The [DCB pattern](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/dcb-pattern.md) handles constraints that span multiple boards:
+The [DCB pattern](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/dcb-pattern.md) concept applies to constraints that span multiple boards:
 
-- **Board name uniqueness per user:** Tag `BoardCreated` events with `owner_id` + `title`. Query by tag before creating. Conditional append rejects if a conflicting `BoardCreated` appeared.
-- **Element reference integrity:** When an element is referenced across boards (linked models), DCB ensures the referenced element still exists at write time.
+- **Board name uniqueness:** The Workspace module checks for file name conflicts when creating new Event Model files.
+- **Element reference integrity:** When an element is referenced across boards (linked models), validation ensures the referenced element still exists.
+
+In the file-based architecture, these constraints are enforced by the Board GenServer and Workspace module rather than by event store conditional appends.
 
 ### Reservation Pattern — Concurrent Editing
 
-The [Reservation pattern](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/reservation-pattern.md) manages concurrent element editing:
+The [Reservation pattern](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/reservation-pattern.md) concept applies to concurrent element editing:
 
-- When a user starts editing an element's text, a `ReserveElement` command locks it to that user.
+- When a user starts editing an element, the Board GenServer locks it to that user (future: multi-user).
 - Other users see the element as locked (visual indicator).
-- On save or timeout, a `ReleaseElement` command frees the lock.
+- On save or timeout, the lock is released.
 - This prevents lost-update conflicts on element content without requiring full CRDT merging (element labels and descriptions are short text, not documents).
 
-### TODO List Pattern — Async Export
-
-The [TODO List pattern](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/todo-list-pattern.md) handles Event Model export generation:
-
-- `ExportEventModel` command → `EventModelExported` event
-- Projector adds export request to `event_model_export_todos` table
-- Scheduler picks up the todo, assembles the Event Model markdown/JSON from read models
-- Worker dispatches `EventModelExportCompleted` with the generated content
-- Projector removes the todo and stores the export
-
-This ensures export generation is crash-resilient and retryable.
-
-### Event Enrichment — Projection Consistency
-
-Following [Event Enrichment](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/event-enrichment.md), events carry enough data for projectors to operate independently:
-
-- `ElementPlaced` includes the board title and swimlane label (not just IDs)
-- `SliceDefined` includes element labels (not just element IDs)
-- `ScenarioAdded` includes the slice name
-
-This prevents cross-projector race conditions where one projector needs data from another's read model.
+In the file-based architecture, locks are ephemeral GenServer state — not persisted to disk.
 
 ## Deployment
 
@@ -800,9 +690,10 @@ This prevents cross-projector race conditions where one projector needs data fro
 # Clone and setup
 git clone <repo-url> && cd event_modeler
 mix deps.get
-mix ecto.setup     # Create DB, run migrations, seed
 mix phx.server     # Start at localhost:4000
 ```
+
+Event Model files are stored in `priv/event_models/`. No database setup required.
 
 For production, build a Phoenix release and deploy to the target infrastructure.
 
@@ -816,10 +707,9 @@ Once extracted, host apps will add the hex module as a dependency:
 
 # Terminal
 mix deps.get
-mix ecto.migrate   # Runs EventModeler's migrations
 ```
 
-Host app adds the router mount, auth adapter, and supervision tree entries. EventModeler runs within the host app's BEAM node.
+Host app adds the router mount, configures the Event Model directory path, and starts the supervision tree. EventModeler runs within the host app's BEAM node.
 
 ### Infrastructure
 
@@ -828,7 +718,7 @@ Standalone server deployment targets Kubernetes (see [Hosting Architecture](http
 | Component | Configuration |
 |-----------|---------------|
 | App pods | Phoenix release |
-| Database | PostgreSQL (event store + read models) |
+| Persistence | File system (Event Model markdown files) |
 | PubSub | Erlang distribution for cross-node PubSub (see [Erlang Clustering](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/hosting/erlang-clustering.md)) |
 | Assets | Bundled JS/CSS served by Phoenix |
 
@@ -836,13 +726,10 @@ Standalone server deployment targets Kubernetes (see [Hosting Architecture](http
 
 - [Product Specification](product-spec.md) — Feature set and Event Model format
 - [Event Modeling](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/event-modeling.md) — Core methodology
-- [Event Sourcing & CQRS](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/event-sourcing-cqrs.md) — Architecture foundation
 - [Collaboration Architecture](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/collaboration-architecture.md) — Two-level sync pattern (adapted)
 - [Optimistic UI Updates](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/optimistic-ui-updates.md) — UI update tiers (applied)
 - [DCB Pattern](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/dcb-pattern.md) — Cross-board constraints
 - [Reservation Pattern](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/reservation-pattern.md) — Element locking
-- [TODO List Pattern](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/todo-list-pattern.md) — Async export
-- [Event Enrichment](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/event-enrichment.md) — Projection consistency
 - [Elixir/Phoenix/LiveView](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/elixir-phoenix-liveview.md) — Stack rationale
 - [Emlang spec v1.0.0](https://github.com/emlang-project/spec) — Slice notation DSL (used in Event Model import/export)
 - [Emlang CLI](https://github.com/emlang-project/emlang) — Linting and diagram generation
