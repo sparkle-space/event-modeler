@@ -2,7 +2,7 @@
 
 **Status:** Concept
 **Date:** 2026-02-17
-**Depends on:** [Event Modeling](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/event-modeling.md), [Event Sourcing & CQRS](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/event-sourcing-cqrs.md), [Collaboration Architecture](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/collaboration-architecture.md)
+**Depends on:** [Event Modeling](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/event-modeling.md), [Collaboration Architecture](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/collaboration-architecture.md)
 **Companion:** [Technical Design](technical-design.md)
 
 ## Vision & Positioning
@@ -497,8 +497,7 @@ slices:
 ### Event Model Import & Export
 
 - **Import:** Parse markdown Event Model (input format or extended format), extract key ideas, suggest initial element placement on the canvas
-- **Export markdown:** Traverse the board, collect slices with their elements, generate structured Event Model in the extended format
-- **Export JSON:** Machine-readable export for integration with external tools
+- **Export markdown:** Traverse the board, collect slices with their elements, generate structured Event Model in the extended format. Markdown + emlang is the canonical export format.
 - **Round-trip fidelity:** Imported content (overview, key ideas, sources) is preserved in the export; model-derived sections (slices, scenarios, data flows) are added alongside
 
 ### Collaborative Canvas
@@ -517,7 +516,7 @@ Standard [Event Modeling](https://github.com/sparkle-space/masterplan/blob/main/
 | Event | Orange | Rectangle | Past-tense name (e.g., `UserRegistered`) + data fields |
 | Command | Blue | Rectangle | Imperative name (e.g., `RegisterUser`) + data fields |
 | View | Green | Rectangle | Descriptive name (e.g., `UserProfile`) + data fields |
-| Wireframe | — | Monospace text block | ASCII art UI sketch + extracted data fields. Plain text in `fields` jsonb — no images, no uploads |
+| Wireframe | — | Monospace text block | ASCII art UI sketch + extracted data fields. Plain text in `fields` map — no images, no uploads |
 | Automation | Gear icon | Circle | Trigger description (e.g., "When OrderPlaced, send confirmation") |
 
 ### Canvas Organization
@@ -585,16 +584,16 @@ Render an Event Model's event model as a non-editable canvas. The system loads a
 Once the standalone app is mature, the core will be extracted into a hex package (`event_modeler`) that adds event modeling capability to any Phoenix app:
 
 - Mountable routes via router macro
-- Own Ecto migrations (boards, elements, slices, scenarios)
 - Own LiveView modules, JS hooks, and CSS assets
+- File-based persistence (Event Model markdown files) — no database required
 - Configurable authentication adapter — host app provides user context
-- Uses host app's Ecto Repo and PubSub
+- Uses host app's PubSub
 
 This is the target architecture, not the initial one. The standalone app is built first; extraction happens when the API surface is stable.
 
 ## Deferred Features (Post-MVP)
 
-- **Code scaffolding** — Generate Elixir module stubs (aggregates, commands, events, projectors) from slices
+- **Code scaffolding** — Generate Elixir module stubs (commands, events, domain logic, handlers) from slices
 - **Ticket integration** — Export slices to Jira or Linear as tickets
 - **Version history** — Board versioning with visual model diffing
 - **Template library** — Pre-built event model patterns (user registration, e-commerce checkout, etc.)
@@ -687,7 +686,6 @@ EventModeler occupies a unique position:
 
 - [Event Modeling](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/event-modeling.md) — Core methodology (not duplicated here)
 - [Technical Design](technical-design.md) — Implementation architecture
-- [Event Sourcing & CQRS](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/event-sourcing-cqrs.md) — Underlying architecture
 - [Collaboration Architecture](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/collaboration-architecture.md) — Real-time collaboration patterns
 - [Optimistic UI Updates](https://github.com/sparkle-space/masterplan/blob/main/01-concepts/technology/optimistic-ui-updates.md) — UI update tier system
 - [Emlang spec v1.0.0](https://github.com/emlang-project/spec) — Slice notation DSL
