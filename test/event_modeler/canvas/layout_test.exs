@@ -219,4 +219,55 @@ defmodule EventModeler.Canvas.LayoutTest do
     assert length(result.slice_labels) == 1
     assert hd(result.slice_labels).name == "RegisterUser"
   end
+
+  test "applies position offsets from element props" do
+    event_model = %EventModel{
+      slices: [
+        %Slice{
+          name: "Test",
+          steps: [
+            %Element{
+              id: "1",
+              type: :command,
+              label: "Cmd",
+              props: %{"position_offset_x" => 50, "position_offset_y" => -20}
+            },
+            %Element{id: "2", type: :event, label: "Evt", props: %{}}
+          ]
+        }
+      ]
+    }
+
+    result = Layout.compute(event_model)
+
+    cmd = Enum.find(result.elements, &(&1.id == "1"))
+    evt = Enum.find(result.elements, &(&1.id == "2"))
+
+    # The element without offsets should have normal position
+    # The element with offsets should be displaced relative to where it would be
+    # Compute what the base position would be (without offsets)
+    base_model = %EventModel{
+      slices: [
+        %Slice{
+          name: "Test",
+          steps: [
+            %Element{id: "1", type: :command, label: "Cmd", props: %{}},
+            %Element{id: "2", type: :event, label: "Evt", props: %{}}
+          ]
+        }
+      ]
+    }
+
+    base_result = Layout.compute(base_model)
+    base_cmd = Enum.find(base_result.elements, &(&1.id == "1"))
+    base_evt = Enum.find(base_result.elements, &(&1.id == "2"))
+
+    # Element with offsets should be displaced
+    assert cmd.x == base_cmd.x + 50
+    assert cmd.y == base_cmd.y - 20
+
+    # Element without offsets should be in the same position
+    assert evt.x == base_evt.x
+    assert evt.y == base_evt.y
+  end
 end

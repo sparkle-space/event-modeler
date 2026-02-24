@@ -24,9 +24,10 @@ import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/event_modeler"
 import EventModelerCanvas from "./hooks/canvas"
+import SliceReorder from "./hooks/slice_reorder"
 import topbar from "../vendor/topbar"
 
-const Hooks = {...colocatedHooks, EventModelerCanvas}
+const Hooks = {...colocatedHooks, EventModelerCanvas, SliceReorder}
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {

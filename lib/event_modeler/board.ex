@@ -14,7 +14,16 @@ defmodule EventModeler.Board do
   alias EventModeler.Workshop.ScenarioGenerator
   alias EventModeler.Workspace
 
-  defstruct [:file_path, :event_model, :layout, :canvas_data, dirty: false, connections: []]
+  defstruct [
+    :file_path,
+    :event_model,
+    :layout,
+    :canvas_data,
+    dirty: false,
+    connections: [],
+    undo_stack: [],
+    redo_stack: []
+  ]
 
   @type t :: %__MODULE__{
           file_path: String.t(),
@@ -22,7 +31,9 @@ defmodule EventModeler.Board do
           layout: map(),
           canvas_data: map(),
           dirty: boolean(),
-          connections: [{String.t(), String.t()}]
+          connections: [{String.t(), String.t()}],
+          undo_stack: list(),
+          redo_stack: list()
         }
 
   @inactivity_timeout :timer.minutes(30)
@@ -125,6 +136,25 @@ defmodule EventModeler.Board do
     call(file_path, {:add_scenario, slice_name, scenario})
   end
 
+  @spec reorder_slice(String.t(), String.t(), :up | :down) :: :ok | {:error, term()}
+  def reorder_slice(file_path, slice_name, direction) do
+    call(file_path, {:reorder_slice, slice_name, direction})
+  end
+
+  @spec set_slice_order(String.t(), [String.t()]) :: :ok | {:error, term()}
+  def set_slice_order(file_path, ordered_names) do
+    call(file_path, {:set_slice_order, ordered_names})
+  end
+
+  @spec undo(String.t()) :: :ok | {:error, term()}
+  def undo(file_path), do: call(file_path, :undo)
+
+  @spec redo(String.t()) :: :ok | {:error, term()}
+  def redo(file_path), do: call(file_path, :redo)
+
+  @spec can_undo_redo(String.t()) :: {:ok, {boolean(), boolean()}} | {:error, term()}
+  def can_undo_redo(file_path), do: call(file_path, :can_undo_redo)
+
   defp call(file_path, message) do
     case Registry.lookup(EventModeler.Board.Registry, file_path) do
       [{pid, _}] -> GenServer.call(pid, message)
@@ -176,6 +206,8 @@ defmodule EventModeler.Board do
   end
 
   def handle_call({:place_element, type, label, swimlane}, _from, state) do
+    state = push_undo(state)
+
     resolved_swimlane =
       swimlane || Swimlane.default_name(Swimlane.type_for_element(type))
 
@@ -204,19 +236,49 @@ defmodule EventModeler.Board do
     {:reply, {:ok, element.id}, state, @inactivity_timeout}
   end
 
-  def handle_call({:move_element, element_id, _x, _y}, _from, state) do
-    # Position tracking is handled by the layout engine, not stored in Event Model
-    # Just record the event
-    event_model =
-      EventStreamWriter.append(state.event_model, "ElementMoved", "user", %{
-        "elementId" => element_id
-      })
+  def handle_call({:move_element, element_id, x, y}, _from, state) do
+    state = push_undo(state)
 
-    state = %{state | event_model: event_model, dirty: true}
-    {:reply, :ok, state, @inactivity_timeout}
+    # Find the element's base position from layout (without current offsets)
+    base_elem = Enum.find(state.layout.elements, &(&1.id == element_id))
+
+    if base_elem do
+      # Current offsets (already applied in layout)
+      current_offset_x = find_element_prop(state.event_model, element_id, "position_offset_x", 0)
+      current_offset_y = find_element_prop(state.event_model, element_id, "position_offset_y", 0)
+
+      # Base position = rendered position minus current offsets
+      base_x = base_elem.x - current_offset_x
+      base_y = base_elem.y - current_offset_y
+
+      # New offset = target position minus base position
+      offset_x = x - base_x
+      offset_y = y - base_y
+
+      event_model =
+        update_element_in_event_model(state.event_model, element_id, %{
+          "props" => %{"position_offset_x" => offset_x, "position_offset_y" => offset_y}
+        })
+
+      event_model =
+        EventStreamWriter.append(event_model, "ElementMoved", "user", %{
+          "elementId" => element_id,
+          "offsetX" => offset_x,
+          "offsetY" => offset_y
+        })
+
+      state =
+        %{state | event_model: event_model, dirty: true}
+        |> recompute_layout()
+
+      {:reply, :ok, state, @inactivity_timeout}
+    else
+      {:reply, {:error, "Element not found"}, state, @inactivity_timeout}
+    end
   end
 
   def handle_call({:edit_element, element_id, changes}, _from, state) do
+    state = push_undo(state)
     elem = find_element(state.event_model, element_id)
 
     if elem && changes["swimlane"] do
@@ -241,6 +303,8 @@ defmodule EventModeler.Board do
   end
 
   def handle_call({:connect_elements, from_id, to_id}, _from, state) do
+    state = push_undo(state)
+
     cond do
       from_id == to_id ->
         {:reply, {:error, "Cannot connect an element to itself"}, state, @inactivity_timeout}
@@ -280,6 +344,7 @@ defmodule EventModeler.Board do
   end
 
   def handle_call({:remove_element, element_id}, _from, state) do
+    state = push_undo(state)
     event_model = remove_element_from_event_model(state.event_model, element_id)
 
     event_model =
@@ -300,6 +365,7 @@ defmodule EventModeler.Board do
   end
 
   def handle_call({:define_slice, name, element_ids}, _from, state) do
+    state = push_undo(state)
     # Collect elements matching the given IDs
     all_elements = Enum.flat_map(state.event_model.slices, & &1.steps)
     selected = Enum.filter(all_elements, &(&1.id in element_ids))
@@ -334,6 +400,8 @@ defmodule EventModeler.Board do
   end
 
   def handle_call({:rename_slice, old_name, new_name}, _from, state) do
+    state = push_undo(state)
+
     updated_slices =
       Enum.map(state.event_model.slices, fn slice ->
         if slice.name == old_name, do: %{slice | name: new_name}, else: slice
@@ -352,6 +420,8 @@ defmodule EventModeler.Board do
   end
 
   def handle_call({:generate_scenarios, slice_name}, _from, state) do
+    state = push_undo(state)
+
     case Enum.find(state.event_model.slices, &(&1.name == slice_name)) do
       nil ->
         {:reply, {:error, "Slice not found"}, state, @inactivity_timeout}
@@ -381,6 +451,8 @@ defmodule EventModeler.Board do
   end
 
   def handle_call({:disconnect_elements, from_id, to_id}, _from, state) do
+    state = push_undo(state)
+
     if {from_id, to_id} in state.connections do
       connections = List.delete(state.connections, {from_id, to_id})
 
@@ -401,6 +473,8 @@ defmodule EventModeler.Board do
   end
 
   def handle_call({:remove_slice, slice_name}, _from, state) do
+    state = push_undo(state)
+
     case Enum.find(state.event_model.slices, &(&1.name == slice_name)) do
       nil ->
         {:reply, {:error, "Slice not found"}, state, @inactivity_timeout}
@@ -444,6 +518,8 @@ defmodule EventModeler.Board do
   end
 
   def handle_call({:remove_element_from_slice, slice_name, element_id}, _from, state) do
+    state = push_undo(state)
+
     case Enum.find(state.event_model.slices, &(&1.name == slice_name)) do
       nil ->
         {:reply, {:error, "Slice not found"}, state, @inactivity_timeout}
@@ -500,6 +576,8 @@ defmodule EventModeler.Board do
   end
 
   def handle_call({:remove_scenario, slice_name, scenario_name}, _from, state) do
+    state = push_undo(state)
+
     case Enum.find(state.event_model.slices, &(&1.name == slice_name)) do
       nil ->
         {:reply, {:error, "Slice not found"}, state, @inactivity_timeout}
@@ -531,6 +609,8 @@ defmodule EventModeler.Board do
   end
 
   def handle_call({:update_scenario, slice_name, scenario_name, changes}, _from, state) do
+    state = push_undo(state)
+
     case Enum.find(state.event_model.slices, &(&1.name == slice_name)) do
       nil ->
         {:reply, {:error, "Slice not found"}, state, @inactivity_timeout}
@@ -573,6 +653,8 @@ defmodule EventModeler.Board do
   end
 
   def handle_call({:add_scenario, slice_name, scenario}, _from, state) do
+    state = push_undo(state)
+
     case Enum.find(state.event_model.slices, &(&1.name == slice_name)) do
       nil ->
         {:reply, {:error, "Slice not found"}, state, @inactivity_timeout}
@@ -606,12 +688,144 @@ defmodule EventModeler.Board do
     end
   end
 
+  def handle_call(:can_undo_redo, _from, state) do
+    {:reply, {:ok, {state.undo_stack != [], state.redo_stack != []}}, state, @inactivity_timeout}
+  end
+
+  def handle_call(:undo, _from, state) do
+    case state.undo_stack do
+      [] ->
+        {:reply, {:error, "Nothing to undo"}, state, @inactivity_timeout}
+
+      [{event_model, connections} | rest] ->
+        redo_snapshot = {state.event_model, state.connections}
+
+        event_model =
+          EventStreamWriter.append(event_model, "UndoPerformed", "user", %{})
+
+        state =
+          %{
+            state
+            | event_model: event_model,
+              connections: connections,
+              dirty: true,
+              undo_stack: rest,
+              redo_stack: [redo_snapshot | state.redo_stack]
+          }
+          |> recompute_layout()
+
+        {:reply, :ok, state, @inactivity_timeout}
+    end
+  end
+
+  def handle_call(:redo, _from, state) do
+    case state.redo_stack do
+      [] ->
+        {:reply, {:error, "Nothing to redo"}, state, @inactivity_timeout}
+
+      [{event_model, connections} | rest] ->
+        undo_snapshot = {state.event_model, state.connections}
+
+        event_model =
+          EventStreamWriter.append(event_model, "RedoPerformed", "user", %{})
+
+        state =
+          %{
+            state
+            | event_model: event_model,
+              connections: connections,
+              dirty: true,
+              undo_stack: [undo_snapshot | state.undo_stack],
+              redo_stack: rest
+          }
+          |> recompute_layout()
+
+        {:reply, :ok, state, @inactivity_timeout}
+    end
+  end
+
+  def handle_call({:set_slice_order, ordered_names}, _from, state) do
+    state = push_undo(state)
+    slices = state.event_model.slices
+    slice_map = Map.new(slices, fn s -> {s.name, s} end)
+
+    # Reorder slices to match provided order, keeping any unmentioned slices at the end
+    ordered =
+      ordered_names
+      |> Enum.filter(&Map.has_key?(slice_map, &1))
+      |> Enum.map(&Map.fetch!(slice_map, &1))
+
+    remaining =
+      Enum.reject(slices, fn s -> s.name in ordered_names end)
+
+    updated_slices = ordered ++ remaining
+    event_model = %{state.event_model | slices: updated_slices}
+
+    event_model =
+      EventStreamWriter.append(event_model, "SlicesReordered", "user", %{
+        "order" => ordered_names
+      })
+
+    state =
+      %{state | event_model: event_model, dirty: true}
+      |> recompute_layout()
+
+    {:reply, :ok, state, @inactivity_timeout}
+  end
+
+  def handle_call({:reorder_slice, slice_name, direction}, _from, state) do
+    state = push_undo(state)
+    slices = state.event_model.slices
+    idx = Enum.find_index(slices, &(&1.name == slice_name))
+
+    cond do
+      is_nil(idx) ->
+        {:reply, {:error, "Slice not found"}, state, @inactivity_timeout}
+
+      direction == :up and idx == 0 ->
+        {:reply, {:error, "Already first"}, state, @inactivity_timeout}
+
+      direction == :down and idx == length(slices) - 1 ->
+        {:reply, {:error, "Already last"}, state, @inactivity_timeout}
+
+      true ->
+        target_idx = if direction == :up, do: idx - 1, else: idx + 1
+
+        updated_slices =
+          slices
+          |> List.replace_at(idx, Enum.at(slices, target_idx))
+          |> List.replace_at(target_idx, Enum.at(slices, idx))
+
+        event_model = %{state.event_model | slices: updated_slices}
+
+        event_model =
+          EventStreamWriter.append(event_model, "SliceReordered", "user", %{
+            "sliceName" => slice_name,
+            "direction" => to_string(direction)
+          })
+
+        state =
+          %{state | event_model: event_model, dirty: true}
+          |> recompute_layout()
+
+        {:reply, :ok, state, @inactivity_timeout}
+    end
+  end
+
   @impl true
   def handle_info(:timeout, state) do
     {:stop, :normal, state}
   end
 
   # Private helpers
+
+  @max_undo_depth 50
+
+  defp push_undo(state) do
+    snapshot = {state.event_model, state.connections}
+    stack = [snapshot | state.undo_stack] |> Enum.take(@max_undo_depth)
+    %{state | undo_stack: stack, redo_stack: []}
+  end
 
   defp do_edit_element(state, element_id, changes) do
     event_model = update_element_in_event_model(state.event_model, element_id, changes)
@@ -693,6 +907,13 @@ defmodule EventModeler.Board do
       |> Enum.reject(fn slice -> slice.steps == [] and slice.name == "Unassigned" end)
 
     %{event_model | slices: updated_slices}
+  end
+
+  defp find_element_prop(%EventModel{} = event_model, element_id, key, default) do
+    case find_element(event_model, element_id) do
+      nil -> default
+      elem -> Map.get(elem.props, key, default)
+    end
   end
 
   defp find_element(%EventModel{slices: slices}, element_id) do

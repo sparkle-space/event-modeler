@@ -146,14 +146,17 @@ defmodule EventModeler.Canvas.Layout do
 
         y = Map.get(swimlane_y, swimlane, @padding)
 
+        offset_x = step.props["position_offset_x"] || 0
+        offset_y = step.props["position_offset_y"] || 0
+
         elem = %PositionedElement{
           id: step.id,
           type: step.type,
           label: step.label,
           swimlane: swimlane,
           props: step.props,
-          x: x,
-          y: y,
+          x: x + offset_x,
+          y: y + offset_y,
           width: @element_width,
           height: @element_height,
           slice_name: slice.name

@@ -40,7 +40,11 @@ defmodule EventModelerWeb.BoardLive do
                    # Implicit mode state
                    show_description: false,
                    show_palette: false,
-                   pre_edit_viewport: nil
+                   pre_edit_viewport: nil,
+                   can_undo: false,
+                   can_redo: false,
+                   show_shortcuts: false,
+                   show_slice_dropdown: false
                  )}
 
               {:error, reason} ->
@@ -72,6 +76,24 @@ defmodule EventModelerWeb.BoardLive do
 
       {:error, reason} ->
         {:noreply, assign(socket, save_message: "Save failed: #{reason}")}
+    end
+  end
+
+  def handle_event("fit_to_window", _params, socket) do
+    {:noreply, push_event(socket, "fit_to_window", %{})}
+  end
+
+  def handle_event("undo", _params, socket) do
+    case Board.undo(socket.assigns.file_path) do
+      :ok -> {:noreply, refresh_state(socket)}
+      {:error, _} -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("redo", _params, socket) do
+    case Board.redo(socket.assigns.file_path) do
+      :ok -> {:noreply, refresh_state(socket)}
+      {:error, _} -> {:noreply, socket}
     end
   end
 
@@ -550,11 +572,11 @@ defmodule EventModelerWeb.BoardLive do
   end
 
   def handle_event("select_slice_from_dropdown", %{"slice" => ""}, socket) do
-    {:noreply, assign(socket, selected_slice: nil)}
+    {:noreply, assign(socket, selected_slice: nil, show_slice_dropdown: false)}
   end
 
   def handle_event("select_slice_from_dropdown", %{"slice" => name}, socket) do
-    socket = assign(socket, selected_slice: name)
+    socket = assign(socket, selected_slice: name, show_slice_dropdown: false)
 
     case Enum.find(socket.assigns.canvas_data.slice_labels, &(&1.name == name)) do
       %{x: x, width: width, y: y, height: height} ->
@@ -603,8 +625,43 @@ defmodule EventModelerWeb.BoardLive do
     {:noreply, assign(socket, selected_slice: nil)}
   end
 
+  def handle_event("toggle_shortcuts_modal", _params, socket) do
+    {:noreply, assign(socket, show_shortcuts: !socket.assigns.show_shortcuts)}
+  end
+
+  def handle_event("toggle_slice_dropdown", _params, socket) do
+    {:noreply, assign(socket, show_slice_dropdown: !socket.assigns.show_slice_dropdown)}
+  end
+
+  def handle_event("move_slice_up", %{"name" => name}, socket) do
+    case Board.reorder_slice(socket.assigns.file_path, name, :up) do
+      :ok -> {:noreply, refresh_state(socket)}
+      {:error, _reason} -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("move_slice_down", %{"name" => name}, socket) do
+    case Board.reorder_slice(socket.assigns.file_path, name, :down) do
+      :ok -> {:noreply, refresh_state(socket)}
+      {:error, _reason} -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("set_slice_order", %{"ordered_names" => names}, socket) do
+    case Board.set_slice_order(socket.assigns.file_path, names) do
+      :ok -> {:noreply, refresh_state(socket)}
+      {:error, _reason} -> {:noreply, socket}
+    end
+  end
+
   def handle_event("escape_pressed", _params, socket) do
     cond do
+      socket.assigns.show_shortcuts ->
+        {:noreply, assign(socket, show_shortcuts: false)}
+
+      socket.assigns.show_slice_dropdown ->
+        {:noreply, assign(socket, show_slice_dropdown: false)}
+
       socket.assigns.show_description ->
         {:noreply, assign(socket, show_description: false)}
 
@@ -638,13 +695,21 @@ defmodule EventModelerWeb.BoardLive do
   defp refresh_state(socket) do
     case Board.get_state(socket.assigns.file_path) do
       {:ok, state} ->
+        {can_undo, can_redo} =
+          case Board.can_undo_redo(socket.assigns.file_path) do
+            {:ok, result} -> result
+            _ -> {false, false}
+          end
+
         assign(socket,
           event_model: state.event_model,
           canvas_data: state.canvas_data,
           dirty: state.dirty,
           slice_names: Enum.map(state.event_model.slices, & &1.name),
           slices: state.event_model.slices,
-          swimlane_options: existing_swimlanes(state.canvas_data)
+          swimlane_options: existing_swimlanes(state.canvas_data),
+          can_undo: can_undo,
+          can_redo: can_redo
         )
 
       {:error, _} ->
@@ -701,21 +766,46 @@ defmodule EventModelerWeb.BoardLive do
           </div>
           <%!-- Center controls: Slices dropdown, Description, Add Element --%>
           <div class="flex items-center gap-2">
-            <form phx-change="select_slice_from_dropdown">
-              <select
-                name="slice"
-                class="text-sm bg-[var(--color-surface-alt)] border border-[var(--color-border)] rounded-[var(--radius-element)] px-3 py-1.5 text-[var(--color-text-primary)] cursor-pointer"
+            <div class="relative" id="slice-dropdown" phx-hook="SliceReorder">
+              <button
+                type="button"
+                phx-click="toggle_slice_dropdown"
+                class="text-sm bg-[var(--color-surface-alt)] border border-[var(--color-border)] rounded-[var(--radius-element)] px-3 py-1.5 text-[var(--color-text-primary)] cursor-pointer flex items-center gap-1"
               >
-                <option value="">Slices ({length(@slice_names)})</option>
-                <option
-                  :for={name <- @slice_names}
-                  value={name}
-                  selected={@selected_slice == name}
+                <span>Slices ({length(@slice_names)})</span>
+                <span class="text-xs">&#9662;</span>
+              </button>
+              <div
+                :if={assigns[:show_slice_dropdown]}
+                class="absolute top-full left-0 mt-1 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-element)] shadow-lg z-30 min-w-[200px] py-1"
+              >
+                <div
+                  :if={@slice_names == []}
+                  class="px-3 py-2 text-xs text-[var(--color-text-secondary)] italic"
                 >
-                  {name}
-                </option>
-              </select>
-            </form>
+                  No slices defined
+                </div>
+                <div
+                  :for={name <- @slice_names}
+                  data-slice-name={name}
+                  draggable="true"
+                  phx-click="select_slice_from_dropdown"
+                  phx-value-slice={name}
+                  class={[
+                    "flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer transition-colors",
+                    if(@selected_slice == name,
+                      do: "bg-primary/10 text-primary",
+                      else: "text-[var(--color-text-primary)] hover:bg-[var(--color-surface-alt)]"
+                    )
+                  ]}
+                >
+                  <span class="text-[var(--color-text-secondary)] cursor-grab text-xs select-none">
+                    &#x2630;
+                  </span>
+                  <span class="truncate">{name}</span>
+                </div>
+              </div>
+            </div>
             <button
               phx-click="toggle_description"
               class={[
@@ -749,6 +839,45 @@ defmodule EventModelerWeb.BoardLive do
             </span>
             <p :if={@save_message} class="text-sm text-success">{@save_message}</p>
             <Layouts.theme_toggle />
+            <button
+              phx-click="undo"
+              class={[
+                "px-2 py-1.5 rounded-[var(--radius-element)] text-sm border border-[var(--color-border)] transition-opacity",
+                if(@can_undo,
+                  do:
+                    "bg-[var(--color-surface-alt)] text-[var(--color-text-primary)] hover:opacity-80",
+                  else:
+                    "bg-[var(--color-surface-alt)] text-[var(--color-text-secondary)] opacity-40 cursor-not-allowed"
+                )
+              ]}
+              disabled={!@can_undo}
+              title="Undo (Ctrl+Z)"
+            >
+              Undo
+            </button>
+            <button
+              phx-click="redo"
+              class={[
+                "px-2 py-1.5 rounded-[var(--radius-element)] text-sm border border-[var(--color-border)] transition-opacity",
+                if(@can_redo,
+                  do:
+                    "bg-[var(--color-surface-alt)] text-[var(--color-text-primary)] hover:opacity-80",
+                  else:
+                    "bg-[var(--color-surface-alt)] text-[var(--color-text-secondary)] opacity-40 cursor-not-allowed"
+                )
+              ]}
+              disabled={!@can_redo}
+              title="Redo (Ctrl+Shift+Z)"
+            >
+              Redo
+            </button>
+            <button
+              phx-click="fit_to_window"
+              class="bg-[var(--color-surface-alt)] text-[var(--color-text-primary)] px-2 py-1.5 rounded-[var(--radius-element)] text-sm hover:opacity-80 transition-opacity border border-[var(--color-border)]"
+              title="Fit to window (Ctrl+0)"
+            >
+              Fit
+            </button>
             <a
               href={~p"/boards/#{Base.url_encode64(@file_path, padding: false)}/export"}
               class="bg-[var(--color-surface-alt)] text-[var(--color-text-primary)] px-3 py-1.5 rounded-[var(--radius-element)] text-sm hover:opacity-80 transition-opacity border border-[var(--color-border)]"
@@ -983,6 +1112,24 @@ defmodule EventModelerWeb.BoardLive do
                       <h3 class="text-sm font-semibold text-[var(--color-text-primary)]">
                         {slice.name}
                       </h3>
+                      <div class="flex items-center gap-0.5">
+                        <button
+                          phx-click="move_slice_up"
+                          phx-value-name={slice.name}
+                          class="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors px-1 text-xs"
+                          title="Move slice left"
+                        >
+                          &larr;
+                        </button>
+                        <button
+                          phx-click="move_slice_down"
+                          phx-value-name={slice.name}
+                          class="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors px-1 text-xs"
+                          title="Move slice right"
+                        >
+                          &rarr;
+                        </button>
+                      </div>
                       <span class="text-xs text-[var(--color-text-secondary)]">
                         {length(slice.steps)} elements
                       </span>
@@ -1461,6 +1608,63 @@ defmodule EventModelerWeb.BoardLive do
                   No description available for this event model.
                 </p>
               </div>
+            </div>
+          </div>
+        </div>
+        <%!-- Keyboard shortcuts modal --%>
+        <div
+          :if={@show_shortcuts}
+          class="fixed inset-0 z-50 flex items-center justify-center"
+        >
+          <div
+            class="absolute inset-0 bg-black/40"
+            phx-click="toggle_shortcuts_modal"
+          />
+          <div class="relative bg-[var(--color-surface)] rounded-[var(--radius-card)] shadow-2xl w-96 overflow-hidden">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)]">
+              <h2 class="text-lg font-semibold text-[var(--color-text-primary)]">
+                Keyboard Shortcuts
+              </h2>
+              <button
+                phx-click="toggle_shortcuts_modal"
+                class="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors text-xl"
+              >
+                &times;
+              </button>
+            </div>
+            <div class="px-6 py-4">
+              <table class="w-full text-sm">
+                <tbody>
+                  <tr
+                    :for={
+                      {key, action} <- [
+                        {"Ctrl/Cmd+S", "Save"},
+                        {"Ctrl/Cmd+Z", "Undo"},
+                        {"Ctrl/Cmd+Shift+Z", "Redo"},
+                        {"Ctrl/Cmd+0", "Fit to window"},
+                        {"+ / -", "Zoom in / out"},
+                        {"Ctrl/Cmd+Scroll", "Zoom at cursor"},
+                        {"Scroll", "Pan canvas"},
+                        {"Double-click", "Zoom in at point"},
+                        {"Delete / Backspace", "Delete selected"},
+                        {"Shift+Click", "Connect elements"},
+                        {"Drag element", "Move element"},
+                        {"M", "Toggle minimap"},
+                        {"Escape", "Cancel / close"},
+                        {"?", "This help"}
+                      ]
+                    }
+                    class="border-b border-[var(--color-border)] last:border-b-0"
+                  >
+                    <td class="py-1.5 pr-4 text-[var(--color-text-secondary)] font-mono text-xs">
+                      {key}
+                    </td>
+                    <td class="py-1.5 text-[var(--color-text-primary)]">
+                      {action}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
