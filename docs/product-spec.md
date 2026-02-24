@@ -28,7 +28,7 @@ EventModeler is built as a **standalone Phoenix/LiveView application** — a loc
 | **Event Model integration** | No existing tool connects structured specifications to visual event models bidirectionally. EventModeler treats the Event Model as a first-class artifact — import it, model from it, export a refined version. |
 | **Embeddable** | Designed for eventual extraction as an embeddable hex module. The library will live alongside the code it describes, making models living documentation. No competitor offers this. |
 | **Non-technical accessibility** | Guided 7-step workshop facilitation mode designed for domain experts, not just developers. Enforces Event Modeling syntax (e.g., Commands cannot connect directly to Views) to prevent invalid models without requiring methodology expertise. |
-| **Facilitation-to-delivery pipeline** | Full journey from Event Model → event model → slices → Given/When/Then scenarios → exportable tickets. Most tools stop at the whiteboard. |
+| **Facilitation-to-delivery pipeline** | Full journey from Event Model → event model → slices → Given/When/Then scenarios → exportable markdown. Most tools stop at the whiteboard. |
 | **Test-case derivation** | Auto-generate Given/When/Then acceptance criteria from slices. The model is the test spec. |
 | **Affordable** | Open-source when the hex module is extracted. Purpose-built event modeling at zero cost, compared to prooph board (EUR 250/month) and generic whiteboards (Miro). |
 
@@ -593,13 +593,15 @@ This is the target architecture, not the initial one. The standalone app is buil
 
 ## Deferred Features (Post-MVP)
 
-- **Code scaffolding** — Generate Elixir module stubs (commands, events, domain logic, handlers) from slices
-- **Ticket integration** — Export slices to Jira or Linear as tickets
-- **Version history** — Board versioning with visual model diffing
-- **Template library** — Pre-built event model patterns (user registration, e-commerce checkout, etc.)
 - **LLM-assisted Event Model generation** — LLMs generate Event Models externally; event_modeler imports and validates them. The verification loop: event_modeler checks completeness, LLM iterates based on feedback. Integration surface is Event Model import/export — LLMs run external, not embedded. Keeping LLMs external preserves scope and avoids coupling; the Event Model format IS the interface
-- **Information completeness checker (full)** — Per-board aggregate score and cross-board tracing (per-element and per-slice checking is MVP)
+- **Information completeness checker (full)** — Per-board overall score and cross-board tracing (per-element and per-slice checking is MVP)
 - **Time collapsing** — Collapse regions of the timeline to manage large models
+
+## Out of Scope
+
+- **Code scaffolding** — Not planned. Event Model export is the deliverable, not generated code.
+- **Ticket integration** — Not planned. Slices and scenarios are exported as markdown, not tickets.
+- **Template library** — Not planned. Users import their own Event Models.
 
 ## User Stories
 

@@ -140,12 +140,14 @@ The project is a **working, file-based prototype** with a functional collaborati
 8. **User authentication & roles** — identity, permissions, invite flow
 9. **Event stream replay / time-travel** — can use markdown event stream entries
 
-### Deferred by Design (post-MVP per spec)
+### Out of Scope
 
 - Code scaffolding from slices
 - Ticket integration (Jira/Linear)
-- Version history with visual diffing
 - Template library
+
+### Deferred by Design (post-MVP per spec)
+
 - LLM-assisted generation
 - Time collapsing
 
