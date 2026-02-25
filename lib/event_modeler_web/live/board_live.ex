@@ -169,9 +169,6 @@ defmodule EventModelerWeb.BoardLive do
           props: Enum.map(props, fn {k, v} -> %{key: k, value: v} end)
         }
 
-        # Approximate 1/3 screen width for the panel
-        panel_width = 400
-
         socket =
           socket
           |> assign(
@@ -184,8 +181,7 @@ defmodule EventModelerWeb.BoardLive do
             x: elem.x,
             y: elem.y,
             width: elem.width,
-            height: elem.height,
-            panel_width: panel_width
+            height: elem.height
           })
 
         {:noreply, socket}
