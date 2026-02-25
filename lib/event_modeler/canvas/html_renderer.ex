@@ -58,13 +58,27 @@ defmodule EventModeler.Canvas.HtmlRenderer do
 
   defp connection_data(%Connection{} = conn) do
     end_x = conn.to_x - 10
-    mid_x = div(conn.from_x + end_x, 2)
+
+    path =
+      if conn.from_x <= end_x do
+        # Normal left-to-right: smooth S-curve
+        mid_x = div(conn.from_x + end_x, 2)
+
+        "M #{conn.from_x} #{conn.from_y} C #{mid_x} #{conn.from_y} #{mid_x} #{conn.to_y} #{end_x} #{conn.to_y}"
+      else
+        # Reversed: loop above and approach target from left
+        loop_y = max(10, min(conn.from_y, conn.to_y) - 80)
+        approach_x = end_x - 30
+
+        "M #{conn.from_x} #{conn.from_y} " <>
+          "C #{conn.from_x} #{loop_y} #{approach_x} #{loop_y} #{approach_x} #{conn.to_y} " <>
+          "L #{end_x} #{conn.to_y}"
+      end
 
     %{
       from_id: conn.from_id,
       to_id: conn.to_id,
-      path:
-        "M #{conn.from_x} #{conn.from_y} C #{mid_x} #{conn.from_y} #{mid_x} #{conn.to_y} #{end_x} #{conn.to_y}"
+      path: path
     }
   end
 

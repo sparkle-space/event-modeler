@@ -54,6 +54,18 @@ const EventModelerCanvas = {
     this.dragStartClient = null
     this.dragStartPos = null
     this.dragThresholdMet = false
+    this.suppressNextClick = false
+
+    // Suppress the click event that fires after a drag to prevent
+    // phx-click="element_selected" from re-selecting the dragged element.
+    // Capture phase fires before LiveView's click handler.
+    this.el.addEventListener("click", (e) => {
+      if (this.suppressNextClick) {
+        e.stopPropagation()
+        e.preventDefault()
+        this.suppressNextClick = false
+      }
+    }, true)
     this.pendingClickElement = null
 
     // Minimap state
@@ -671,6 +683,9 @@ const EventModelerCanvas = {
           x: finalX,
           y: finalY,
         })
+        // Suppress the click event that fires after mouseup to prevent
+        // phx-click="element_selected" from re-selecting the element
+        this.suppressNextClick = true
       }
       // If threshold not met, it was a click — phx-click handles selection
 
