@@ -10,7 +10,7 @@ defmodule EventModeler.Canvas.HtmlRenderer do
   the same coordinate space as the positioned divs.
   """
 
-  alias EventModeler.Canvas.Layout.{LayoutResult, PositionedElement, Connection}
+  alias EventModeler.Canvas.Layout.{LayoutResult, PositionedElement, PositionedSpec, Connection}
 
   @type_classes %{
     command: %{bg: "bg-[#3B82F6]", text: "text-white", ring: "ring-[#2563EB]"},
@@ -89,6 +89,55 @@ defmodule EventModeler.Canvas.HtmlRenderer do
       y: swimlane.y - 10,
       height: swimlane.height,
       width: canvas_width
+    }
+  end
+
+  @type_colors %{
+    "c" => "#3B82F6",
+    "e" => "#F97316",
+    "v" => "#22C55E",
+    "x" => "#EF4444"
+  }
+
+  @doc """
+  Renders spec card data for template rendering.
+  Takes a list of `PositionedSpec` structs and returns render-ready maps.
+  """
+  @spec render_spec_cards([%PositionedSpec{}]) :: [map()]
+  def render_spec_cards(spec_cards) do
+    Enum.map(spec_cards, &spec_card_data/1)
+  end
+
+  defp spec_card_data(%PositionedSpec{} = spec) do
+    %{
+      name: spec.name,
+      slice_name: spec.slice_name,
+      x: spec.x,
+      y: spec.y,
+      width: spec.width,
+      height: spec.height,
+      given: Enum.map(spec.given, &mini_element/1),
+      when_clause: Enum.map(spec.when_clause, &mini_element/1),
+      then_clause: Enum.map(spec.then_clause, &mini_element/1)
+    }
+  end
+
+  defp mini_element(%{type: type, label: label}) do
+    %{
+      type: type,
+      label: label,
+      color: Map.get(@type_colors, type, "#9CA3AF")
+    }
+  end
+
+  defp mini_element(%{} = item) do
+    type = Map.get(item, :type, "e")
+    label = Map.get(item, :label, "")
+
+    %{
+      type: type,
+      label: label,
+      color: Map.get(@type_colors, type, "#9CA3AF")
     }
   end
 end

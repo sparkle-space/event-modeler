@@ -20,6 +20,11 @@ defmodule EventModeler.Canvas.Layout do
   @slice_gap 100
   @padding 40
 
+  @spec_card_height 80
+  @spec_card_gap 10
+  @spec_top_margin 20
+  @spec_indicator_height 24
+
   defmodule PositionedElement do
     @moduledoc false
     defstruct [:id, :type, :label, :swimlane, :props, :x, :y, :width, :height, :slice_name]
@@ -28,6 +33,11 @@ defmodule EventModeler.Canvas.Layout do
   defmodule Connection do
     @moduledoc false
     defstruct [:from_id, :to_id, :from_x, :from_y, :to_x, :to_y]
+  end
+
+  defmodule PositionedSpec do
+    @moduledoc false
+    defstruct [:name, :slice_name, :x, :y, :width, :height, :given, :when_clause, :then_clause]
   end
 
   defmodule LayoutResult do
@@ -198,4 +208,83 @@ defmodule EventModeler.Canvas.Layout do
     max_y_bottom = elements |> Enum.map(&(&1.y + &1.height)) |> Enum.max()
     {min_y, max_y_bottom}
   end
+
+  @doc """
+  Computes spec card positions for a selected slice on demand.
+
+  Given the slices list, a slice name, and the existing layout result,
+  returns `{spec_cards, indicator, extra_height}` where:
+  - `spec_cards` — list of `%PositionedSpec{}` positioned below the slice
+  - `indicator` — map with position data for the spec count badge
+  - `extra_height` — additional canvas height needed when expanded
+  """
+  @spec compute_spec_cards(
+          [%EventModeler.EventModel.Slice{}],
+          String.t(),
+          %LayoutResult{} | map()
+        ) ::
+          {[%PositionedSpec{}], map() | nil, non_neg_integer()}
+  def compute_spec_cards(slices, slice_name, layout) do
+    slice = Enum.find(slices, &(&1.name == slice_name))
+    slice_labels = get_slice_labels(layout)
+    label = Enum.find(slice_labels, &(&1.name == slice_name))
+    canvas_height = get_canvas_height(layout)
+
+    tests = (slice && slice.tests) || []
+
+    if tests == [] || label == nil do
+      {[], nil, 0}
+    else
+      # Position indicator below the slice's lowest element
+      indicator_y = label.y + label.height + @spec_top_margin
+
+      indicator = %{
+        slice_name: slice_name,
+        x: label.x,
+        y: indicator_y,
+        width: label.width,
+        count: length(tests)
+      }
+
+      # Position spec cards below the indicator
+      cards_start_y = indicator_y + @spec_indicator_height + @spec_card_gap
+
+      {spec_cards, _y} =
+        Enum.reduce(tests, {[], cards_start_y}, fn test, {acc, y} ->
+          card = %PositionedSpec{
+            name: test.name,
+            slice_name: slice_name,
+            x: label.x,
+            y: y,
+            width: label.width,
+            height: @spec_card_height,
+            given: test.given || [],
+            when_clause: test.when_clause || [],
+            then_clause: test.then_clause || []
+          }
+
+          {acc ++ [card], y + @spec_card_height + @spec_card_gap}
+        end)
+
+      # Extra height = from layout bottom to spec cards bottom
+      last_card_bottom =
+        case List.last(spec_cards) do
+          nil -> 0
+          card -> card.y + card.height + @padding
+        end
+
+      extra_height = max(0, last_card_bottom - canvas_height)
+
+      {spec_cards, indicator, extra_height}
+    end
+  end
+
+  defp get_slice_labels(%LayoutResult{slice_labels: labels}), do: labels
+  defp get_slice_labels(%{slice_labels: labels}), do: labels
+  defp get_slice_labels(_), do: []
+
+  defp get_canvas_height(%LayoutResult{height: h}), do: h
+  defp get_canvas_height(%{canvas_height: h}), do: h
+  defp get_canvas_height(%{height: h}), do: h
+  defp get_canvas_height(_), do: 0
 end

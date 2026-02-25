@@ -302,4 +302,128 @@ defmodule EventModeler.Canvas.LayoutTest do
     assert evt.x == base_evt.x
     assert evt.y == base_evt.y
   end
+
+  describe "compute_spec_cards/3" do
+    test "returns empty for slice with no tests" do
+      event_model = %EventModel{
+        slices: [
+          %Slice{
+            name: "NoTests",
+            steps: [%Element{id: "1", type: :command, label: "Cmd"}],
+            tests: []
+          }
+        ]
+      }
+
+      layout = Layout.compute(event_model)
+      {cards, indicator, extra} = Layout.compute_spec_cards(event_model.slices, "NoTests", layout)
+
+      assert cards == []
+      assert indicator == nil
+      assert extra == 0
+    end
+
+    test "returns empty for nonexistent slice" do
+      event_model = %EventModel{slices: []}
+      layout = Layout.compute(event_model)
+
+      {cards, indicator, extra} =
+        Layout.compute_spec_cards(event_model.slices, "Missing", layout)
+
+      assert cards == []
+      assert indicator == nil
+      assert extra == 0
+    end
+
+    test "computes indicator for slice with tests" do
+      event_model = %EventModel{
+        slices: [
+          %Slice{
+            name: "WithTests",
+            steps: [
+              %Element{id: "1", type: :command, label: "Register"},
+              %Element{id: "2", type: :event, label: "Registered"}
+            ],
+            tests: [
+              %{
+                name: "HappyPath",
+                given: [%{type: "e", label: "Existing"}],
+                when_clause: [%{type: "c", label: "Register"}],
+                then_clause: [%{type: "e", label: "Registered"}]
+              }
+            ]
+          }
+        ]
+      }
+
+      layout = Layout.compute(event_model)
+
+      {_cards, indicator, _extra} =
+        Layout.compute_spec_cards(event_model.slices, "WithTests", layout)
+
+      assert indicator != nil
+      assert indicator.slice_name == "WithTests"
+      assert indicator.count == 1
+      assert indicator.x > 0
+      assert indicator.y > 0
+    end
+
+    test "positions spec cards below indicator" do
+      event_model = %EventModel{
+        slices: [
+          %Slice{
+            name: "WithTests",
+            steps: [
+              %Element{id: "1", type: :command, label: "Register"},
+              %Element{id: "2", type: :event, label: "Registered"}
+            ],
+            tests: [
+              %{
+                name: "HappyPath",
+                given: [%{type: "e", label: "Existing"}],
+                when_clause: [%{type: "c", label: "Register"}],
+                then_clause: [%{type: "e", label: "Registered"}]
+              },
+              %{
+                name: "DuplicateEmail",
+                given: [%{type: "e", label: "Existing"}],
+                when_clause: [%{type: "c", label: "Register"}],
+                then_clause: [%{type: "x", label: "DuplicateError"}]
+              }
+            ]
+          }
+        ]
+      }
+
+      layout = Layout.compute(event_model)
+
+      {cards, indicator, extra} =
+        Layout.compute_spec_cards(event_model.slices, "WithTests", layout)
+
+      assert length(cards) == 2
+      assert indicator.count == 2
+
+      [card1, card2] = cards
+      assert card1.name == "HappyPath"
+      assert card2.name == "DuplicateEmail"
+      assert card1.slice_name == "WithTests"
+
+      # Cards should be below the indicator
+      assert card1.y > indicator.y
+      # Second card below first
+      assert card2.y > card1.y
+
+      # Cards share the slice's x position
+      assert card1.x == indicator.x
+      assert card2.x == indicator.x
+
+      # Extra height should be positive since cards extend below layout
+      assert extra >= 0
+
+      # Cards carry their GWT data
+      assert length(card1.given) == 1
+      assert length(card1.when_clause) == 1
+      assert length(card1.then_clause) == 1
+    end
+  end
 end
