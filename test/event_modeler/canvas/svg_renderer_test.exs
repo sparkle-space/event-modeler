@@ -69,6 +69,34 @@ defmodule EventModeler.Canvas.SvgRendererTest do
     assert conn.path =~ "M 340 70"
   end
 
+  test "connection path loops above when target is to the left" do
+    layout = %LayoutResult{
+      width: 800,
+      height: 400,
+      elements: [],
+      connections: [
+        %Connection{
+          from_id: "1",
+          to_id: "2",
+          from_x: 500,
+          from_y: 70,
+          to_x: 100,
+          to_y: 70
+        }
+      ],
+      swimlanes: [%{name: "Default", y: 40, height: 100}],
+      slice_labels: []
+    }
+
+    svg_data = SvgRenderer.render(layout)
+    [conn] = svg_data.connections
+
+    # Path should start at source and use loop-above with L segment to target
+    assert conn.path =~ "M 500 70"
+    # Should contain a horizontal line segment approaching from the left
+    assert conn.path =~ "L 90 70"
+  end
+
   test "renders different colors for each element type" do
     types = [:command, :event, :view, :wireframe, :exception]
 

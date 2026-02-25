@@ -220,6 +220,38 @@ defmodule EventModeler.Canvas.LayoutTest do
     assert hd(result.slice_labels).name == "RegisterUser"
   end
 
+  test "connection direction adjusts when target element has negative offset" do
+    event_model = %EventModel{
+      slices: [
+        %Slice{
+          name: "Test",
+          steps: [
+            %Element{id: "a", type: :command, label: "Cmd", props: %{}},
+            %Element{
+              id: "b",
+              type: :event,
+              label: "Evt",
+              props: %{"position_offset_x" => -500}
+            }
+          ]
+        }
+      ]
+    }
+
+    result = Layout.compute(event_model)
+    [conn] = result.connections
+
+    elem_a = Enum.find(result.elements, &(&1.id == "a"))
+    elem_b = Enum.find(result.elements, &(&1.id == "b"))
+
+    # Element b is to the left of element a due to negative offset
+    assert elem_b.x < elem_a.x
+
+    # Connection always goes from right edge of source to left edge of target
+    assert conn.from_x == elem_a.x + elem_a.width
+    assert conn.to_x == elem_b.x
+  end
+
   test "applies position offsets from element props" do
     event_model = %EventModel{
       slices: [

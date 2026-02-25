@@ -126,7 +126,22 @@ defmodule EventModelerWeb.BoardLive do
 
   def handle_event("move_element", %{"element_id" => id, "x" => x, "y" => y}, socket) do
     Board.move_element(socket.assigns.file_path, id, x, y)
-    {:noreply, refresh_state(socket)}
+
+    socket =
+      if socket.assigns.editing_element && socket.assigns.pre_edit_viewport do
+        push_event(socket, "restore_viewport", socket.assigns.pre_edit_viewport)
+      else
+        socket
+      end
+
+    {:noreply,
+     refresh_state(socket)
+     |> assign(
+       editing_element: nil,
+       editing_element_data: nil,
+       pre_edit_viewport: nil,
+       selected_element: nil
+     )}
   end
 
   def handle_event("element_selected", %{"element_id" => id}, socket) do
@@ -154,9 +169,6 @@ defmodule EventModelerWeb.BoardLive do
           props: Enum.map(props, fn {k, v} -> %{key: k, value: v} end)
         }
 
-        # Approximate 1/3 screen width for the panel
-        panel_width = 400
-
         socket =
           socket
           |> assign(
@@ -169,8 +181,7 @@ defmodule EventModelerWeb.BoardLive do
             x: elem.x,
             y: elem.y,
             width: elem.width,
-            height: elem.height,
-            panel_width: panel_width
+            height: elem.height
           })
 
         {:noreply, socket}

@@ -16,7 +16,7 @@ defmodule EventModeler.Canvas.HtmlRenderer do
     command: %{bg: "bg-[#3B82F6]", text: "text-white", ring: "ring-[#2563EB]"},
     event: %{bg: "bg-[#F97316]", text: "text-white", ring: "ring-[#EA580C]"},
     view: %{bg: "bg-[#22C55E]", text: "text-white", ring: "ring-[#16A34A]"},
-    wireframe: %{bg: "bg-[#E5E7EB]", text: "text-[#374151]", ring: "ring-[#9CA3AF]"},
+    wireframe: %{bg: "bg-[#E5E7EB]", text: "text-[#374151]", ring: "ring-[#6366F1]"},
     automation: %{bg: "bg-[#8B5CF6]", text: "text-white", ring: "ring-[#7C3AED]"},
     exception: %{bg: "bg-[#EF4444]", text: "text-white", ring: "ring-[#DC2626]"}
   }
@@ -58,13 +58,27 @@ defmodule EventModeler.Canvas.HtmlRenderer do
 
   defp connection_data(%Connection{} = conn) do
     end_x = conn.to_x - 10
-    mid_x = div(conn.from_x + end_x, 2)
+
+    path =
+      if conn.from_x <= end_x do
+        # Normal left-to-right: smooth S-curve
+        mid_x = div(conn.from_x + end_x, 2)
+
+        "M #{conn.from_x} #{conn.from_y} C #{mid_x} #{conn.from_y} #{mid_x} #{conn.to_y} #{end_x} #{conn.to_y}"
+      else
+        # Reversed: loop above and approach target from left
+        loop_y = max(10, min(conn.from_y, conn.to_y) - 80)
+        approach_x = end_x - 30
+
+        "M #{conn.from_x} #{conn.from_y} " <>
+          "C #{conn.from_x} #{loop_y} #{approach_x} #{loop_y} #{approach_x} #{conn.to_y} " <>
+          "L #{end_x} #{conn.to_y}"
+      end
 
     %{
       from_id: conn.from_id,
       to_id: conn.to_id,
-      path:
-        "M #{conn.from_x} #{conn.from_y} C #{mid_x} #{conn.from_y} #{mid_x} #{conn.to_y} #{end_x} #{conn.to_y}"
+      path: path
     }
   end
 

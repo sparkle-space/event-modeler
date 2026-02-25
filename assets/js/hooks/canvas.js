@@ -54,6 +54,18 @@ const EventModelerCanvas = {
     this.dragStartClient = null
     this.dragStartPos = null
     this.dragThresholdMet = false
+    this.suppressNextClick = false
+
+    // Suppress the click event that fires after a drag to prevent
+    // phx-click="element_selected" from re-selecting the dragged element.
+    // Capture phase fires before LiveView's click handler.
+    this.el.addEventListener("click", (e) => {
+      if (this.suppressNextClick) {
+        e.stopPropagation()
+        e.preventDefault()
+        this.suppressNextClick = false
+      }
+    }, true)
     this.pendingClickElement = null
 
     // Minimap state
@@ -175,13 +187,7 @@ const EventModelerCanvas = {
     })
 
     this.handleEvent("zoom_to_element", (payload) => {
-      this.zoomToElement(
-        payload.x,
-        payload.y,
-        payload.width,
-        payload.height,
-        payload.panel_width || 0
-      )
+      this.zoomToElement(payload.x, payload.y, payload.width, payload.height)
     })
 
     this.handleEvent("restore_viewport", (payload) => {
@@ -515,23 +521,21 @@ const EventModelerCanvas = {
     }, 300)
   },
 
-  zoomToElement(elemX, elemY, elemWidth, elemHeight, panelWidth) {
+  zoomToElement(elemX, elemY, elemWidth, elemHeight) {
     const vp = this.viewport.getBoundingClientRect()
-    // Available canvas width accounts for the right panel that will appear
-    const availableWidth = vp.width - panelWidth
     const padding = 120
 
     // Calculate scale to fit element comfortably
-    const scaleX = availableWidth / (elemWidth + padding * 2)
+    const scaleX = vp.width / (elemWidth + padding * 2)
     const scaleY = vp.height / (elemHeight + padding * 2)
     const fitScale = Math.min(scaleX, scaleY, 2.5) // Cap at 2.5x
 
     this.scale = Math.max(0.5, fitScale)
 
-    // Center the element in the available canvas area (not the full viewport)
+    // Center the element in the viewport (already resized by the right panel)
     const centerX = elemX + elemWidth / 2
     const centerY = elemY + elemHeight / 2
-    this.translateX = availableWidth / 2 - centerX * this.scale
+    this.translateX = vp.width / 2 - centerX * this.scale
     this.translateY = vp.height / 2 - centerY * this.scale
 
     // Note: intentionally NOT clamping here — zoom-to-element may need
@@ -671,6 +675,9 @@ const EventModelerCanvas = {
           x: finalX,
           y: finalY,
         })
+        // Suppress the click event that fires after mouseup to prevent
+        // phx-click="element_selected" from re-selecting the element
+        this.suppressNextClick = true
       }
       // If threshold not met, it was a click — phx-click handles selection
 

@@ -5,6 +5,7 @@
 @source "../css";
 @source "../js";
 @source "../../lib/event_modeler_web";
+@source "../../lib/event_modeler/canvas";
 
 /* A Tailwind plugin that makes "hero-#{ICON}" classes available.
    The heroicons installation itself is managed by your mix.exs */
