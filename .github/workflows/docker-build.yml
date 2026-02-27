@@ -17,8 +17,8 @@ jobs:
       - name: Generate image tag
         id: tag
         run: |
-          TIMESTAMP=$(date -u +%Y%m%d-%H%M%S)
-          TAG="${TIMESTAMP}-run${{ github.run_number }}"
+          TIMESTAMP=$(date -u +%Y%m%d)
+          TAG="${TIMESTAMP}-${{ github.run_number }}"
           echo "TAG=${TAG}" >> $GITHUB_OUTPUT
 
   build-platform:
