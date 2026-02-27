@@ -123,6 +123,34 @@ defmodule EventModeler.Canvas.HtmlRendererTest do
     assert swimlane.type == :trigger
   end
 
+  test "connection path loops above when target is to the left" do
+    layout = %LayoutResult{
+      width: 800,
+      height: 400,
+      elements: [],
+      connections: [
+        %Connection{
+          from_id: "1",
+          to_id: "2",
+          from_x: 500,
+          from_y: 70,
+          to_x: 100,
+          to_y: 70
+        }
+      ],
+      swimlanes: [],
+      slice_labels: []
+    }
+
+    canvas_data = HtmlRenderer.render(layout)
+    [conn] = canvas_data.connections
+
+    # Path should start at source and use loop-above with L segment to target
+    assert conn.path =~ "M 500 70"
+    # Should contain a horizontal line segment approaching from the left
+    assert conn.path =~ "L 90 70"
+  end
+
   test "unknown element type falls back to command classes" do
     layout = %LayoutResult{
       width: 800,

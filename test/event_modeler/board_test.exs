@@ -256,12 +256,21 @@ defmodule EventModeler.BoardTest do
     assert :ok = Board.connect_elements(path, cmd_id, evt_id)
   end
 
-  test "disconnect_elements returns error for nonexistent connection", %{path: path} do
+  test "disconnect_elements returns informative error for structural connection", %{path: path} do
     {:ok, _pid} = Board.open(path)
     {:ok, cmd_id} = Board.place_element(path, :command, "Cmd")
     {:ok, evt_id} = Board.place_element(path, :event, "Evt")
 
-    assert {:error, "Connection not found"} = Board.disconnect_elements(path, cmd_id, evt_id)
+    # These elements are consecutive in a slice, so they have a structural connection
+    assert {:error, msg} = Board.disconnect_elements(path, cmd_id, evt_id)
+    assert msg =~ "slice connection"
+  end
+
+  test "disconnect_elements returns error for nonexistent connection", %{path: path} do
+    {:ok, _pid} = Board.open(path)
+
+    assert {:error, "Connection not found"} =
+             Board.disconnect_elements(path, "nonexistent_a", "nonexistent_b")
   end
 
   test "disconnect persists through save", %{path: path} do

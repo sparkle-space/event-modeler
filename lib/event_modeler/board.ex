@@ -453,22 +453,28 @@ defmodule EventModeler.Board do
   def handle_call({:disconnect_elements, from_id, to_id}, _from, state) do
     state = push_undo(state)
 
-    if {from_id, to_id} in state.connections do
-      connections = List.delete(state.connections, {from_id, to_id})
+    cond do
+      {from_id, to_id} in state.connections ->
+        connections = List.delete(state.connections, {from_id, to_id})
 
-      event_model =
-        EventStreamWriter.append(state.event_model, "ElementsDisconnected", "user", %{
-          "fromId" => from_id,
-          "toId" => to_id
-        })
+        event_model =
+          EventStreamWriter.append(state.event_model, "ElementsDisconnected", "user", %{
+            "fromId" => from_id,
+            "toId" => to_id
+          })
 
-      state =
-        %{state | event_model: event_model, dirty: true, connections: connections}
-        |> recompute_layout()
+        state =
+          %{state | event_model: event_model, dirty: true, connections: connections}
+          |> recompute_layout()
 
-      {:reply, :ok, state, @inactivity_timeout}
-    else
-      {:reply, {:error, "Connection not found"}, state, @inactivity_timeout}
+        {:reply, :ok, state, @inactivity_timeout}
+
+      layout_connection?(state.layout, from_id, to_id) ->
+        {:reply, {:error, "This is a slice connection. Edit the slice to change element order."},
+         state, @inactivity_timeout}
+
+      true ->
+        {:reply, {:error, "Connection not found"}, state, @inactivity_timeout}
     end
   end
 
@@ -919,6 +925,12 @@ defmodule EventModeler.Board do
   defp find_element(%EventModel{slices: slices}, element_id) do
     Enum.find_value(slices, fn slice ->
       Enum.find(slice.steps, &(&1.id == element_id))
+    end)
+  end
+
+  defp layout_connection?(layout, from_id, to_id) do
+    Enum.any?(layout.connections, fn conn ->
+      conn.from_id == from_id and conn.to_id == to_id
     end)
   end
 

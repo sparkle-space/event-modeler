@@ -2,7 +2,7 @@ defmodule EventModelerWeb.BoardLive do
   use EventModelerWeb, :live_view
 
   alias EventModeler.Board
-  alias EventModeler.Canvas.Swimlane
+  alias EventModeler.Canvas.{HtmlRenderer, Layout, Swimlane}
 
   @impl true
   def mount(%{"path" => encoded_path}, _session, socket) do
@@ -44,7 +44,12 @@ defmodule EventModelerWeb.BoardLive do
                    can_undo: false,
                    can_redo: false,
                    show_shortcuts: false,
-                   show_slice_dropdown: false
+                   show_slice_dropdown: false,
+                   # Spec card state
+                   specs_expanded: false,
+                   spec_cards: [],
+                   spec_indicator: nil,
+                   spec_extra_height: 0
                  )}
 
               {:error, reason} ->
@@ -126,7 +131,22 @@ defmodule EventModelerWeb.BoardLive do
 
   def handle_event("move_element", %{"element_id" => id, "x" => x, "y" => y}, socket) do
     Board.move_element(socket.assigns.file_path, id, x, y)
-    {:noreply, refresh_state(socket)}
+
+    socket =
+      if socket.assigns.editing_element && socket.assigns.pre_edit_viewport do
+        push_event(socket, "restore_viewport", socket.assigns.pre_edit_viewport)
+      else
+        socket
+      end
+
+    {:noreply,
+     refresh_state(socket)
+     |> assign(
+       editing_element: nil,
+       editing_element_data: nil,
+       pre_edit_viewport: nil,
+       selected_element: nil
+     )}
   end
 
   def handle_event("element_selected", %{"element_id" => id}, socket) do
@@ -154,9 +174,6 @@ defmodule EventModelerWeb.BoardLive do
           props: Enum.map(props, fn {k, v} -> %{key: k, value: v} end)
         }
 
-        # Approximate 1/3 screen width for the panel
-        panel_width = 400
-
         socket =
           socket
           |> assign(
@@ -169,8 +186,7 @@ defmodule EventModelerWeb.BoardLive do
             x: elem.x,
             y: elem.y,
             width: elem.width,
-            height: elem.height,
-            panel_width: panel_width
+            height: elem.height
           })
 
         {:noreply, socket}
@@ -305,7 +321,10 @@ defmodule EventModelerWeb.BoardLive do
   # Slice management events
 
   def handle_event("select_slice", %{"name" => name}, socket) do
-    socket = assign(socket, selected_slice: name)
+    socket =
+      socket
+      |> assign(selected_slice: name)
+      |> compute_spec_indicator(name)
 
     case Enum.find(socket.assigns.canvas_data.slice_labels, &(&1.name == name)) do
       %{x: x, width: width, y: y, height: height} ->
@@ -572,11 +591,14 @@ defmodule EventModelerWeb.BoardLive do
   end
 
   def handle_event("select_slice_from_dropdown", %{"slice" => ""}, socket) do
-    {:noreply, assign(socket, selected_slice: nil, show_slice_dropdown: false)}
+    {:noreply, clear_spec_state(assign(socket, selected_slice: nil, show_slice_dropdown: false))}
   end
 
   def handle_event("select_slice_from_dropdown", %{"slice" => name}, socket) do
-    socket = assign(socket, selected_slice: name, show_slice_dropdown: false)
+    socket =
+      socket
+      |> assign(selected_slice: name, show_slice_dropdown: false)
+      |> compute_spec_indicator(name)
 
     case Enum.find(socket.assigns.canvas_data.slice_labels, &(&1.name == name)) do
       %{x: x, width: width, y: y, height: height} ->
@@ -622,7 +644,7 @@ defmodule EventModelerWeb.BoardLive do
   end
 
   def handle_event("close_slice_details", _params, socket) do
-    {:noreply, assign(socket, selected_slice: nil)}
+    {:noreply, clear_spec_state(assign(socket, selected_slice: nil))}
   end
 
   def handle_event("toggle_shortcuts_modal", _params, socket) do
@@ -684,12 +706,68 @@ defmodule EventModelerWeb.BoardLive do
       socket.assigns.show_palette ->
         {:noreply, assign(socket, show_palette: false, palette_type: nil)}
 
+      socket.assigns.specs_expanded ->
+        {:noreply, assign(socket, specs_expanded: false, spec_cards: [], spec_extra_height: 0)}
+
       socket.assigns.selected_slice ->
-        {:noreply, assign(socket, selected_slice: nil)}
+        {:noreply, clear_spec_state(assign(socket, selected_slice: nil))}
 
       true ->
         {:noreply, socket}
     end
+  end
+
+  def handle_event("toggle_specs", _params, socket) do
+    if socket.assigns.specs_expanded do
+      {:noreply, assign(socket, specs_expanded: false, spec_cards: [], spec_extra_height: 0)}
+    else
+      {:noreply, expand_specs(socket)}
+    end
+  end
+
+  defp compute_spec_indicator(socket, slice_name) do
+    {_cards, indicator, _extra} =
+      Layout.compute_spec_cards(
+        socket.assigns.slices,
+        slice_name,
+        socket.assigns.canvas_data
+      )
+
+    assign(socket,
+      spec_indicator: indicator,
+      specs_expanded: false,
+      spec_cards: [],
+      spec_extra_height: 0
+    )
+  end
+
+  defp expand_specs(socket) do
+    slice_name = socket.assigns.selected_slice
+
+    {spec_cards, indicator, extra_height} =
+      Layout.compute_spec_cards(
+        socket.assigns.slices,
+        slice_name,
+        socket.assigns.canvas_data
+      )
+
+    rendered_cards = HtmlRenderer.render_spec_cards(spec_cards)
+
+    assign(socket,
+      specs_expanded: true,
+      spec_cards: rendered_cards,
+      spec_indicator: indicator,
+      spec_extra_height: extra_height
+    )
+  end
+
+  defp clear_spec_state(socket) do
+    assign(socket,
+      specs_expanded: false,
+      spec_cards: [],
+      spec_indicator: nil,
+      spec_extra_height: 0
+    )
   end
 
   defp refresh_state(socket) do
@@ -1000,9 +1078,10 @@ defmodule EventModelerWeb.BoardLive do
               +
             </button>
 
+            <% effective_height = @canvas_data.canvas_height + @spec_extra_height %>
             <div
               id="canvas-world"
-              style={"width: #{@canvas_data.canvas_width}px; height: #{@canvas_data.canvas_height}px; position: relative; transform-origin: 0 0;"}
+              style={"width: #{@canvas_data.canvas_width}px; height: #{effective_height}px; position: relative; transform-origin: 0 0;"}
             >
               <%!-- Swimlane bands --%>
               <div
@@ -1020,7 +1099,7 @@ defmodule EventModelerWeb.BoardLive do
 
               <%!-- Connection SVG overlay --%>
               <svg
-                style={"position: absolute; top: 0; left: 0; width: #{@canvas_data.canvas_width}px; height: #{@canvas_data.canvas_height}px; overflow: visible;"}
+                style={"position: absolute; top: 0; left: 0; width: #{@canvas_data.canvas_width}px; height: #{effective_height}px; overflow: visible;"}
                 xmlns="http://www.w3.org/2000/svg"
               >
                 <defs>
@@ -1092,6 +1171,85 @@ defmodule EventModelerWeb.BoardLive do
                 class="text-center text-[11px] font-medium text-[var(--color-text-secondary)] pointer-events-none"
               >
                 {sl.name}
+              </div>
+
+              <%!-- Spec indicator badge (below selected slice) --%>
+              <button
+                :if={@spec_indicator && @spec_indicator.count > 0}
+                phx-click="toggle_specs"
+                style={
+                  "position: absolute; left: #{@spec_indicator.x}px; top: #{@spec_indicator.y}px;"
+                }
+                class="text-[10px] bg-[var(--color-surface-alt)] border border-[var(--color-border)] rounded-md px-2 py-0.5 hover:bg-[var(--color-surface)] transition-colors cursor-pointer z-10 flex items-center gap-1"
+              >
+                <span>{if @specs_expanded, do: "\u25BE", else: "\u25B8"}</span>
+                <span>{@spec_indicator.count} specs</span>
+              </button>
+
+              <%!-- Expanded spec cards --%>
+              <div
+                :for={spec <- @spec_cards}
+                :if={@specs_expanded}
+                style={
+                  "position: absolute; left: #{spec.x}px; top: #{spec.y}px; width: #{spec.width}px; height: #{spec.height}px;"
+                }
+                class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm overflow-hidden"
+              >
+                <div class="text-[9px] font-medium text-[var(--color-text-secondary)] px-2 pt-1.5 truncate">
+                  spec: {spec.name}
+                </div>
+                <div class="flex items-center gap-1 px-2 py-1.5">
+                  <%!-- Given elements --%>
+                  <div :if={spec.given != []} class="flex items-center gap-0.5">
+                    <span class="text-[8px] text-[var(--color-text-secondary)] mr-0.5">G</span>
+                    <div
+                      :for={g <- spec.given}
+                      style={"background-color: #{g.color};"}
+                      class="w-4 h-4 rounded-sm flex items-center justify-center"
+                      title={g.label}
+                    >
+                      <span class="text-white text-[6px] font-bold">{g.type}</span>
+                    </div>
+                  </div>
+                  <%!-- Arrow --%>
+                  <span
+                    :if={spec.given != [] && spec.when_clause != []}
+                    class="text-[var(--color-text-secondary)] text-[10px] mx-0.5"
+                  >
+                    &rarr;
+                  </span>
+                  <%!-- When elements --%>
+                  <div :if={spec.when_clause != []} class="flex items-center gap-0.5">
+                    <span class="text-[8px] text-[var(--color-text-secondary)] mr-0.5">W</span>
+                    <div
+                      :for={w <- spec.when_clause}
+                      style={"background-color: #{w.color};"}
+                      class="w-4 h-4 rounded-sm flex items-center justify-center"
+                      title={w.label}
+                    >
+                      <span class="text-white text-[6px] font-bold">{w.type}</span>
+                    </div>
+                  </div>
+                  <%!-- Arrow --%>
+                  <span
+                    :if={spec.when_clause != [] && spec.then_clause != []}
+                    class="text-[var(--color-text-secondary)] text-[10px] mx-0.5"
+                  >
+                    &rarr;
+                  </span>
+                  <%!-- Then elements --%>
+                  <div :if={spec.then_clause != []} class="flex items-center gap-0.5">
+                    <span class="text-[8px] text-[var(--color-text-secondary)] mr-0.5">T</span>
+                    <div
+                      :for={t <- spec.then_clause}
+                      style={"background-color: #{t.color};"}
+                      class="w-4 h-4 rounded-sm flex items-center justify-center"
+                      title={t.label}
+                    >
+                      <span class="text-white text-[6px] font-bold">{t.type}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
