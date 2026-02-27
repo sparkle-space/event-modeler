@@ -50,10 +50,13 @@ defmodule EventModeler.Board do
         {:ok, pid}
 
       [] ->
-        DynamicSupervisor.start_child(
-          EventModeler.Board.Supervisor,
-          {__MODULE__, file_path}
-        )
+        case DynamicSupervisor.start_child(
+               EventModeler.Board.Supervisor,
+               {__MODULE__, file_path}
+             ) do
+          {:error, {:already_started, pid}} -> {:ok, pid}
+          other -> other
+        end
     end
   rescue
     ArgumentError -> {:error, :registry_unavailable}
