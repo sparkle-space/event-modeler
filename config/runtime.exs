@@ -20,6 +20,13 @@ if System.get_env("PHX_SERVER") do
   config :event_modeler, EventModelerWeb.Endpoint, server: true
 end
 
+# Optional static password auth. When set, all routes require login.
+auth_password = System.get_env("AUTH_PASSWORD")
+
+if auth_password && auth_password != "" do
+  config :event_modeler, :auth_password, auth_password
+end
+
 config :event_modeler, EventModelerWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 

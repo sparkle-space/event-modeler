@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+
+# No database to migrate currently.
+echo "No migrations to run."

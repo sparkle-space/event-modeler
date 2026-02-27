@@ -1,0 +1,132 @@
+name: Docker Build & Push
+
+on:
+  push:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.tag.outputs.TAG }}
+    steps:
+      - name: Generate image tag
+        id: tag
+        run: |
+          TIMESTAMP=$(date -u +%Y%m%d-%H%M%S)
+          TAG="${TIMESTAMP}-run${{ github.run_number }}"
+          echo "TAG=${TAG}" >> $GITHUB_OUTPUT
+
+  build-platform:
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    concurrency:
+      group: docker-build-${{ matrix.platform }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/arm64
+            runner: ubuntu-arm-latest-l
+          - platform: linux/amd64
+            runner: ubuntu-latest-l
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare platform tag
+        id: platform
+        run: |
+          PLATFORM_TAG=$(echo "${{ matrix.platform }}" | sed 's/\//-/g')
+          echo "TAG=${PLATFORM_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ needs.prepare.outputs.image_tag }}-${{ steps.platform.outputs.TAG }}
+          flavor: |
+            latest=false
+
+      - name: Build and push platform image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: |
+            type=gha,scope=${{ steps.platform.outputs.TAG }}
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-${{ steps.platform.outputs.TAG }}
+          cache-to: |
+            type=gha,mode=max,scope=${{ steps.platform.outputs.TAG }}
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-${{ steps.platform.outputs.TAG }},mode=max
+
+  create-manifest:
+    needs: [prepare, build-platform]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifest
+        env:
+          IMAGE_TAG: ${{ needs.prepare.outputs.image_tag }}
+          IMAGE_BASE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        run: |
+          docker buildx imagetools create -t "${IMAGE_BASE}:${IMAGE_TAG}" \
+            "${IMAGE_BASE}:${IMAGE_TAG}-linux-arm64" \
+            "${IMAGE_BASE}:${IMAGE_TAG}-linux-amd64"
+
+          docker buildx imagetools create -t "${IMAGE_BASE}:latest" \
+            "${IMAGE_BASE}:${IMAGE_TAG}-linux-arm64" \
+            "${IMAGE_BASE}:${IMAGE_TAG}-linux-amd64"
+
+          echo "Created multi-arch manifest: ${IMAGE_BASE}:${IMAGE_TAG}"
+          echo "Updated latest tag: ${IMAGE_BASE}:latest"
+
+  summary:
+    name: Build & Push
+    runs-on: ubuntu-latest
+    needs: [prepare, build-platform, create-manifest]
+    if: always()
+    steps:
+      - name: Check workflow success
+        env:
+          PREPARE_RESULT: ${{ needs.prepare.result }}
+          BUILD_RESULT: ${{ needs.build-platform.result }}
+          MANIFEST_RESULT: ${{ needs.create-manifest.result }}
+        run: |
+          if [[ "${PREPARE_RESULT}" != "success" ]] || \
+             [[ "${BUILD_RESULT}" != "success" ]] || \
+             [[ "${MANIFEST_RESULT}" != "success" ]]; then
+            echo "One or more required jobs failed"
+            exit 1
+          fi
+          echo "All required jobs succeeded"

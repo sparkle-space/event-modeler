@@ -1,0 +1,40 @@
+<div class="min-h-screen bg-[var(--color-bg)] flex items-center justify-center px-4">
+  <div class="w-full max-w-sm">
+    <div class="text-center mb-8">
+      <h1 class="text-3xl font-bold text-[var(--color-text-primary)]">EventModeler</h1>
+      <p class="mt-2 text-sm text-[var(--color-text-secondary)]">Enter password to continue</p>
+    </div>
+
+    <div class="bg-[var(--color-surface)] rounded-[var(--radius-card)] shadow-sm border border-[var(--color-border)] p-6">
+      <form action={~p"/login"} method="post">
+        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+
+        <div class="mb-4">
+          <label
+            for="password"
+            class="block text-sm font-medium text-[var(--color-text-secondary)] mb-1"
+          >
+            Password
+          </label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            required
+            autofocus
+            class="w-full border border-[var(--color-border)] rounded-[var(--radius-element)] px-3 py-2 bg-[var(--color-surface)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-primary/50"
+          />
+        </div>
+
+        <p :if={@error} class="text-sm text-error mb-4">{@error}</p>
+
+        <button
+          type="submit"
+          class="w-full bg-primary text-primary-content px-4 py-2 rounded-[var(--radius-element)] hover:opacity-90 transition-opacity font-medium cursor-pointer"
+        >
+          Sign In
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
