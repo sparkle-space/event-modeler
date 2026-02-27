@@ -1,0 +1,40 @@
+# Git
+.git
+.gitignore
+
+# Build artifacts
+_build
+deps
+node_modules
+
+# IDE and editor files
+.elixir_ls
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Test files
+test
+
+# Documentation (keep README)
+*.md
+!README.md
+
+# Docker files
+Dockerfile
+.dockerignore
+
+# CI/CD
+.github
+
+# Claude artifacts
+.claude
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp

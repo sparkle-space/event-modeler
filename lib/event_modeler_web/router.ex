@@ -8,6 +8,7 @@ defmodule EventModelerWeb.Router do
     plug :put_root_layout, html: {EventModelerWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug EventModelerWeb.Plugs.Auth
   end
 
   pipeline :api do
@@ -17,11 +18,18 @@ defmodule EventModelerWeb.Router do
   scope "/", EventModelerWeb do
     pipe_through :browser
 
+    get "/login", SessionController, :new
+    post "/login", SessionController, :create
+    delete "/logout", SessionController, :delete
+
     get "/", PageController, :home
-    live "/visualize", VisualizeLive
-    live "/boards", BoardsLive
-    live "/boards/:path", BoardLive
     get "/boards/:path/export", ExportController, :export
+
+    live_session :authenticated, on_mount: [EventModelerWeb.AuthHook] do
+      live "/visualize", VisualizeLive
+      live "/boards", BoardsLive
+      live "/boards/:path", BoardLive
+    end
   end
 
   # Other scopes may use custom stacks.

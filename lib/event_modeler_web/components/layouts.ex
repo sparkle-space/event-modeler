@@ -48,6 +48,15 @@ defmodule EventModelerWeb.Layouts do
               Boards
             </.link>
           </li>
+          <li :if={Application.get_env(:event_modeler, :auth_password)}>
+            <.link
+              href={~p"/logout"}
+              method="delete"
+              class="btn btn-ghost text-[var(--color-text-secondary)]"
+            >
+              Logout
+            </.link>
+          </li>
           <li>
             <.theme_toggle />
           </li>
