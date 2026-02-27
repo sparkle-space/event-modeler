@@ -5,6 +5,8 @@ defmodule EventModeler.MixProject do
     [
       app: :event_modeler,
       version: "0.1.0",
+      description:
+        "A collaborative canvas for designing information systems using Event Modeling",
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
