@@ -22,7 +22,7 @@ defmodule EventModeler.EventModel.EmlangParser do
   """
   @spec extract_emlang_blocks(String.t()) :: [String.t()]
   def extract_emlang_blocks(markdown) do
-    Regex.scan(~r/```emlang\n(.*?)```/s, markdown, capture: :all_but_first)
+    Regex.scan(~r/```yaml emlang\n(.*?)```/s, markdown, capture: :all_but_first)
     |> Enum.map(fn [block] -> String.trim(block) end)
   end
 

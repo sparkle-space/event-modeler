@@ -140,7 +140,7 @@ defmodule EventModeler.EventModel.Serializer do
       |> Enum.concat(tests)
       |> Enum.join("\n")
 
-    "```emlang\n#{body}\n```\n"
+    "```yaml emlang\n#{body}\n```\n"
   end
 
   defp render_emlang_steps(steps) do

@@ -361,11 +361,11 @@ Markdown Event Model (input)
 │              │  Identify existing Slices/Scenarios if present (re-import)
 └──────┬──────┘
        │
-       ├──── ```emlang``` blocks found? ────┐
+       ├──── ```yaml emlang``` blocks found? ────┐
        │  No                                │ Yes
        ▼                                    ▼
 ┌─────────────┐                    ┌─────────────┐
-│ Suggest      │                    │ Parse Emlang │  Parse each ```emlang``` block as YAML
+│ Suggest      │                    │ Parse Emlang │  Parse each ```yaml emlang``` block as YAML
 │ Placement    │                    │ Blocks       │  Extract: slice names, element types,
 │ (heuristic)  │                    │              │  props, swimlanes, tests
 │              │                    └──────┬──────┘
@@ -412,7 +412,7 @@ Board (read model)
 │ Sections     │  (Trigger → Command → Event → View)
 │ (emlang)     │  Format as emlang YAML steps: list with props:
 │              │  Include scenarios as emlang tests: blocks
-│              │  Wrap in ```emlang fenced code block
+│              │  Wrap in ```yaml emlang fenced code block
 │              │  Wireframe description as **Wireframe:** above block
 └──────┬──────┘
        │
@@ -429,7 +429,7 @@ Board (read model)
 │              │  Generated: Slices (emlang), Scenarios, Data Flows
 └──────┬──────┘
        │
-       └──→ Markdown (.md) — with ```emlang slice blocks
+       └──→ Markdown (.md) — with ```yaml emlang slice blocks
 ```
 
 ### Round-Trip Fidelity

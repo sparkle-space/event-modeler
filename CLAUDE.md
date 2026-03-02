@@ -97,7 +97,7 @@ See `docs/product-spec.md` for the full format definition.
 
 ### Emlang Notation
 
-Slices use [emlang](https://github.com/emlang-project/spec) v1.0.0 — a YAML DSL for event model slices. Embedded in Event Models as fenced `` ```emlang `` code blocks.
+Slices use [emlang](https://github.com/emlang-project/spec) v1.0.0 — a YAML DSL for event model slices. Embedded in Event Models as fenced `` ```yaml emlang `` code blocks.
 
 ### Event Stream
 

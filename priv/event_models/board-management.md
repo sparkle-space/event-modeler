@@ -28,7 +28,7 @@ Board Management provides the core workflow for creating and managing event mode
 
 **Wireframe:** Dashboard page with board list and "New Board" button
 
-```emlang
+```yaml emlang
 slices:
   CreateBoard:
     steps:
@@ -58,7 +58,7 @@ slices:
 
 **Wireframe:** Import dialog with file picker and paste area
 
-```emlang
+```yaml emlang
 slices:
   ImportEventModel:
     steps:
@@ -97,7 +97,7 @@ slices:
 
 **Wireframe:** Read-only canvas rendering of an event model
 
-```emlang
+```yaml emlang
 slices:
   VisualizeModel:
     steps:

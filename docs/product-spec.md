@@ -47,11 +47,11 @@ Slice definitions use [emlang](https://github.com/emlang-project/spec) (Event Mo
 - **GWT tests** (`tests:`) attached to slices with given/when/then constraints
 - **Linting** via the `emlang` CLI (10 rules enforcing Event Modeling best practices)
 
-Slices are embedded in Event Model markdown as fenced `` ```emlang `` code blocks -- one block per slice, directly beneath its `### Slice:` heading. This makes the blocks extractable for linting and diagram generation:
+Slices are embedded in Event Model markdown as fenced `` ```yaml emlang `` code blocks -- one block per slice, directly beneath its `### Slice:` heading. This makes the blocks extractable for linting and diagram generation:
 
 ```bash
 # Extract all emlang blocks from an Event Model and lint them
-awk '/^```emlang/{p=1; print "---"; next} /^```/{p=0; next} p' feature-event-model.md | emlang lint -
+awk '/^```yaml emlang/{p=1; print "---"; next} /^```/{p=0; next} p' feature-event-model.md | emlang lint -
 ```
 
 For the full rationale and comparison with alternative DSLs, see the [emlang Event Model format proposal](https://github.com/sparkle-space/masterplan/blob/main/00-scratchpad/emlang-prd-format/prd-format-proposal.md).
@@ -91,7 +91,7 @@ defined in emlang notation.
 
 **Wireframe:** Registration form with email, password, display name
 
-```emlang
+```yaml emlang
 slices:
   RegisterUser:
     steps:
@@ -168,7 +168,7 @@ The existing format in `00-scratchpad/prd-ideas/` (Overview + Key Ideas + Source
 | Frontmatter | Optional | Always present |
 | Overview | Required | Preserved from input |
 | Key Ideas | Required | Preserved, linked to slices |
-| Slices (emlang blocks) | Absent or present (re-import) | Generated from model as `` ```emlang `` code blocks |
+| Slices (emlang blocks) | Absent or present (re-import) | Generated from model as `` ```yaml emlang `` code blocks |
 | Scenarios | Absent | Generated from model |
 | Data Flows | Absent | Generated from model |
 | Dependencies | Optional | Enriched from model |
@@ -181,7 +181,7 @@ Event Model files carry an append-only event stream that records every modeling 
 
 **Placement:** Bottom of the Event Model file, after all content sections. An HTML comment sentinel `<!-- event-stream -->` marks the start, followed by a `## Event Stream` heading.
 
-**Format:** One fenced `` ```eventstream `` block per event (same pattern as `` ```emlang ``). Each block contains YAML with the following schema:
+**Format:** One fenced `` ```eventstream `` block per event (same pattern as `` ```yaml emlang ``). Each block contains YAML with the following schema:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -251,7 +251,7 @@ EventModeler models itself. The slices below describe the core workflows of the 
 
 User creates a new modeling board.
 
-```emlang
+```yaml emlang
 slices:
   CreateBoard:
     steps:
@@ -280,7 +280,7 @@ slices:
 
 User imports a markdown Event Model into a board.
 
-```emlang
+```yaml emlang
 slices:
   ImportEventModel:
     steps:
@@ -302,7 +302,7 @@ slices:
         when:
           - c: ImportEventModel
             props:
-              markdownContent: "---\ntitle: Feature\n---\n## Slices\n```emlang\nslices:\n  Register:\n    steps:\n      - c: Register\n```"
+              markdownContent: "---\ntitle: Feature\n---\n## Slices\n```yaml emlang\nslices:\n  Register:\n    steps:\n      - c: Register\n```"
         then:
           - e: EventModel/EventModelImported
       EmptyEventModel:
@@ -318,7 +318,7 @@ slices:
 
 User places elements, connects them, and defines swimlanes on the modeling canvas.
 
-```emlang
+```yaml emlang
 slices:
   PlaceElement:
     steps:
@@ -372,7 +372,7 @@ slices:
 
 User groups elements into a named slice.
 
-```emlang
+```yaml emlang
 slices:
   DefineSlice:
     steps:
@@ -404,7 +404,7 @@ slices:
 
 Auto-generate Given/When/Then scenarios from a slice's element graph.
 
-```emlang
+```yaml emlang
 slices:
   GenerateScenarios:
     steps:
@@ -436,7 +436,7 @@ slices:
 
 Export a refined Event Model with slices, scenarios, data flows, and event stream.
 
-```emlang
+```yaml emlang
 slices:
   ExportEventModel:
     steps:
@@ -467,7 +467,7 @@ slices:
 
 Read-only rendering of an Event Model's event model -- no editing, just visualization.
 
-```emlang
+```yaml emlang
 slices:
   VisualizeModel:
     steps:

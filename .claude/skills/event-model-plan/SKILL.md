@@ -18,7 +18,7 @@ A slice is a vertical unit of work: Trigger → Command → Event → View.
 
 Use emlang notation:
 
-```emlang
+```yaml emlang
 slices:
   SliceName:
     steps:
