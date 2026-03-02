@@ -35,3 +35,7 @@ mix phx.server      # Start dev server at localhost:4000
 - **Real-Time Collaboration** — Multiple users editing the same board simultaneously with cursor tracking, element locking, and Phoenix Presence
 - **Workshop Mode** — Guided 7-step Event Modeling workshop with per-step element constraints and facilitator controls
 - **Completeness Checking + Polish** — Field traceability (View → Event → Command), read-only sharing route, landing page navigation, dogfooding readiness
+
+## License
+
+MIT — see [LICENSE](LICENSE).
