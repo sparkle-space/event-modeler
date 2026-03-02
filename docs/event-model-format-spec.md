@@ -216,7 +216,7 @@ Each test has a PascalCase name and optional `given`, required `when`, and requi
 Extract all emlang blocks from an Event Model for linting or processing:
 
 ```bash
-awk '/^```emlang/{p=1; print "---"; next} /^```/{p=0; next} p' feature-event-model.md | emlang lint -
+awk '/^```yaml emlang/{p=1; print "---"; next} /^```/{p=0; next} p' feature-event-model.md | emlang lint -
 ```
 
 ## Event Stream

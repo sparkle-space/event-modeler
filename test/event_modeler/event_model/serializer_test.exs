@@ -41,7 +41,7 @@ defmodule EventModeler.EventModel.SerializerTest do
     assert result =~ "## Slices"
     assert result =~ "### Slice: DoThing"
     assert result =~ "**Wireframe:** A form"
-    assert result =~ "```emlang"
+    assert result =~ "```yaml emlang"
     assert result =~ "c: DoThing"
     assert result =~ "e: Domain/ThingDone"
     assert result =~ "name: string"

@@ -9,7 +9,7 @@ defmodule EventModeler.EventModel.EmlangParserTest do
 
     ### Slice: CreateBoard
 
-    ```emlang
+    ```yaml emlang
     slices:
       CreateBoard:
         steps:
@@ -50,7 +50,7 @@ defmodule EventModeler.EventModel.EmlangParserTest do
 
   test "parses multiple slices from multiple blocks" do
     markdown = """
-    ```emlang
+    ```yaml emlang
     slices:
       SliceOne:
         steps:
@@ -58,7 +58,7 @@ defmodule EventModeler.EventModel.EmlangParserTest do
           - e: ThingDone
     ```
 
-    ```emlang
+    ```yaml emlang
     slices:
       SliceTwo:
         steps:
@@ -74,7 +74,7 @@ defmodule EventModeler.EventModel.EmlangParserTest do
 
   test "parses tests (GWT scenarios)" do
     markdown = """
-    ```emlang
+    ```yaml emlang
     slices:
       RegisterUser:
         steps:
@@ -122,7 +122,7 @@ defmodule EventModeler.EventModel.EmlangParserTest do
 
   test "parses multiple slices within one block" do
     markdown = """
-    ```emlang
+    ```yaml emlang
     slices:
       PlaceElement:
         steps:
@@ -143,7 +143,7 @@ defmodule EventModeler.EventModel.EmlangParserTest do
     markdown = """
     Some text
 
-    ```emlang
+    ```yaml emlang
     slices:
       Test:
         steps:

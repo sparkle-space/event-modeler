@@ -29,7 +29,7 @@ defmodule EventModelerWeb.VisualizeLiveTest do
 
     ### Slice: DoThing
 
-    ```emlang
+    ```yaml emlang
     slices:
       DoThing:
         steps:
@@ -82,7 +82,7 @@ defmodule EventModelerWeb.VisualizeLiveTest do
 
     ### Slice: Test
 
-    ```emlang
+    ```yaml emlang
     slices:
       Test:
         steps:

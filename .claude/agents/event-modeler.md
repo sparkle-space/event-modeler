@@ -32,7 +32,7 @@ Follow the 7-step process:
 
 Output slices in emlang notation:
 
-```emlang
+```yaml emlang
 slices:
   SliceName:
     steps:

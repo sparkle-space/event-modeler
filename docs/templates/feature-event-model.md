@@ -31,7 +31,7 @@ Slices are derived from the event model. Each slice is a vertical unit of work d
 
 **Wireframe:** Dashboard page with board list and "New Board" button
 
-```emlang
+```yaml emlang
 slices:
   CreateBoard:
     steps:
@@ -60,7 +60,7 @@ slices:
 
 **Wireframe:** Import dialog with file picker and paste area
 
-```emlang
+```yaml emlang
 slices:
   ImportEventModel:
     steps:
@@ -98,7 +98,7 @@ slices:
 
 **Wireframe:** Read-only canvas rendering of an event model
 
-```emlang
+```yaml emlang
 slices:
   VisualizeModel:
     steps:

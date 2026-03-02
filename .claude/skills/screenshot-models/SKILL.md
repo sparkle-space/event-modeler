@@ -39,7 +39,7 @@ Brief description of what this model represents.
 
 Description of the slice.
 
-```emlang
+```yaml emlang
 slices:
   SliceName:
     steps:
@@ -88,7 +88,7 @@ data:
 
 Add `props` to commands and events for field-level detail:
 
-```emlang
+```yaml emlang
 slices:
   BookRoom:
     steps:

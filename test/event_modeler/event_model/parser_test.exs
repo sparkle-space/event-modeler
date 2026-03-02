@@ -50,7 +50,7 @@ defmodule EventModeler.EventModel.ParserTest do
 
     **Wireframe:** A form with input fields
 
-    ```emlang
+    ```yaml emlang
     slices:
       DoThing:
         steps:
