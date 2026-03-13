@@ -1123,6 +1123,19 @@ defmodule EventModelerWeb.BoardLive do
                   >
                     <polygon points="0 0, 8 3, 0 6" fill="var(--color-slice-connection)" />
                   </marker>
+                  <marker
+                    id="arrowhead-slice-external"
+                    markerWidth="8"
+                    markerHeight="6"
+                    refX="0"
+                    refY="3"
+                    orient="auto"
+                  >
+                    <polygon
+                      points="0 0, 8 3, 0 6"
+                      fill="var(--color-external-connection)"
+                    />
+                  </marker>
                 </defs>
                 <g :for={conn <- @canvas_data.connections}>
                   <%!-- Invisible wider path for easier clicking --%>
@@ -1160,7 +1173,12 @@ defmodule EventModelerWeb.BoardLive do
                   stroke-width="1.5"
                   stroke-dasharray={if(sc.style == :dashed, do: "6,4", else: "none")}
                   opacity="0.6"
-                  marker-end="url(#arrowhead-slice)"
+                  marker-end={
+                    if(sc.style == :dashed,
+                      do: "url(#arrowhead-slice-external)",
+                      else: "url(#arrowhead-slice)"
+                    )
+                  }
                   style="pointer-events: none;"
                 />
               </svg>
