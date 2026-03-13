@@ -178,6 +178,86 @@ defmodule EventModeler.EventModel.SerializerTest do
     assert result =~ "| Registered | email | Profile | email |"
   end
 
+  test "serializes connections in emlang block" do
+    event_model = %EventModel{
+      title: "Test",
+      status: "draft",
+      slices: [
+        %Slice{
+          name: "Consumer",
+          steps: [
+            %Element{type: :command, label: "Consume", props: %{}},
+            %Element{type: :event, label: "Consumed", props: %{}}
+          ],
+          connections: %{
+            consumes: ["Forge/IdeaCreated"],
+            produces_for: ["DownstreamSlice"],
+            gates: ["draft→active: condition met"]
+          },
+          tests: []
+        }
+      ]
+    }
+
+    result = Serializer.serialize(event_model)
+    assert result =~ "connections:"
+    assert result =~ "consumes:"
+    assert result =~ "Forge/IdeaCreated"
+    assert result =~ "produces_for:"
+    assert result =~ "DownstreamSlice"
+    assert result =~ "gates:"
+    assert result =~ "draft→active: condition met"
+  end
+
+  test "skips connections when nil" do
+    event_model = %EventModel{
+      title: "Test",
+      status: "draft",
+      slices: [
+        %Slice{
+          name: "NoConns",
+          steps: [%Element{type: :command, label: "Cmd", props: %{}}],
+          connections: nil,
+          tests: []
+        }
+      ]
+    }
+
+    result = Serializer.serialize(event_model)
+    refute result =~ "connections:"
+  end
+
+  test "round-trip preserves connections" do
+    event_model = %EventModel{
+      title: "Connections Round Trip",
+      status: "draft",
+      slices: [
+        %Slice{
+          name: "WithConns",
+          steps: [
+            %Element{id: "1", type: :command, label: "DoThing", props: %{}},
+            %Element{id: "2", type: :event, label: "ThingDone", props: %{}}
+          ],
+          connections: %{
+            consumes: ["Other/EventHappened"],
+            produces_for: ["DownstreamSlice"],
+            gates: []
+          },
+          tests: []
+        }
+      ]
+    }
+
+    serialized = Serializer.serialize(event_model)
+    {:ok, parsed} = Parser.parse(serialized)
+
+    [slice] = parsed.slices
+    assert slice.connections != nil
+    assert slice.connections.consumes == ["Other/EventHappened"]
+    assert slice.connections.produces_for == ["DownstreamSlice"]
+    assert slice.connections.gates == []
+  end
+
   test "double round-trip preserves all data" do
     event_model1 = %EventModel{
       title: "Round Trip Test",

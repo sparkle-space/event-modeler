@@ -56,13 +56,34 @@ defmodule EventModeler.EventModel.EmlangParser do
   defp parse_slice(name, definition, raw_yaml) do
     steps = parse_steps(Map.get(definition, "steps", []))
     tests = parse_tests(Map.get(definition, "tests", %{}))
+    connections = parse_connections(Map.get(definition, "connections"))
 
     %Slice{
       name: name,
       steps: steps,
       tests: tests,
+      connections: connections,
       raw_emlang: raw_yaml
     }
+  end
+
+  defp parse_connections(nil), do: nil
+  defp parse_connections(conn) when not is_map(conn), do: nil
+
+  defp parse_connections(conn) do
+    consumes = Map.get(conn, "consumes", []) || []
+    produces_for = Map.get(conn, "produces_for", []) || []
+    gates = Map.get(conn, "gates", []) || []
+
+    consumes = if is_list(consumes), do: Enum.map(consumes, &to_string/1), else: []
+    produces_for = if is_list(produces_for), do: Enum.map(produces_for, &to_string/1), else: []
+    gates = if is_list(gates), do: Enum.map(gates, &to_string/1), else: []
+
+    if consumes == [] and produces_for == [] and gates == [] do
+      nil
+    else
+      %{consumes: consumes, produces_for: produces_for, gates: gates}
+    end
   end
 
   defp parse_steps(steps) when is_list(steps) do

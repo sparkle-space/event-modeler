@@ -61,6 +61,9 @@ slices:
 ```yaml emlang
 slices:
   ImportEventModel:
+    connections:
+      produces_for:
+        - VisualizeModel
     steps:
       - t: User/ImportDialog
       - c: ImportEventModel
@@ -100,6 +103,11 @@ slices:
 ```yaml emlang
 slices:
   VisualizeModel:
+    connections:
+      consumes:
+        - EventModel/EventModelImported
+      gates:
+        - "imported→visualized: valid event model required"
     steps:
       - t: System/EventModelFile
       - c: LoadModel

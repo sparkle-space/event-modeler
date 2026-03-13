@@ -204,6 +204,17 @@ defmodule EventModelerWeb.VisualizeLive do
                     marker-end="url(#arrowhead)"
                   />
 
+                  <%!-- Slice connection arcs --%>
+                  <path
+                    :for={sc <- @svg_data.slice_connections}
+                    d={sc.path}
+                    fill="none"
+                    stroke={if(sc.style == :dashed, do: "#9CA3AF", else: "#8B5CF6")}
+                    stroke-width="1.5"
+                    stroke-dasharray={if(sc.style == :dashed, do: "6,4", else: "none")}
+                    opacity="0.6"
+                  />
+
                   <%!-- Elements --%>
                   <g :for={elem <- @svg_data.elements}>
                     <rect

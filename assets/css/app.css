@@ -130,6 +130,10 @@
   /* Connection colors */
   --color-connection: #9CA3AF;
   --color-connection-hover: #6B7280;
+
+  /* Slice connection colors */
+  --color-slice-connection: #8B5CF6;
+  --color-external-connection: #9CA3AF;
 }
 
 [data-theme=dark] {
@@ -154,6 +158,9 @@
 
   --color-connection: #57555C;
   --color-connection-hover: #78767D;
+
+  --color-slice-connection: #A78BFA;
+  --color-external-connection: #78767D;
 }
 
 body {

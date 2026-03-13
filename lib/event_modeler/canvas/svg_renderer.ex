@@ -11,7 +11,7 @@ defmodule EventModeler.Canvas.SvgRenderer do
   - Exceptions = red rectangles
   """
 
-  alias EventModeler.Canvas.Layout.{LayoutResult, PositionedElement, Connection}
+  alias EventModeler.Canvas.Layout.{LayoutResult, PositionedElement, Connection, SliceConnection}
 
   @type_colors %{
     command: %{fill: "#3B82F6", stroke: "#2563EB", text: "#FFFFFF"},
@@ -34,7 +34,8 @@ defmodule EventModeler.Canvas.SvgRenderer do
       elements: Enum.map(layout.elements, &element_data/1),
       connections: Enum.map(layout.connections, &connection_data/1),
       swimlanes: Enum.map(layout.swimlanes, &swimlane_data(&1, layout.width)),
-      slice_labels: layout.slice_labels
+      slice_labels: layout.slice_labels,
+      slice_connections: Enum.map(layout.slice_connections, &slice_connection_data/1)
     }
   end
 
@@ -81,6 +82,24 @@ defmodule EventModeler.Canvas.SvgRenderer do
     %{
       from_id: conn.from_id,
       to_id: conn.to_id,
+      path: path
+    }
+  end
+
+  defp slice_connection_data(%SliceConnection{} = conn) do
+    dx = abs(conn.to_x - conn.from_x)
+    arc_height = min(max(30, dx * 0.15), 80)
+    arc_y = conn.from_y - arc_height
+
+    path =
+      "M #{conn.from_x} #{conn.from_y} " <>
+        "C #{conn.from_x} #{arc_y} #{conn.to_x} #{arc_y} #{conn.to_x} #{conn.to_y}"
+
+    %{
+      from_slice: conn.from_slice,
+      to_slice: conn.to_slice,
+      type: conn.type,
+      style: conn.style,
       path: path
     }
   end
