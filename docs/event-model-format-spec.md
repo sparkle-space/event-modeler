@@ -220,7 +220,7 @@ props:
   focus_area: "general | gaps | feasibility | null"
 ```
 
-> **Warning:** Never place `| null` outside a quoted string. The pattern `"a | b" | null` is **invalid YAML** — it creates two adjacent scalar values. Always put `null` inside the quotes: `"a | b | null"`.
+> **Warning:** When a quoted enum needs to be nullable, put `null` inside the quotes: `"a | b | null"`. The pattern `"a | b" | null` is **invalid YAML** (parse error — trailing tokens after a quoted scalar). Note that simple nullable types like `uuid | null` (unquoted) are fine because YAML reads the entire value as one string.
 
 ### Tests (GWT Scenarios)
 
