@@ -140,9 +140,9 @@ defmodule EventModeler.Canvas.Layout do
                     type: :consumes,
                     style: if(cross_context, do: :dashed, else: :solid),
                     from_x: from_label.x + div(from_label.width, 2),
-                    from_y: 4,
+                    from_y: 24,
                     to_x: to_label.x + div(to_label.width, 2),
-                    to_y: 4
+                    to_y: 24
                   }
                 ]
               else
@@ -160,9 +160,9 @@ defmodule EventModeler.Canvas.Layout do
                           type: :consumes,
                           style: :dashed,
                           from_x: to_label.x - 60,
-                          from_y: 4,
+                          from_y: 24,
                           to_x: to_label.x + div(to_label.width, 2),
-                          to_y: 4
+                          to_y: 24
                         }
                       ]
                   end
@@ -187,9 +187,9 @@ defmodule EventModeler.Canvas.Layout do
                     type: :produces_for,
                     style: if(cross, do: :dashed, else: :solid),
                     from_x: from_label.x + div(from_label.width, 2),
-                    from_y: 4,
+                    from_y: 24,
                     to_x: to_label.x + div(to_label.width, 2),
-                    to_y: 4
+                    to_y: 24
                   }
                 ]
               else

@@ -166,9 +166,9 @@ defmodule EventModeler.Canvas.HtmlRendererTest do
           type: :produces_for,
           style: :solid,
           from_x: 200,
-          from_y: 4,
+          from_y: 24,
           to_x: 500,
-          to_y: 4
+          to_y: 24
         },
         %EventModeler.Canvas.Layout.SliceConnection{
           from_slice: "External/Event",
@@ -176,9 +176,9 @@ defmodule EventModeler.Canvas.HtmlRendererTest do
           type: :consumes,
           style: :dashed,
           from_x: 100,
-          from_y: 4,
+          from_y: 24,
           to_x: 500,
-          to_y: 4
+          to_y: 24
         }
       ]
     }
@@ -190,10 +190,10 @@ defmodule EventModeler.Canvas.HtmlRendererTest do
     assert solid.style == :solid
     assert solid.from_slice == "Producer"
     assert solid.to_slice == "Consumer"
-    assert solid.path =~ "M 200 4"
+    assert solid.path =~ "M 200 24"
 
     assert dashed.style == :dashed
-    assert dashed.path =~ "M 100 4"
+    assert dashed.path =~ "M 100 24"
   end
 
   test "unknown element type falls back to command classes" do

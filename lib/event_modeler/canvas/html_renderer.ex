@@ -100,10 +100,10 @@ defmodule EventModeler.Canvas.HtmlRenderer do
   end
 
   defp slice_connection_data(%SliceConnection{} = conn) do
-    # Arc above slice labels — higher arc for more distant slices
+    # Arc above slice labels — higher arc for more distant slices, capped to stay visible
     dx = abs(conn.to_x - conn.from_x)
-    arc_height = min(max(30, dx * 0.15), 80)
-    arc_y = conn.from_y - arc_height
+    arc_height = min(max(10, dx * 0.12), 20)
+    arc_y = max(2, conn.from_y - arc_height)
 
     path =
       "M #{conn.from_x} #{conn.from_y} " <>
