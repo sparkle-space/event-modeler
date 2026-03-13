@@ -183,6 +183,45 @@ Elements can declare typed properties:
     displayName: string
 ```
 
+### Property Type Conventions
+
+Property values are **informal type annotations** stored as plain strings. Since they live inside YAML, they must be valid YAML scalars.
+
+**Simple types** — unquoted:
+
+```yaml
+props:
+  email: string
+  user_id: uuid
+  count: integer
+```
+
+**Nullable types** — unquoted (YAML reads the whole value as one string):
+
+```yaml
+props:
+  source_id: uuid | null
+  notes: string | null
+```
+
+**Enum types** — quoted (pipes inside quotes are string content):
+
+```yaml
+props:
+  status: "draft | active | review | completed"
+  priority: "low | medium | high"
+```
+
+**Nullable enum types** — include `null` inside the quotes:
+
+```yaml
+props:
+  source_type: "manual | signal | clone | null"
+  focus_area: "general | gaps | feasibility | null"
+```
+
+> **Warning:** Never place `| null` outside a quoted string. The pattern `"a | b" | null` is **invalid YAML** — it creates two adjacent scalar values. Always put `null` inside the quotes: `"a | b | null"`.
+
 ### Tests (GWT Scenarios)
 
 Slices can embed Given/When/Then tests:
@@ -210,6 +249,24 @@ tests:
 ```
 
 Each test has a PascalCase name and optional `given`, required `when`, and required `then` clauses. Each clause is a list of elements with optional `props`.
+
+### Connections (Extension)
+
+Slices can optionally include a `connections` block documenting inter-slice dependencies. See [`emlang-spec.md`](emlang-spec.md) for the full extension specification.
+
+```yaml
+slices:
+  EvaluateDimension:
+    connections:
+      consumes:
+        - Forge/DimensionResearchCompleted
+      produces_for:
+        - AdvanceIdeaStage
+      gates:
+        - "draft→active: problem_clarity + strategic_fit evaluated"
+    steps: ...
+    tests: ...
+```
 
 ### Extraction
 
