@@ -10,7 +10,13 @@ defmodule EventModeler.Canvas.HtmlRenderer do
   the same coordinate space as the positioned divs.
   """
 
-  alias EventModeler.Canvas.Layout.{LayoutResult, PositionedElement, PositionedSpec, Connection}
+  alias EventModeler.Canvas.Layout.{
+    LayoutResult,
+    PositionedElement,
+    PositionedSpec,
+    Connection,
+    SliceConnection
+  }
 
   @type_classes %{
     command: %{bg: "bg-[#3B82F6]", text: "text-white", ring: "ring-[#2563EB]"},
@@ -32,7 +38,8 @@ defmodule EventModeler.Canvas.HtmlRenderer do
       elements: Enum.map(layout.elements, &element_data/1),
       connections: Enum.map(layout.connections, &connection_data/1),
       swimlanes: Enum.map(layout.swimlanes, &swimlane_data(&1, layout.width)),
-      slice_labels: layout.slice_labels
+      slice_labels: layout.slice_labels,
+      slice_connections: Enum.map(layout.slice_connections, &slice_connection_data/1)
     }
   end
 
@@ -89,6 +96,25 @@ defmodule EventModeler.Canvas.HtmlRenderer do
       y: swimlane.y - 10,
       height: swimlane.height,
       width: canvas_width
+    }
+  end
+
+  defp slice_connection_data(%SliceConnection{} = conn) do
+    # Arc above slice labels — higher arc for more distant slices, capped to stay visible
+    dx = abs(conn.to_x - conn.from_x)
+    arc_height = min(max(10, dx * 0.12), 20)
+    arc_y = max(2, conn.from_y - arc_height)
+
+    path =
+      "M #{conn.from_x} #{conn.from_y} " <>
+        "C #{conn.from_x} #{arc_y} #{conn.to_x} #{arc_y} #{conn.to_x} #{conn.to_y}"
+
+    %{
+      from_slice: conn.from_slice,
+      to_slice: conn.to_slice,
+      type: conn.type,
+      style: conn.style,
+      path: path
     }
   end
 

@@ -40,6 +40,11 @@ defmodule EventModeler.Canvas.Layout do
     defstruct [:name, :slice_name, :x, :y, :width, :height, :given, :when_clause, :then_clause]
   end
 
+  defmodule SliceConnection do
+    @moduledoc false
+    defstruct [:from_slice, :to_slice, :type, :style, :from_x, :from_y, :to_x, :to_y]
+  end
+
   defmodule LayoutResult do
     @moduledoc false
     defstruct [
@@ -48,7 +53,8 @@ defmodule EventModeler.Canvas.Layout do
       elements: [],
       connections: [],
       swimlanes: [],
-      slice_labels: []
+      slice_labels: [],
+      slice_connections: []
     ]
   end
 
@@ -82,14 +88,119 @@ defmodule EventModeler.Canvas.Layout do
         }
       end)
 
+    slice_conns = compute_slice_connections(slices, slice_labels)
+
     %LayoutResult{
       elements: positioned,
       connections: connections,
       swimlanes: swimlane_data,
       slice_labels: slice_labels,
+      slice_connections: slice_conns,
       width: max(total_width + @padding * 2, 800),
       height: max(total_height + @padding * 2, 400)
     }
+  end
+
+  defp compute_slice_connections(slices, slice_labels) do
+    label_map = Map.new(slice_labels, fn l -> {l.name, l} end)
+
+    # Build a map of event labels to producing slice names
+    event_to_slice =
+      Enum.flat_map(slices, fn slice ->
+        slice.steps
+        |> Enum.filter(&(&1.type == :event))
+        |> Enum.flat_map(fn step ->
+          full = if step.swimlane, do: "#{step.swimlane}/#{step.label}", else: step.label
+          [{full, slice.name}, {step.label, slice.name}]
+        end)
+      end)
+      |> Map.new()
+
+    slices
+    |> Enum.flat_map(fn slice ->
+      case slice.connections do
+        nil ->
+          []
+
+        %{consumes: consumes, produces_for: produces_for} ->
+          consume_conns =
+            Enum.flat_map(consumes, fn event_ref ->
+              source_slice = Map.get(event_to_slice, event_ref)
+              cross_context = String.contains?(event_ref, "/") and is_nil(source_slice)
+              from = source_slice
+
+              if from && Map.has_key?(label_map, from) && Map.has_key?(label_map, slice.name) do
+                from_label = label_map[from]
+                to_label = label_map[slice.name]
+
+                [
+                  %SliceConnection{
+                    from_slice: from,
+                    to_slice: slice.name,
+                    type: :consumes,
+                    style: if(cross_context, do: :dashed, else: :solid),
+                    from_x: from_label.x + div(from_label.width, 2),
+                    from_y: 24,
+                    to_x: to_label.x + div(to_label.width, 2),
+                    to_y: 24
+                  }
+                ]
+              else
+                if cross_context do
+                  # External reference with no local match — create dashed stub
+                  case Map.get(label_map, slice.name) do
+                    nil ->
+                      []
+
+                    to_label ->
+                      [
+                        %SliceConnection{
+                          from_slice: event_ref,
+                          to_slice: slice.name,
+                          type: :consumes,
+                          style: :dashed,
+                          from_x: to_label.x - 60,
+                          from_y: 24,
+                          to_x: to_label.x + div(to_label.width, 2),
+                          to_y: 24
+                        }
+                      ]
+                  end
+                else
+                  []
+                end
+              end
+            end)
+
+          produce_conns =
+            Enum.flat_map(produces_for, fn target_ref ->
+              if Map.has_key?(label_map, target_ref) &&
+                   Map.has_key?(label_map, slice.name) do
+                from_label = label_map[slice.name]
+                to_label = label_map[target_ref]
+                cross = String.contains?(target_ref, "/")
+
+                [
+                  %SliceConnection{
+                    from_slice: slice.name,
+                    to_slice: target_ref,
+                    type: :produces_for,
+                    style: if(cross, do: :dashed, else: :solid),
+                    from_x: from_label.x + div(from_label.width, 2),
+                    from_y: 24,
+                    to_x: to_label.x + div(to_label.width, 2),
+                    to_y: 24
+                  }
+                ]
+              else
+                []
+              end
+            end)
+
+          consume_conns ++ produce_conns
+      end
+    end)
+    |> Enum.uniq_by(fn c -> {c.from_slice, c.to_slice} end)
   end
 
   defp collect_swimlanes(slices) do

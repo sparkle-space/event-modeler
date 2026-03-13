@@ -151,6 +151,51 @@ defmodule EventModeler.Canvas.HtmlRendererTest do
     assert conn.path =~ "L 90 70"
   end
 
+  test "renders slice connections in canvas data" do
+    layout = %LayoutResult{
+      width: 800,
+      height: 400,
+      elements: [],
+      connections: [],
+      swimlanes: [],
+      slice_labels: [],
+      slice_connections: [
+        %EventModeler.Canvas.Layout.SliceConnection{
+          from_slice: "Producer",
+          to_slice: "Consumer",
+          type: :produces_for,
+          style: :solid,
+          from_x: 200,
+          from_y: 24,
+          to_x: 500,
+          to_y: 24
+        },
+        %EventModeler.Canvas.Layout.SliceConnection{
+          from_slice: "External/Event",
+          to_slice: "Consumer",
+          type: :consumes,
+          style: :dashed,
+          from_x: 100,
+          from_y: 24,
+          to_x: 500,
+          to_y: 24
+        }
+      ]
+    }
+
+    canvas_data = HtmlRenderer.render(layout)
+    assert length(canvas_data.slice_connections) == 2
+
+    [solid, dashed] = canvas_data.slice_connections
+    assert solid.style == :solid
+    assert solid.from_slice == "Producer"
+    assert solid.to_slice == "Consumer"
+    assert solid.path =~ "M 200 24"
+
+    assert dashed.style == :dashed
+    assert dashed.path =~ "M 100 24"
+  end
+
   test "unknown element type falls back to command classes" do
     layout = %LayoutResult{
       width: 800,

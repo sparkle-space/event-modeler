@@ -1113,6 +1113,29 @@ defmodule EventModelerWeb.BoardLive do
                   >
                     <polygon points="0 0, 10 3.5, 0 7" fill="var(--color-connection)" />
                   </marker>
+                  <marker
+                    id="arrowhead-slice"
+                    markerWidth="8"
+                    markerHeight="6"
+                    refX="0"
+                    refY="3"
+                    orient="auto"
+                  >
+                    <polygon points="0 0, 8 3, 0 6" fill="var(--color-slice-connection)" />
+                  </marker>
+                  <marker
+                    id="arrowhead-slice-external"
+                    markerWidth="8"
+                    markerHeight="6"
+                    refX="0"
+                    refY="3"
+                    orient="auto"
+                  >
+                    <polygon
+                      points="0 0, 8 3, 0 6"
+                      fill="var(--color-external-connection)"
+                    />
+                  </marker>
                 </defs>
                 <g :for={conn <- @canvas_data.connections}>
                   <%!-- Invisible wider path for easier clicking --%>
@@ -1136,6 +1159,28 @@ defmodule EventModelerWeb.BoardLive do
                     style="pointer-events: none;"
                   />
                 </g>
+                <%!-- Slice connection arcs --%>
+                <path
+                  :for={sc <- @canvas_data.slice_connections}
+                  d={sc.path}
+                  fill="none"
+                  stroke={
+                    if(sc.style == :dashed,
+                      do: "var(--color-external-connection)",
+                      else: "var(--color-slice-connection)"
+                    )
+                  }
+                  stroke-width="1.5"
+                  stroke-dasharray={if(sc.style == :dashed, do: "6,4", else: "none")}
+                  opacity="0.6"
+                  marker-end={
+                    if(sc.style == :dashed,
+                      do: "url(#arrowhead-slice-external)",
+                      else: "url(#arrowhead-slice)"
+                    )
+                  }
+                  style="pointer-events: none;"
+                />
               </svg>
 
               <%!-- Element divs --%>
@@ -1496,6 +1541,52 @@ defmodule EventModelerWeb.BoardLive do
                           + Add Scenario
                         </button>
                       <% end %>
+                    </div>
+
+                    <%!-- Connections & Gates --%>
+                    <div :if={slice.connections != nil} class="flex-1 min-w-0">
+                      <h4 class="text-xs font-semibold text-[var(--color-text-secondary)] mb-1">
+                        Connections
+                      </h4>
+                      <div :if={slice.connections.consumes != []} class="mb-1">
+                        <span class="text-[10px] text-[var(--color-text-secondary)]">
+                          Consumes:
+                        </span>
+                        <div class="space-y-0.5 mt-0.5">
+                          <div
+                            :for={c <- slice.connections.consumes}
+                            class="text-xs text-[var(--color-text-primary)] truncate"
+                          >
+                            {c}
+                          </div>
+                        </div>
+                      </div>
+                      <div :if={slice.connections.produces_for != []} class="mb-1">
+                        <span class="text-[10px] text-[var(--color-text-secondary)]">
+                          Produces for:
+                        </span>
+                        <div class="space-y-0.5 mt-0.5">
+                          <div
+                            :for={p <- slice.connections.produces_for}
+                            class="text-xs text-[var(--color-text-primary)] truncate"
+                          >
+                            {p}
+                          </div>
+                        </div>
+                      </div>
+                      <div :if={slice.connections.gates != []} class="mb-1">
+                        <span class="text-[10px] text-[var(--color-text-secondary)]">
+                          Gates:
+                        </span>
+                        <div class="space-y-0.5 mt-0.5">
+                          <span
+                            :for={g <- slice.connections.gates}
+                            class="inline-block text-[10px] bg-warning/20 text-warning border border-warning/30 rounded px-1.5 py-0.5 mr-1 mb-0.5"
+                          >
+                            {g}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

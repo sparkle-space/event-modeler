@@ -131,17 +131,62 @@ defmodule EventModeler.EventModel.Serializer do
   end
 
   defp render_emlang_block(slice) do
+    connections = render_emlang_connections(slice.connections)
     steps = render_emlang_steps(slice.steps)
     tests = render_emlang_tests(slice.tests)
 
     body =
-      ["slices:", "  #{slice.name}:", "    steps:"]
+      ["slices:", "  #{slice.name}:"]
+      |> Enum.concat(connections)
+      |> Enum.concat(["    steps:"])
       |> Enum.concat(steps)
       |> Enum.concat(tests)
       |> Enum.join("\n")
 
     "```yaml emlang\n#{body}\n```\n"
   end
+
+  defp render_emlang_connections(nil), do: []
+
+  defp render_emlang_connections(%{consumes: c, produces_for: p, gates: g})
+       when c == [] and p == [] and g == [] do
+    []
+  end
+
+  defp render_emlang_connections(%{consumes: consumes, produces_for: produces_for, gates: gates}) do
+    lines = ["    connections:"]
+
+    lines =
+      if consumes != [] do
+        lines ++
+          ["      consumes:"] ++
+          Enum.map(consumes, &"        - #{&1}")
+      else
+        lines
+      end
+
+    lines =
+      if produces_for != [] do
+        lines ++
+          ["      produces_for:"] ++
+          Enum.map(produces_for, &"        - #{&1}")
+      else
+        lines
+      end
+
+    lines =
+      if gates != [] do
+        lines ++
+          ["      gates:"] ++
+          Enum.map(gates, &"        - \"#{&1}\"")
+      else
+        lines
+      end
+
+    lines
+  end
+
+  defp render_emlang_connections(_), do: []
 
   defp render_emlang_steps(steps) do
     Enum.flat_map(steps, fn step ->
