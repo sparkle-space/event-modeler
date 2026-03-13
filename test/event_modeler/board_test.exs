@@ -37,15 +37,29 @@ defmodule EventModeler.BoardTest do
   end
 
   defp ensure_registry_alive do
+    ensure_registry_alive(3)
+  end
+
+  defp ensure_registry_alive(0), do: raise("Board.Registry failed to start after retries")
+
+  defp ensure_registry_alive(retries) do
     case Process.whereis(EventModeler.Board.Registry) do
       nil ->
-        # Registry died - restart the application
         Application.stop(:event_modeler)
         Application.ensure_all_started(:event_modeler)
         Process.sleep(100)
+        ensure_registry_alive(retries - 1)
 
-      _pid ->
-        :ok
+      pid when is_pid(pid) ->
+        # Verify the registry is actually responsive
+        try do
+          Registry.lookup(EventModeler.Board.Registry, "__health_check__")
+          :ok
+        rescue
+          ArgumentError ->
+            Process.sleep(50)
+            ensure_registry_alive(retries - 1)
+        end
     end
   end
 
