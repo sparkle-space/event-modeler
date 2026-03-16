@@ -131,4 +131,65 @@ defmodule EventModeler.Canvas.SvgRendererTest do
     fills = Enum.map(svg_data.elements, & &1.fill) |> Enum.uniq()
     assert length(fills) == 5
   end
+
+  test "renders element-anchored slice connections with S-curve path" do
+    layout = %LayoutResult{
+      width: 1200,
+      height: 400,
+      elements: [],
+      connections: [],
+      swimlanes: [],
+      slice_labels: [],
+      slice_connections: [
+        %EventModeler.Canvas.Layout.SliceConnection{
+          from_slice: "Producer",
+          to_slice: "Consumer",
+          type: :produces_for,
+          style: :solid,
+          from_x: 340,
+          from_y: 100,
+          to_x: 600,
+          to_y: 70,
+          from_element_id: "2",
+          to_element_id: "3",
+          anchor_mode: :element
+        }
+      ]
+    }
+
+    svg_data = SvgRenderer.render(layout)
+    [conn] = svg_data.slice_connections
+    assert conn.anchor_mode == :element
+    assert conn.path =~ "M 340 100"
+    assert conn.path =~ "C"
+  end
+
+  test "renders label-anchored slice connections with arc path" do
+    layout = %LayoutResult{
+      width: 800,
+      height: 400,
+      elements: [],
+      connections: [],
+      swimlanes: [],
+      slice_labels: [],
+      slice_connections: [
+        %EventModeler.Canvas.Layout.SliceConnection{
+          from_slice: "Producer",
+          to_slice: "Consumer",
+          type: :produces_for,
+          style: :solid,
+          from_x: 200,
+          from_y: 24,
+          to_x: 500,
+          to_y: 24,
+          anchor_mode: :label
+        }
+      ]
+    }
+
+    svg_data = SvgRenderer.render(layout)
+    [conn] = svg_data.slice_connections
+    assert conn.anchor_mode == :label
+    assert conn.path =~ "M 200 24"
+  end
 end

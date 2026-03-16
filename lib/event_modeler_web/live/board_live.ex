@@ -1179,27 +1179,51 @@ defmodule EventModelerWeb.BoardLive do
                   />
                 </g>
                 <%!-- Slice connection arcs --%>
-                <path
-                  :for={sc <- @canvas_data.slice_connections}
-                  d={sc.path}
-                  fill="none"
-                  stroke={
-                    if(sc.style == :dashed,
-                      do: "var(--color-external-connection)",
-                      else: "var(--color-slice-connection)"
-                    )
-                  }
-                  stroke-width="1.5"
-                  stroke-dasharray={if(sc.style == :dashed, do: "6,4", else: "none")}
-                  opacity="0.6"
-                  marker-end={
-                    if(sc.style == :dashed,
-                      do: "url(#arrowhead-slice-external)",
-                      else: "url(#arrowhead-slice)"
-                    )
-                  }
-                  style="pointer-events: none;"
-                />
+                <%= for sc <- @canvas_data.slice_connections do %>
+                  <%= if Map.get(sc, :anchor_mode) == :element do %>
+                    <path
+                      d={sc.path}
+                      fill="none"
+                      stroke={
+                        if(sc.style == :dashed,
+                          do: "var(--color-external-connection)",
+                          else: "var(--color-slice-connection)"
+                        )
+                      }
+                      stroke-width="2"
+                      stroke-dasharray={if(sc.style == :dashed, do: "6,4", else: "8,4")}
+                      opacity="0.8"
+                      marker-end={
+                        if(sc.style == :dashed,
+                          do: "url(#arrowhead-slice-external)",
+                          else: "url(#arrowhead-slice)"
+                        )
+                      }
+                      style="pointer-events: none;"
+                    />
+                  <% else %>
+                    <path
+                      d={sc.path}
+                      fill="none"
+                      stroke={
+                        if(sc.style == :dashed,
+                          do: "var(--color-external-connection)",
+                          else: "var(--color-slice-connection)"
+                        )
+                      }
+                      stroke-width="1.5"
+                      stroke-dasharray={if(sc.style == :dashed, do: "6,4", else: "none")}
+                      opacity="0.6"
+                      marker-end={
+                        if(sc.style == :dashed,
+                          do: "url(#arrowhead-slice-external)",
+                          else: "url(#arrowhead-slice)"
+                        )
+                      }
+                      style="pointer-events: none;"
+                    />
+                  <% end %>
+                <% end %>
               </svg>
 
               <%!-- Element divs --%>

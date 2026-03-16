@@ -205,8 +205,6 @@ slices:
         - Billing/OrderPlaced
         - Shipping/OrderShipped
     steps:
-      - e: Billing/OrderPlaced
-      - e: Shipping/OrderShipped
       - v: OrderDashboard
         fields:
           orderId: uuid

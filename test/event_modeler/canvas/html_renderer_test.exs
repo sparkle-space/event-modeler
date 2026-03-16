@@ -151,7 +151,7 @@ defmodule EventModeler.Canvas.HtmlRendererTest do
     assert conn.path =~ "L 90 70"
   end
 
-  test "renders slice connections in canvas data" do
+  test "renders label-anchored slice connections with arc path" do
     layout = %LayoutResult{
       width: 800,
       height: 400,
@@ -168,7 +168,8 @@ defmodule EventModeler.Canvas.HtmlRendererTest do
           from_x: 200,
           from_y: 24,
           to_x: 500,
-          to_y: 24
+          to_y: 24,
+          anchor_mode: :label
         },
         %EventModeler.Canvas.Layout.SliceConnection{
           from_slice: "External/Event",
@@ -178,7 +179,8 @@ defmodule EventModeler.Canvas.HtmlRendererTest do
           from_x: 100,
           from_y: 24,
           to_x: 500,
-          to_y: 24
+          to_y: 24,
+          anchor_mode: :stub
         }
       ]
     }
@@ -188,12 +190,48 @@ defmodule EventModeler.Canvas.HtmlRendererTest do
 
     [solid, dashed] = canvas_data.slice_connections
     assert solid.style == :solid
+    assert solid.anchor_mode == :label
     assert solid.from_slice == "Producer"
     assert solid.to_slice == "Consumer"
     assert solid.path =~ "M 200 24"
 
     assert dashed.style == :dashed
+    assert dashed.anchor_mode == :stub
     assert dashed.path =~ "M 100 24"
+  end
+
+  test "renders element-anchored slice connections with S-curve path" do
+    layout = %LayoutResult{
+      width: 1200,
+      height: 400,
+      elements: [],
+      connections: [],
+      swimlanes: [],
+      slice_labels: [],
+      slice_connections: [
+        %EventModeler.Canvas.Layout.SliceConnection{
+          from_slice: "Producer",
+          to_slice: "Consumer",
+          type: :produces_for,
+          style: :solid,
+          from_x: 340,
+          from_y: 100,
+          to_x: 600,
+          to_y: 70,
+          from_element_id: "2",
+          to_element_id: "3",
+          anchor_mode: :element
+        }
+      ]
+    }
+
+    canvas_data = HtmlRenderer.render(layout)
+    [conn] = canvas_data.slice_connections
+    assert conn.anchor_mode == :element
+    # S-curve path starts at element position, not y=24
+    assert conn.path =~ "M 340 100"
+    # Path uses cubic Bézier (C)
+    assert conn.path =~ "C"
   end
 
   test "unknown element type falls back to command classes" do

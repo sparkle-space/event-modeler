@@ -304,7 +304,7 @@ defmodule EventModeler.Canvas.LayoutTest do
   end
 
   describe "slice_connections" do
-    test "computes slice connections from produces_for" do
+    test "computes slice connections from produces_for with element anchoring" do
       event_model = %EventModel{
         slices: [
           %Slice{
@@ -337,9 +337,20 @@ defmodule EventModeler.Canvas.LayoutTest do
       assert conn.to_slice == "Consumer"
       assert conn.type == :produces_for
       assert conn.style == :solid
+      assert conn.anchor_mode == :element
+      assert conn.from_element_id == "2"
+      assert conn.to_element_id == "3"
+
+      # Verify coordinates anchor to elements
+      source_event = Enum.find(result.elements, &(&1.id == "2"))
+      target_cmd = Enum.find(result.elements, &(&1.id == "3"))
+      assert conn.from_x == source_event.x + source_event.width
+      assert conn.from_y == source_event.y + div(source_event.height, 2)
+      assert conn.to_x == target_cmd.x
+      assert conn.to_y == target_cmd.y + div(target_cmd.height, 2)
     end
 
-    test "computes slice connections from consumes" do
+    test "computes slice connections from consumes with element anchoring" do
       event_model = %EventModel{
         slices: [
           %Slice{
@@ -372,9 +383,20 @@ defmodule EventModeler.Canvas.LayoutTest do
       assert conn.to_slice == "Consumer"
       assert conn.type == :consumes
       assert conn.style == :solid
+      assert conn.anchor_mode == :element
+      assert conn.from_element_id == "2"
+      assert conn.to_element_id == "3"
+
+      # Verify coordinates anchor to elements
+      source_event = Enum.find(result.elements, &(&1.id == "2"))
+      target_cmd = Enum.find(result.elements, &(&1.id == "3"))
+      assert conn.from_x == source_event.x + source_event.width
+      assert conn.from_y == source_event.y + div(source_event.height, 2)
+      assert conn.to_x == target_cmd.x
+      assert conn.to_y == target_cmd.y + div(target_cmd.height, 2)
     end
 
-    test "cross-context references without local match produce dashed style" do
+    test "cross-context references without local match produce stub anchor_mode" do
       event_model = %EventModel{
         slices: [
           %Slice{
@@ -396,6 +418,7 @@ defmodule EventModeler.Canvas.LayoutTest do
       assert length(result.slice_connections) == 1
       [conn] = result.slice_connections
       assert conn.style == :dashed
+      assert conn.anchor_mode == :stub
     end
 
     test "no connections when connections field is nil" do
@@ -450,6 +473,137 @@ defmodule EventModeler.Canvas.LayoutTest do
         end)
 
       assert length(a_to_b) == 1
+    end
+
+    test "falls back to label anchor when source event not found" do
+      event_model = %EventModel{
+        slices: [
+          %Slice{
+            name: "Producer",
+            steps: [
+              # No event element - only a command
+              %Element{id: "1", type: :command, label: "Produce"}
+            ],
+            connections: %{
+              consumes: [],
+              produces_for: ["Consumer"],
+              gates: []
+            }
+          },
+          %Slice{
+            name: "Consumer",
+            steps: [
+              %Element{id: "2", type: :command, label: "Consume"}
+            ]
+          }
+        ]
+      }
+
+      result = Layout.compute(event_model)
+      assert length(result.slice_connections) == 1
+      [conn] = result.slice_connections
+      assert conn.anchor_mode == :label
+      assert conn.from_y == 24
+      assert conn.to_y == 24
+    end
+
+    test "consumes with unmatched cross-context ref produces stub" do
+      event_model = %EventModel{
+        slices: [
+          %Slice{
+            name: "Producer",
+            steps: [
+              %Element{id: "1", type: :command, label: "Produce"},
+              %Element{id: "2", type: :event, label: "OtherEvent", swimlane: "Domain"}
+            ]
+          },
+          %Slice{
+            name: "Consumer",
+            steps: [
+              %Element{id: "3", type: :event, label: "Consumed"}
+            ],
+            connections: %{
+              consumes: ["Domain/Produced"],
+              produces_for: [],
+              gates: []
+            }
+          }
+        ]
+      }
+
+      result = Layout.compute(event_model)
+      # "Domain/Produced" doesn't match "Domain/OtherEvent", treated as cross-context stub
+      assert length(result.slice_connections) == 1
+      [conn] = result.slice_connections
+      assert conn.anchor_mode == :stub
+      assert conn.style == :dashed
+    end
+
+    test "target entry uses first element when no command/trigger exists" do
+      event_model = %EventModel{
+        slices: [
+          %Slice{
+            name: "Producer",
+            steps: [
+              %Element{id: "1", type: :command, label: "Produce"},
+              %Element{id: "2", type: :event, label: "Produced", swimlane: "Domain"}
+            ],
+            connections: %{
+              consumes: [],
+              produces_for: ["Consumer"],
+              gates: []
+            }
+          },
+          %Slice{
+            name: "Consumer",
+            steps: [
+              # Only events, no command/trigger
+              %Element{id: "3", type: :event, label: "AlreadyConsumed"},
+              %Element{id: "4", type: :event, label: "Consumed"}
+            ]
+          }
+        ]
+      }
+
+      result = Layout.compute(event_model)
+      [conn] = result.slice_connections
+      assert conn.anchor_mode == :element
+      # Should use first element as target since no command/trigger exists
+      assert conn.to_element_id == "3"
+    end
+
+    test "produces_for uses last event from source slice" do
+      event_model = %EventModel{
+        slices: [
+          %Slice{
+            name: "Producer",
+            steps: [
+              %Element{id: "1", type: :command, label: "Produce"},
+              %Element{id: "2", type: :event, label: "FirstEvent", swimlane: "Domain"},
+              %Element{id: "3", type: :event, label: "SecondEvent", swimlane: "Domain"}
+            ],
+            connections: %{
+              consumes: [],
+              produces_for: ["Consumer"],
+              gates: []
+            }
+          },
+          %Slice{
+            name: "Consumer",
+            steps: [
+              %Element{id: "4", type: :command, label: "Consume"},
+              %Element{id: "5", type: :event, label: "Consumed"}
+            ]
+          }
+        ]
+      }
+
+      result = Layout.compute(event_model)
+      [conn] = result.slice_connections
+      assert conn.anchor_mode == :element
+      # Should use last event "SecondEvent" (id: "3") as source
+      assert conn.from_element_id == "3"
+      assert conn.to_element_id == "4"
     end
   end
 

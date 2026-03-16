@@ -95,6 +95,34 @@ defmodule EventModeler.Canvas.SvgRenderer do
     }
   end
 
+  defp slice_connection_data(%SliceConnection{anchor_mode: :element} = conn) do
+    # S-curve Bézier from element to element
+    end_x = conn.to_x - 10
+
+    path =
+      if conn.from_x <= end_x do
+        mid_x = div(conn.from_x + end_x, 2)
+
+        "M #{conn.from_x} #{conn.from_y} C #{mid_x} #{conn.from_y} #{mid_x} #{conn.to_y} #{end_x} #{conn.to_y}"
+      else
+        loop_y = max(10, min(conn.from_y, conn.to_y) - 80)
+        approach_x = end_x - 30
+
+        "M #{conn.from_x} #{conn.from_y} " <>
+          "C #{conn.from_x} #{loop_y} #{approach_x} #{loop_y} #{approach_x} #{conn.to_y} " <>
+          "L #{end_x} #{conn.to_y}"
+      end
+
+    %{
+      from_slice: conn.from_slice,
+      to_slice: conn.to_slice,
+      type: conn.type,
+      style: conn.style,
+      anchor_mode: :element,
+      path: path
+    }
+  end
+
   defp slice_connection_data(%SliceConnection{} = conn) do
     dx = abs(conn.to_x - conn.from_x)
     arc_height = min(max(10, dx * 0.12), 20)
@@ -109,6 +137,7 @@ defmodule EventModeler.Canvas.SvgRenderer do
       to_slice: conn.to_slice,
       type: conn.type,
       style: conn.style,
+      anchor_mode: conn.anchor_mode || :label,
       path: path
     }
   end
