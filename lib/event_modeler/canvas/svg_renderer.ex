@@ -11,7 +11,13 @@ defmodule EventModeler.Canvas.SvgRenderer do
   - Exceptions = red rectangles
   """
 
-  alias EventModeler.Canvas.Layout.{LayoutResult, PositionedElement, Connection, SliceConnection}
+  alias EventModeler.Canvas.Layout.{
+    DomainBand,
+    LayoutResult,
+    PositionedElement,
+    Connection,
+    SliceConnection
+  }
 
   @type_colors %{
     command: %{fill: "#3B82F6", stroke: "#2563EB", text: "#FFFFFF"},
@@ -19,7 +25,9 @@ defmodule EventModeler.Canvas.SvgRenderer do
     view: %{fill: "#22C55E", stroke: "#16A34A", text: "#FFFFFF"},
     wireframe: %{fill: "#E5E7EB", stroke: "#9CA3AF", text: "#374151"},
     exception: %{fill: "#EF4444", stroke: "#DC2626", text: "#FFFFFF"},
-    automation: %{fill: "#8B5CF6", stroke: "#7C3AED", text: "#FFFFFF"}
+    automation: %{fill: "#8B5CF6", stroke: "#7C3AED", text: "#FFFFFF"},
+    processor: %{fill: "#A855F7", stroke: "#9333EA", text: "#FFFFFF"},
+    translator: %{fill: "#EC4899", stroke: "#DB2777", text: "#FFFFFF"}
   }
 
   @doc """
@@ -35,7 +43,8 @@ defmodule EventModeler.Canvas.SvgRenderer do
       connections: Enum.map(layout.connections, &connection_data/1),
       swimlanes: Enum.map(layout.swimlanes, &swimlane_data(&1, layout.width)),
       slice_labels: layout.slice_labels,
-      slice_connections: Enum.map(layout.slice_connections, &slice_connection_data/1)
+      slice_connections: Enum.map(layout.slice_connections, &slice_connection_data/1),
+      domain_bands: Enum.map(layout.domain_bands, &domain_band_data(&1, layout.width))
     }
   end
 
@@ -107,9 +116,20 @@ defmodule EventModeler.Canvas.SvgRenderer do
   defp swimlane_data(swimlane, canvas_width) do
     %{
       name: swimlane.name,
+      domain: Map.get(swimlane, :domain),
       y: swimlane.y - 10,
       height: swimlane.height,
       width: canvas_width
+    }
+  end
+
+  defp domain_band_data(%DomainBand{} = band, canvas_width) do
+    %{
+      name: band.name,
+      y: band.y,
+      height: band.height,
+      width: canvas_width,
+      color: band.color
     }
   end
 end
