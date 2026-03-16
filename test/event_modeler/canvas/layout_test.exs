@@ -303,6 +303,156 @@ defmodule EventModeler.Canvas.LayoutTest do
     assert evt.y == base_evt.y
   end
 
+  describe "slice_connections" do
+    test "computes slice connections from produces_for" do
+      event_model = %EventModel{
+        slices: [
+          %Slice{
+            name: "Producer",
+            steps: [
+              %Element{id: "1", type: :command, label: "Produce"},
+              %Element{id: "2", type: :event, label: "Produced", swimlane: "Domain"}
+            ],
+            connections: %{
+              consumes: [],
+              produces_for: ["Consumer"],
+              gates: []
+            }
+          },
+          %Slice{
+            name: "Consumer",
+            steps: [
+              %Element{id: "3", type: :command, label: "Consume"},
+              %Element{id: "4", type: :event, label: "Consumed"}
+            ]
+          }
+        ]
+      }
+
+      result = Layout.compute(event_model)
+      assert length(result.slice_connections) == 1
+
+      [conn] = result.slice_connections
+      assert conn.from_slice == "Producer"
+      assert conn.to_slice == "Consumer"
+      assert conn.type == :produces_for
+      assert conn.style == :solid
+    end
+
+    test "computes slice connections from consumes" do
+      event_model = %EventModel{
+        slices: [
+          %Slice{
+            name: "Producer",
+            steps: [
+              %Element{id: "1", type: :command, label: "Produce"},
+              %Element{id: "2", type: :event, label: "Produced", swimlane: "Domain"}
+            ]
+          },
+          %Slice{
+            name: "Consumer",
+            steps: [
+              %Element{id: "3", type: :command, label: "Consume"},
+              %Element{id: "4", type: :event, label: "Consumed"}
+            ],
+            connections: %{
+              consumes: ["Domain/Produced"],
+              produces_for: [],
+              gates: []
+            }
+          }
+        ]
+      }
+
+      result = Layout.compute(event_model)
+      assert length(result.slice_connections) == 1
+
+      [conn] = result.slice_connections
+      assert conn.from_slice == "Producer"
+      assert conn.to_slice == "Consumer"
+      assert conn.type == :consumes
+      assert conn.style == :solid
+    end
+
+    test "cross-context references without local match produce dashed style" do
+      event_model = %EventModel{
+        slices: [
+          %Slice{
+            name: "Consumer",
+            steps: [
+              %Element{id: "1", type: :command, label: "Consume"},
+              %Element{id: "2", type: :event, label: "Consumed"}
+            ],
+            connections: %{
+              consumes: ["External/SomethingHappened"],
+              produces_for: [],
+              gates: []
+            }
+          }
+        ]
+      }
+
+      result = Layout.compute(event_model)
+      assert length(result.slice_connections) == 1
+      [conn] = result.slice_connections
+      assert conn.style == :dashed
+    end
+
+    test "no connections when connections field is nil" do
+      event_model = %EventModel{
+        slices: [
+          %Slice{
+            name: "Simple",
+            steps: [%Element{id: "1", type: :command, label: "Cmd"}]
+          }
+        ]
+      }
+
+      result = Layout.compute(event_model)
+      assert result.slice_connections == []
+    end
+
+    test "deduplicates connections by from/to pair" do
+      event_model = %EventModel{
+        slices: [
+          %Slice{
+            name: "A",
+            steps: [
+              %Element{id: "1", type: :command, label: "Do"},
+              %Element{id: "2", type: :event, label: "Done", swimlane: "X"}
+            ],
+            connections: %{
+              consumes: [],
+              produces_for: ["B"],
+              gates: []
+            }
+          },
+          %Slice{
+            name: "B",
+            steps: [
+              %Element{id: "3", type: :command, label: "Handle"},
+              %Element{id: "4", type: :event, label: "Handled"}
+            ],
+            connections: %{
+              consumes: ["X/Done"],
+              produces_for: [],
+              gates: []
+            }
+          }
+        ]
+      }
+
+      result = Layout.compute(event_model)
+      # Both A->B from produces_for and A->B from consumes should deduplicate
+      a_to_b =
+        Enum.filter(result.slice_connections, fn c ->
+          c.from_slice == "A" and c.to_slice == "B"
+        end)
+
+      assert length(a_to_b) == 1
+    end
+  end
+
   describe "compute_spec_cards/3" do
     test "returns empty for slice with no tests" do
       event_model = %EventModel{

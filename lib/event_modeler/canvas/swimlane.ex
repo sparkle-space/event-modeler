@@ -10,13 +10,14 @@ defmodule EventModeler.Canvas.Swimlane do
   - `:event` (bottom) — events and exceptions
   """
 
-  defstruct [:name, :type]
+  defstruct [:name, :type, :domain]
 
   @type swimlane_type :: :trigger | :command_view | :event
 
   @type t :: %__MODULE__{
           name: String.t(),
-          type: swimlane_type()
+          type: swimlane_type(),
+          domain: String.t() | nil
         }
 
   @doc """
@@ -25,6 +26,8 @@ defmodule EventModeler.Canvas.Swimlane do
   @spec type_for_element(atom()) :: swimlane_type()
   def type_for_element(:wireframe), do: :trigger
   def type_for_element(:automation), do: :trigger
+  def type_for_element(:processor), do: :trigger
+  def type_for_element(:translator), do: :trigger
   def type_for_element(:command), do: :command_view
   def type_for_element(:view), do: :command_view
   def type_for_element(:event), do: :event
@@ -34,7 +37,7 @@ defmodule EventModeler.Canvas.Swimlane do
   Returns allowed element types for a swimlane type.
   """
   @spec allowed_element_types(swimlane_type()) :: [atom()]
-  def allowed_element_types(:trigger), do: [:wireframe, :automation]
+  def allowed_element_types(:trigger), do: [:wireframe, :automation, :processor, :translator]
   def allowed_element_types(:command_view), do: [:command, :view]
   def allowed_element_types(:event), do: [:event, :exception]
 

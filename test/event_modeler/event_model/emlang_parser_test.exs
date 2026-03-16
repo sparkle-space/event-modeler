@@ -139,6 +139,95 @@ defmodule EventModeler.EventModel.EmlangParserTest do
     assert length(slices) == 2
   end
 
+  describe "connections parsing" do
+    test "parses connections with all three keys" do
+      markdown = """
+      ```yaml emlang
+      slices:
+        EvaluateDimension:
+          connections:
+            consumes:
+              - Forge/IdeaCreated
+              - Forge/DimensionResearchCompleted
+            produces_for:
+              - AdvanceIdeaStage
+              - IdeaDashboardView
+            gates:
+              - "draft→active: problem_clarity evaluated"
+              - "active→review: 5 dimensions evaluated"
+          steps:
+            - c: EvaluateDimension
+            - e: Forge/DimensionEvaluated
+      ```
+      """
+
+      assert {:ok, [slice]} = EmlangParser.parse(markdown)
+      assert slice.connections != nil
+
+      assert slice.connections.consumes == [
+               "Forge/IdeaCreated",
+               "Forge/DimensionResearchCompleted"
+             ]
+
+      assert slice.connections.produces_for == ["AdvanceIdeaStage", "IdeaDashboardView"]
+      assert length(slice.connections.gates) == 2
+    end
+
+    test "parses connections with partial keys" do
+      markdown = """
+      ```yaml emlang
+      slices:
+        Producer:
+          connections:
+            produces_for:
+              - ConsumerSlice
+          steps:
+            - c: Produce
+            - e: Produced
+      ```
+      """
+
+      assert {:ok, [slice]} = EmlangParser.parse(markdown)
+      assert slice.connections != nil
+      assert slice.connections.consumes == []
+      assert slice.connections.produces_for == ["ConsumerSlice"]
+      assert slice.connections.gates == []
+    end
+
+    test "connections is nil when absent" do
+      markdown = """
+      ```yaml emlang
+      slices:
+        Simple:
+          steps:
+            - c: DoThing
+            - e: ThingDone
+      ```
+      """
+
+      assert {:ok, [slice]} = EmlangParser.parse(markdown)
+      assert slice.connections == nil
+    end
+
+    test "connections is nil when all lists empty" do
+      markdown = """
+      ```yaml emlang
+      slices:
+        Empty:
+          connections:
+            consumes: []
+            produces_for: []
+            gates: []
+          steps:
+            - c: DoThing
+      ```
+      """
+
+      assert {:ok, [slice]} = EmlangParser.parse(markdown)
+      assert slice.connections == nil
+    end
+  end
+
   test "extracts raw emlang blocks" do
     markdown = """
     Some text

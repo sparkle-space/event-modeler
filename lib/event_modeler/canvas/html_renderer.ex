@@ -10,7 +10,14 @@ defmodule EventModeler.Canvas.HtmlRenderer do
   the same coordinate space as the positioned divs.
   """
 
-  alias EventModeler.Canvas.Layout.{LayoutResult, PositionedElement, PositionedSpec, Connection}
+  alias EventModeler.Canvas.Layout.{
+    DomainBand,
+    LayoutResult,
+    PositionedElement,
+    PositionedSpec,
+    Connection,
+    SliceConnection
+  }
 
   @type_classes %{
     command: %{bg: "bg-[#3B82F6]", text: "text-white", ring: "ring-[#2563EB]"},
@@ -18,6 +25,8 @@ defmodule EventModeler.Canvas.HtmlRenderer do
     view: %{bg: "bg-[#22C55E]", text: "text-white", ring: "ring-[#16A34A]"},
     wireframe: %{bg: "bg-[#E5E7EB]", text: "text-[#374151]", ring: "ring-[#6366F1]"},
     automation: %{bg: "bg-[#8B5CF6]", text: "text-white", ring: "ring-[#7C3AED]"},
+    processor: %{bg: "bg-[#A855F7]", text: "text-white", ring: "ring-[#9333EA]"},
+    translator: %{bg: "bg-[#EC4899]", text: "text-white", ring: "ring-[#DB2777]"},
     exception: %{bg: "bg-[#EF4444]", text: "text-white", ring: "ring-[#DC2626]"}
   }
 
@@ -32,12 +41,20 @@ defmodule EventModeler.Canvas.HtmlRenderer do
       elements: Enum.map(layout.elements, &element_data/1),
       connections: Enum.map(layout.connections, &connection_data/1),
       swimlanes: Enum.map(layout.swimlanes, &swimlane_data(&1, layout.width)),
-      slice_labels: layout.slice_labels
+      slice_labels: layout.slice_labels,
+      slice_connections: Enum.map(layout.slice_connections, &slice_connection_data/1),
+      domain_bands: Enum.map(layout.domain_bands, &domain_band_data(&1, layout.width))
     }
   end
 
   defp element_data(%PositionedElement{} = elem) do
     classes = Map.get(@type_classes, elem.type, @type_classes.command)
+
+    fields_data =
+      (elem.fields || [])
+      |> Enum.map(fn field ->
+        %{name: field.name, type: Atom.to_string(field.type)}
+      end)
 
     %{
       id: elem.id,
@@ -52,6 +69,7 @@ defmodule EventModeler.Canvas.HtmlRenderer do
       text_class: classes.text,
       ring_class: classes.ring,
       props: elem.props,
+      fields: fields_data,
       slice_name: elem.slice_name
     }
   end
@@ -86,9 +104,40 @@ defmodule EventModeler.Canvas.HtmlRenderer do
     %{
       name: swimlane.name,
       type: swimlane.type,
+      domain: Map.get(swimlane, :domain),
       y: swimlane.y - 10,
       height: swimlane.height,
       width: canvas_width
+    }
+  end
+
+  defp domain_band_data(%DomainBand{} = band, canvas_width) do
+    %{
+      name: band.name,
+      y: band.y,
+      height: band.height,
+      width: canvas_width,
+      color: band.color,
+      description: band.description
+    }
+  end
+
+  defp slice_connection_data(%SliceConnection{} = conn) do
+    # Arc above slice labels — higher arc for more distant slices, capped to stay visible
+    dx = abs(conn.to_x - conn.from_x)
+    arc_height = min(max(10, dx * 0.12), 20)
+    arc_y = max(2, conn.from_y - arc_height)
+
+    path =
+      "M #{conn.from_x} #{conn.from_y} " <>
+        "C #{conn.from_x} #{arc_y} #{conn.to_x} #{arc_y} #{conn.to_x} #{conn.to_y}"
+
+    %{
+      from_slice: conn.from_slice,
+      to_slice: conn.to_slice,
+      type: conn.type,
+      style: conn.style,
+      path: path
     }
   end
 
