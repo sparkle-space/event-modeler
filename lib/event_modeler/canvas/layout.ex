@@ -55,7 +55,20 @@ defmodule EventModeler.Canvas.Layout do
 
   defmodule SliceConnection do
     @moduledoc false
-    defstruct [:from_slice, :to_slice, :type, :style, :from_x, :from_y, :to_x, :to_y]
+
+    defstruct [
+      :from_slice,
+      :to_slice,
+      :type,
+      :style,
+      :from_x,
+      :from_y,
+      :to_x,
+      :to_y,
+      :from_element_id,
+      :to_element_id,
+      :anchor_mode
+    ]
   end
 
   defmodule DomainBand do
@@ -127,7 +140,7 @@ defmodule EventModeler.Canvas.Layout do
         }
       end)
 
-    slice_conns = compute_slice_connections(slices, slice_labels)
+    slice_conns = compute_slice_connections(slices, slice_labels, positioned)
 
     %LayoutResult{
       elements: positioned,
@@ -141,20 +154,27 @@ defmodule EventModeler.Canvas.Layout do
     }
   end
 
-  defp compute_slice_connections(slices, slice_labels) do
+  defp compute_slice_connections(slices, slice_labels, positioned) do
     label_map = Map.new(slice_labels, fn l -> {l.name, l} end)
 
-    # Build a map of event labels to producing slice names
+    # Build element lookup by slice name
+    elements_by_slice = Enum.group_by(positioned, & &1.slice_name)
+
+    # Build a map of event labels to producing slice names.
+    # Use put_new to keep the first occurrence — later slices (e.g. view slices)
+    # may reference the same events as inputs, not producers.
     event_to_slice =
-      Enum.flat_map(slices, fn slice ->
+      Enum.reduce(slices, %{}, fn slice, acc ->
         slice.steps
         |> Enum.filter(&(&1.type == :event))
-        |> Enum.flat_map(fn step ->
+        |> Enum.reduce(acc, fn step, inner_acc ->
           full = if step.swimlane, do: "#{step.swimlane}/#{step.label}", else: step.label
-          [{full, slice.name}, {step.label, slice.name}]
+
+          inner_acc
+          |> Map.put_new(full, slice.name)
+          |> Map.put_new(step.label, slice.name)
         end)
       end)
-      |> Map.new()
 
     slices
     |> Enum.flat_map(fn slice ->
@@ -170,21 +190,47 @@ defmodule EventModeler.Canvas.Layout do
               from = source_slice
 
               if from && Map.has_key?(label_map, from) && Map.has_key?(label_map, slice.name) do
-                from_label = label_map[from]
-                to_label = label_map[slice.name]
+                # Try to resolve element anchors
+                source_event = find_source_event(elements_by_slice, from, event_ref)
+                target_entry = find_target_entry(elements_by_slice, slice.name)
 
-                [
-                  %SliceConnection{
-                    from_slice: from,
-                    to_slice: slice.name,
-                    type: :consumes,
-                    style: if(cross_context, do: :dashed, else: :solid),
-                    from_x: from_label.x + div(from_label.width, 2),
-                    from_y: 24,
-                    to_x: to_label.x + div(to_label.width, 2),
-                    to_y: 24
-                  }
-                ]
+                case {source_event, target_entry} do
+                  {%PositionedElement{} = src, %PositionedElement{} = tgt} ->
+                    [
+                      %SliceConnection{
+                        from_slice: from,
+                        to_slice: slice.name,
+                        type: :consumes,
+                        style: :solid,
+                        from_x: src.x + src.width,
+                        from_y: src.y + div(src.height, 2),
+                        to_x: tgt.x,
+                        to_y: tgt.y + div(tgt.height, 2),
+                        from_element_id: src.id,
+                        to_element_id: tgt.id,
+                        anchor_mode: :element
+                      }
+                    ]
+
+                  _ ->
+                    # Fallback to label-based
+                    from_label = label_map[from]
+                    to_label = label_map[slice.name]
+
+                    [
+                      %SliceConnection{
+                        from_slice: from,
+                        to_slice: slice.name,
+                        type: :consumes,
+                        style: :solid,
+                        from_x: from_label.x + div(from_label.width, 2),
+                        from_y: 24,
+                        to_x: to_label.x + div(to_label.width, 2),
+                        to_y: 24,
+                        anchor_mode: :label
+                      }
+                    ]
+                end
               else
                 if cross_context do
                   # External reference with no local match — create dashed stub
@@ -202,7 +248,8 @@ defmodule EventModeler.Canvas.Layout do
                           from_x: to_label.x - 60,
                           from_y: 24,
                           to_x: to_label.x + div(to_label.width, 2),
-                          to_y: 24
+                          to_y: 24,
+                          anchor_mode: :stub
                         }
                       ]
                   end
@@ -216,22 +263,49 @@ defmodule EventModeler.Canvas.Layout do
             Enum.flat_map(produces_for, fn target_ref ->
               if Map.has_key?(label_map, target_ref) &&
                    Map.has_key?(label_map, slice.name) do
-                from_label = label_map[slice.name]
-                to_label = label_map[target_ref]
                 cross = String.contains?(target_ref, "/")
 
-                [
-                  %SliceConnection{
-                    from_slice: slice.name,
-                    to_slice: target_ref,
-                    type: :produces_for,
-                    style: if(cross, do: :dashed, else: :solid),
-                    from_x: from_label.x + div(from_label.width, 2),
-                    from_y: 24,
-                    to_x: to_label.x + div(to_label.width, 2),
-                    to_y: 24
-                  }
-                ]
+                # Try to resolve element anchors
+                source_event = find_last_event(elements_by_slice, slice.name)
+                target_entry = find_target_entry(elements_by_slice, target_ref)
+
+                case {source_event, target_entry} do
+                  {%PositionedElement{} = src, %PositionedElement{} = tgt} ->
+                    [
+                      %SliceConnection{
+                        from_slice: slice.name,
+                        to_slice: target_ref,
+                        type: :produces_for,
+                        style: if(cross, do: :dashed, else: :solid),
+                        from_x: src.x + src.width,
+                        from_y: src.y + div(src.height, 2),
+                        to_x: tgt.x,
+                        to_y: tgt.y + div(tgt.height, 2),
+                        from_element_id: src.id,
+                        to_element_id: tgt.id,
+                        anchor_mode: :element
+                      }
+                    ]
+
+                  _ ->
+                    # Fallback to label-based
+                    from_label = label_map[slice.name]
+                    to_label = label_map[target_ref]
+
+                    [
+                      %SliceConnection{
+                        from_slice: slice.name,
+                        to_slice: target_ref,
+                        type: :produces_for,
+                        style: if(cross, do: :dashed, else: :solid),
+                        from_x: from_label.x + div(from_label.width, 2),
+                        from_y: 24,
+                        to_x: to_label.x + div(to_label.width, 2),
+                        to_y: 24,
+                        anchor_mode: :label
+                      }
+                    ]
+                end
               else
                 []
               end
@@ -241,6 +315,34 @@ defmodule EventModeler.Canvas.Layout do
       end
     end)
     |> Enum.uniq_by(fn c -> {c.from_slice, c.to_slice} end)
+  end
+
+  # Find the event element in source_slice whose label matches the event_ref
+  defp find_source_event(elements_by_slice, source_slice, event_ref) do
+    elems = Map.get(elements_by_slice, source_slice, [])
+    # Strip swimlane prefix from event_ref (e.g. "Domain/Produced" -> "Produced")
+    bare_label = event_ref |> String.split("/") |> List.last()
+
+    Enum.find(elems, fn e ->
+      e.type == :event and (e.label == event_ref or e.label == bare_label)
+    end)
+  end
+
+  # Find the last event element in a slice (for produces_for)
+  defp find_last_event(elements_by_slice, slice_name) do
+    elems = Map.get(elements_by_slice, slice_name, [])
+
+    elems
+    |> Enum.filter(&(&1.type == :event))
+    |> List.last()
+  end
+
+  # Find the first command/trigger element in a slice (the entry point)
+  @entry_types [:command, :wireframe, :automation, :processor, :translator]
+  defp find_target_entry(elements_by_slice, slice_name) do
+    elems = Map.get(elements_by_slice, slice_name, [])
+
+    Enum.find(elems, fn e -> e.type in @entry_types end) || List.first(elems)
   end
 
   defp collect_swimlanes(slices, has_domains) do
