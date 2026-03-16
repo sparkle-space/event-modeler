@@ -49,6 +49,10 @@ defmodule EventModeler.Board do
   """
   @spec open(String.t()) :: {:ok, pid()} | {:error, term()}
   def open(file_path) do
+    do_open(file_path, 1)
+  end
+
+  defp do_open(file_path, attempt) do
     case Registry.lookup(EventModeler.Board.Registry, file_path) do
       [{pid, _}] ->
         {:ok, pid}
@@ -63,7 +67,14 @@ defmodule EventModeler.Board do
         end
     end
   rescue
-    ArgumentError -> {:error, :registry_unavailable}
+    ArgumentError ->
+      if attempt < 3 do
+        # Registry process may have crashed; wait for supervision tree to restart it
+        Process.sleep(100 * attempt)
+        do_open(file_path, attempt + 1)
+      else
+        {:error, :registry_unavailable}
+      end
   end
 
   @spec get_state(String.t()) :: {:ok, t()} | {:error, term()}
