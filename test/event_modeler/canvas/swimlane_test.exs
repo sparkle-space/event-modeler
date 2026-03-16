@@ -21,8 +21,13 @@ defmodule EventModeler.Canvas.SwimlaneTest do
   end
 
   describe "allowed_element_types/1" do
-    test "trigger allows wireframe and automation" do
-      assert Swimlane.allowed_element_types(:trigger) == [:wireframe, :automation]
+    test "trigger allows wireframe, automation, processor, and translator" do
+      assert Swimlane.allowed_element_types(:trigger) == [
+               :wireframe,
+               :automation,
+               :processor,
+               :translator
+             ]
     end
 
     test "command_view allows command and view" do

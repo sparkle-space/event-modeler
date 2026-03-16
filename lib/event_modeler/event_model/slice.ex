@@ -6,11 +6,15 @@ defmodule EventModeler.EventModel.Slice do
   defstruct [
     :name,
     :wireframe_description,
+    :pattern,
+    :domain,
     steps: [],
     tests: [],
     connections: nil,
     raw_emlang: nil
   ]
+
+  @type pattern_type :: :command | :view | :automation | :translation | nil
 
   @type connections_t :: %{
           consumes: [String.t()],
@@ -21,6 +25,8 @@ defmodule EventModeler.EventModel.Slice do
   @type t :: %__MODULE__{
           name: String.t(),
           wireframe_description: String.t() | nil,
+          pattern: pattern_type(),
+          domain: String.t() | nil,
           steps: [EventModeler.EventModel.Element.t()],
           tests: [map()],
           connections: connections_t() | nil,

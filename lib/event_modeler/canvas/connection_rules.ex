@@ -18,8 +18,12 @@ defmodule EventModeler.Canvas.ConnectionRules do
     {:command, :exception},
     {:event, :view},
     {:event, :automation},
+    {:event, :processor},
+    {:event, :translator},
     {:exception, :view},
     {:automation, :command},
+    {:processor, :command},
+    {:translator, :command},
     {:wireframe, :command},
     {:wireframe, :view}
   ]
@@ -100,6 +104,14 @@ defmodule EventModeler.Canvas.ConnectionRules do
     "Wireframes represent user interactions and cannot connect to Automations"
   end
 
+  defp describe_rejection(:wireframe, :processor) do
+    "Wireframes represent user interactions and cannot connect to Processors"
+  end
+
+  defp describe_rejection(:wireframe, :translator) do
+    "Wireframes represent user interactions and cannot connect to Translators"
+  end
+
   defp describe_rejection(:wireframe, :exception) do
     "Wireframes cannot connect directly to Exceptions — a Wireframe invokes a Command, which may produce an Exception"
   end
@@ -113,6 +125,8 @@ defmodule EventModeler.Canvas.ConnectionRules do
   defp format_type(:view), do: "View"
   defp format_type(:wireframe), do: "Wireframe"
   defp format_type(:automation), do: "Automation"
+  defp format_type(:processor), do: "Processor"
+  defp format_type(:translator), do: "Translator"
   defp format_type(:exception), do: "Exception"
   defp format_type(other), do: to_string(other)
 end

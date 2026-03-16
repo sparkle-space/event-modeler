@@ -7,7 +7,7 @@ defmodule EventModeler.EventModel.Serializer do
   """
 
   alias EventModeler.EventModel
-  alias EventModeler.EventModel.{Element, EventEntry}
+  alias EventModeler.EventModel.{Domain, Element, EventEntry, Field}
 
   @doc """
   Serializes a `%EventModel{}` struct to an Event Model markdown string.
@@ -60,6 +60,7 @@ defmodule EventModeler.EventModel.Serializer do
     fm = %{}
     fm = if event_model.title, do: Map.put(fm, "title", event_model.title), else: fm
     fm = if event_model.status, do: Map.put(fm, "status", event_model.status), else: fm
+    fm = if event_model.format, do: Map.put(fm, "format", event_model.format), else: fm
     fm = if event_model.domain, do: Map.put(fm, "domain", event_model.domain), else: fm
     fm = if event_model.version, do: Map.put(fm, "version", event_model.version), else: fm
     fm = if event_model.created, do: Map.put(fm, "created", event_model.created), else: fm
@@ -73,6 +74,11 @@ defmodule EventModeler.EventModel.Serializer do
     fm =
       if event_model.tags != nil and event_model.tags != [],
         do: Map.put(fm, "tags", event_model.tags),
+        else: fm
+
+    fm =
+      if event_model.domains != nil and event_model.domains != [],
+        do: Map.put(fm, "domains", event_model.domains),
         else: fm
 
     if map_size(fm) == 0 do
@@ -134,9 +140,11 @@ defmodule EventModeler.EventModel.Serializer do
     connections = render_emlang_connections(slice.connections)
     steps = render_emlang_steps(slice.steps)
     tests = render_emlang_tests(slice.tests)
+    slice_meta = render_slice_meta(slice)
 
     body =
       ["slices:", "  #{slice.name}:"]
+      |> Enum.concat(slice_meta)
       |> Enum.concat(connections)
       |> Enum.concat(["    steps:"])
       |> Enum.concat(steps)
@@ -144,6 +152,13 @@ defmodule EventModeler.EventModel.Serializer do
       |> Enum.join("\n")
 
     "```yaml emlang\n#{body}\n```\n"
+  end
+
+  defp render_slice_meta(slice) do
+    lines = []
+    lines = if slice.pattern, do: lines ++ ["    pattern: #{slice.pattern}"], else: lines
+    lines = if slice.domain, do: lines ++ ["    domain: #{slice.domain}"], else: lines
+    lines
   end
 
   defp render_emlang_connections(nil), do: []
@@ -193,19 +208,72 @@ defmodule EventModeler.EventModel.Serializer do
       prefix = Element.prefix_from_type(step.type)
       label = if step.swimlane, do: "#{step.swimlane}/#{step.label}", else: step.label
       base = "      - #{prefix}: #{label}"
+      has_props = step.props != nil and step.props != %{}
+      has_fields = step.fields != nil and step.fields != []
 
-      if step.props == nil or step.props == %{} do
-        [base]
-      else
-        props_lines =
-          Enum.map(step.props, fn {k, v} ->
-            "          #{k}: #{v}"
-          end)
+      cond do
+        has_fields and has_props ->
+          props_lines = render_props_lines(step.props)
+          fields_lines = render_fields_lines(step.fields)
+          [base, "        props:" | props_lines] ++ ["        fields:" | fields_lines]
 
-        [base, "        props:" | props_lines]
+        has_fields ->
+          fields_lines = render_fields_lines(step.fields)
+          [base, "        fields:" | fields_lines]
+
+        has_props ->
+          props_lines = render_props_lines(step.props)
+          [base, "        props:" | props_lines]
+
+        true ->
+          [base]
       end
     end)
   end
+
+  defp render_props_lines(props) do
+    Enum.map(props, fn {k, v} ->
+      "          #{k}: #{v}"
+    end)
+  end
+
+  defp render_fields_lines(fields) do
+    Enum.flat_map(fields, fn field ->
+      {name, value} = Field.to_yaml(field)
+
+      case value do
+        v when is_binary(v) ->
+          ["          #{name}: #{v}"]
+
+        %{} = map ->
+          # Render as inline YAML flow mapping with sorted keys for stable output
+          field_key_order = ["type", "of", "generated", "cardinality", "enum"]
+
+          sorted_keys =
+            Enum.sort_by(Map.keys(map), fn k ->
+              Enum.find_index(field_key_order, &(&1 == k)) || 99
+            end)
+
+          inner =
+            Enum.map_join(sorted_keys, ", ", fn k ->
+              "#{k}: #{format_field_value(Map.get(map, k))}"
+            end)
+
+          ["          #{name}: {#{inner}}"]
+      end
+    end)
+  end
+
+  defp format_field_value(v) when is_boolean(v), do: to_string(v)
+  defp format_field_value(v) when is_binary(v), do: v
+
+  defp format_field_value(v) when is_list(v) do
+    # Quote string items to prevent YAML implicit typing (e.g., "on" -> true)
+    quoted = Enum.map_join(v, ", ", fn item -> "\"#{item}\"" end)
+    "[#{quoted}]"
+  end
+
+  defp format_field_value(v), do: inspect(v)
 
   defp render_emlang_tests(nil), do: []
   defp render_emlang_tests([]), do: []
@@ -362,12 +430,14 @@ defmodule EventModeler.EventModel.Serializer do
     key_order = [
       "title",
       "status",
+      "format",
       "domain",
       "version",
       "created",
       "updated",
       "dependencies",
-      "tags"
+      "tags",
+      "domains"
     ]
 
     keys = Enum.sort_by(Map.keys(map), fn k -> Enum.find_index(key_order, &(&1 == k)) || 99 end)
@@ -382,10 +452,42 @@ defmodule EventModeler.EventModel.Serializer do
   defp render_yaml_field(key, value) when is_integer(value), do: "#{key}: #{value}\n"
   defp render_yaml_field(key, value) when is_atom(value), do: "#{key}: #{value}\n"
 
+  defp render_yaml_field("domains", domains) when is_list(domains) do
+    items =
+      Enum.map_join(domains, "", fn domain ->
+        yaml = Domain.to_yaml(domain)
+        render_domain_item(yaml)
+      end)
+
+    "domains:\n#{items}"
+  end
+
   defp render_yaml_field(key, value) when is_list(value) do
     items = Enum.map_join(value, "", fn item -> "  - \"#{item}\"\n" end)
     "#{key}:\n#{items}"
   end
 
   defp render_yaml_field(key, value), do: "#{key}: #{inspect(value)}\n"
+
+  defp render_domain_item(name) when is_binary(name), do: "  - \"#{name}\"\n"
+
+  defp render_domain_item(%{} = map) do
+    # Sort keys: name first, then description, then color, then rest
+    key_order = ["name", "description", "color"]
+
+    keys =
+      Enum.sort_by(Map.keys(map), fn k ->
+        Enum.find_index(key_order, &(&1 == k)) || 99
+      end)
+
+    [first_key | rest_keys] = keys
+    first_line = "  - #{first_key}: \"#{Map.get(map, first_key)}\"\n"
+
+    rest_lines =
+      Enum.map_join(rest_keys, "", fn k ->
+        "    #{k}: \"#{Map.get(map, k)}\"\n"
+      end)
+
+    first_line <> rest_lines
+  end
 end

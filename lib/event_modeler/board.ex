@@ -10,7 +10,7 @@ defmodule EventModeler.Board do
 
   alias EventModeler.EventModel
   alias EventModeler.EventModel.{Element, Slice, EventStreamWriter}
-  alias EventModeler.Canvas.{Layout, HtmlRenderer, ConnectionRules, Swimlane}
+  alias EventModeler.Canvas.{Layout, HtmlRenderer, ConnectionRules, CompletenessChecker, Swimlane}
   alias EventModeler.Workshop.ScenarioGenerator
   alias EventModeler.Workspace
 
@@ -20,10 +20,13 @@ defmodule EventModeler.Board do
     :layout,
     :canvas_data,
     dirty: false,
+    view_mode: :compact,
     connections: [],
     undo_stack: [],
     redo_stack: []
   ]
+
+  @type view_mode :: :compact | :detailed
 
   @type t :: %__MODULE__{
           file_path: String.t(),
@@ -31,6 +34,7 @@ defmodule EventModeler.Board do
           layout: map(),
           canvas_data: map(),
           dirty: boolean(),
+          view_mode: view_mode(),
           connections: [{String.t(), String.t()}],
           undo_stack: list(),
           redo_stack: list()
@@ -45,6 +49,10 @@ defmodule EventModeler.Board do
   """
   @spec open(String.t()) :: {:ok, pid()} | {:error, term()}
   def open(file_path) do
+    do_open(file_path, 1)
+  end
+
+  defp do_open(file_path, attempt) do
     case Registry.lookup(EventModeler.Board.Registry, file_path) do
       [{pid, _}] ->
         {:ok, pid}
@@ -59,7 +67,14 @@ defmodule EventModeler.Board do
         end
     end
   rescue
-    ArgumentError -> {:error, :registry_unavailable}
+    ArgumentError ->
+      if attempt < 3 do
+        # Registry process may have crashed; wait for supervision tree to restart it
+        Process.sleep(100 * attempt)
+        do_open(file_path, attempt + 1)
+      else
+        {:error, :registry_unavailable}
+      end
   end
 
   @spec get_state(String.t()) :: {:ok, t()} | {:error, term()}
@@ -157,6 +172,33 @@ defmodule EventModeler.Board do
 
   @spec can_undo_redo(String.t()) :: {:ok, {boolean(), boolean()}} | {:error, term()}
   def can_undo_redo(file_path), do: call(file_path, :can_undo_redo)
+
+  @spec toggle_view_mode(String.t()) :: {:ok, view_mode()} | {:error, term()}
+  def toggle_view_mode(file_path), do: call(file_path, :toggle_view_mode)
+
+  @spec get_view_mode(String.t()) :: {:ok, view_mode()} | {:error, term()}
+  def get_view_mode(file_path), do: call(file_path, :get_view_mode)
+
+  @spec check_completeness(String.t()) :: {:ok, list()} | {:error, term()}
+  def check_completeness(file_path), do: call(file_path, :check_completeness)
+
+  @doc """
+  Copies fields from source element to target element (forward: Command -> Event).
+  Only copies fields not already present on the target.
+  """
+  @spec copy_fields_forward(String.t(), String.t(), String.t()) :: :ok | {:error, term()}
+  def copy_fields_forward(file_path, from_id, to_id) do
+    call(file_path, {:copy_fields, from_id, to_id, :forward})
+  end
+
+  @doc """
+  Copies fields from target element back to source element (backward: Event -> Command).
+  Only copies fields not already present on the source.
+  """
+  @spec copy_fields_backward(String.t(), String.t(), String.t()) :: :ok | {:error, term()}
+  def copy_fields_backward(file_path, from_id, to_id) do
+    call(file_path, {:copy_fields, from_id, to_id, :backward})
+  end
 
   defp call(file_path, message) do
     case Registry.lookup(EventModeler.Board.Registry, file_path) do
@@ -701,6 +743,73 @@ defmodule EventModeler.Board do
     {:reply, {:ok, {state.undo_stack != [], state.redo_stack != []}}, state, @inactivity_timeout}
   end
 
+  def handle_call(:toggle_view_mode, _from, state) do
+    new_mode = if state.view_mode == :compact, do: :detailed, else: :compact
+    state = %{state | view_mode: new_mode} |> recompute_layout()
+    {:reply, {:ok, new_mode}, state, @inactivity_timeout}
+  end
+
+  def handle_call(:get_view_mode, _from, state) do
+    {:reply, {:ok, state.view_mode}, state, @inactivity_timeout}
+  end
+
+  def handle_call(:check_completeness, _from, state) do
+    results = CompletenessChecker.check(state.event_model)
+    {:reply, {:ok, results}, state, @inactivity_timeout}
+  end
+
+  def handle_call({:copy_fields, from_id, to_id, direction}, _from, state) do
+    from_elem = find_element(state.event_model, from_id)
+    to_elem = find_element(state.event_model, to_id)
+
+    cond do
+      is_nil(from_elem) ->
+        {:reply, {:error, "Source element not found"}, state, @inactivity_timeout}
+
+      is_nil(to_elem) ->
+        {:reply, {:error, "Target element not found"}, state, @inactivity_timeout}
+
+      true ->
+        state = push_undo(state)
+
+        {source, target_id} =
+          case direction do
+            :forward -> {from_elem, to_id}
+            :backward -> {to_elem, from_id}
+          end
+
+        source_fields = source.fields || []
+        target = if direction == :forward, do: to_elem, else: from_elem
+        existing_names = MapSet.new(target.fields || [], & &1.name)
+
+        new_fields =
+          Enum.reject(source_fields, fn f -> MapSet.member?(existing_names, f.name) end)
+
+        if new_fields == [] do
+          {:reply, :ok, state, @inactivity_timeout}
+        else
+          merged = (target.fields || []) ++ new_fields
+
+          event_model =
+            update_element_fields_in_event_model(state.event_model, target_id, merged)
+
+          event_model =
+            EventStreamWriter.append(event_model, "FieldsCopied", "user", %{
+              "fromId" => from_id,
+              "toId" => to_id,
+              "direction" => to_string(direction),
+              "fieldCount" => length(new_fields)
+            })
+
+          state =
+            %{state | event_model: event_model, dirty: true}
+            |> recompute_layout()
+
+          {:reply, :ok, state, @inactivity_timeout}
+        end
+    end
+  end
+
   def handle_call(:undo, _from, state) do
     case state.undo_stack do
       [] ->
@@ -853,7 +962,7 @@ defmodule EventModeler.Board do
   end
 
   defp recompute_layout(state) do
-    layout = Layout.compute(state.event_model)
+    layout = Layout.compute(state.event_model, view_mode: state.view_mode)
     canvas_data = HtmlRenderer.render(layout)
     %{state | layout: layout, canvas_data: canvas_data}
   end
@@ -929,6 +1038,28 @@ defmodule EventModeler.Board do
     Enum.find_value(slices, fn slice ->
       Enum.find(slice.steps, &(&1.id == element_id))
     end)
+  end
+
+  defp update_element_fields_in_event_model(
+         %EventModel{slices: slices} = event_model,
+         element_id,
+         fields
+       ) do
+    updated_slices =
+      Enum.map(slices, fn slice ->
+        updated_steps =
+          Enum.map(slice.steps, fn step ->
+            if step.id == element_id do
+              %{step | fields: fields}
+            else
+              step
+            end
+          end)
+
+        %{slice | steps: updated_steps}
+      end)
+
+    %{event_model | slices: updated_slices}
   end
 
   defp layout_connection?(layout, from_id, to_id) do

@@ -8,17 +8,27 @@ defmodule EventModeler.EventModel.Element do
     :type,
     :label,
     :swimlane,
-    props: %{}
+    props: %{},
+    fields: []
   ]
 
-  @type element_type :: :wireframe | :command | :event | :view | :exception | :automation
+  @type element_type ::
+          :wireframe
+          | :command
+          | :event
+          | :view
+          | :exception
+          | :automation
+          | :processor
+          | :translator
 
   @type t :: %__MODULE__{
           id: String.t() | nil,
           type: element_type(),
           label: String.t(),
           swimlane: String.t() | nil,
-          props: map()
+          props: map(),
+          fields: [EventModeler.EventModel.Field.t()]
         }
 
   @doc """
@@ -31,6 +41,8 @@ defmodule EventModeler.EventModel.Element do
   def type_from_prefix("v"), do: :view
   def type_from_prefix("x"), do: :exception
   def type_from_prefix("a"), do: :automation
+  def type_from_prefix("p"), do: :processor
+  def type_from_prefix("r"), do: :translator
 
   @doc """
   Maps element type atom to emlang type prefix.
@@ -42,4 +54,6 @@ defmodule EventModeler.EventModel.Element do
   def prefix_from_type(:view), do: "v"
   def prefix_from_type(:exception), do: "x"
   def prefix_from_type(:automation), do: "a"
+  def prefix_from_type(:processor), do: "p"
+  def prefix_from_type(:translator), do: "r"
 end

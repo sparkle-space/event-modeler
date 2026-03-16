@@ -10,6 +10,7 @@ defmodule EventModeler.Canvas.Layout do
   """
 
   alias EventModeler.EventModel
+  alias EventModeler.EventModel.Pattern
   alias EventModeler.Canvas.Swimlane
 
   @element_width 180
@@ -27,7 +28,19 @@ defmodule EventModeler.Canvas.Layout do
 
   defmodule PositionedElement do
     @moduledoc false
-    defstruct [:id, :type, :label, :swimlane, :props, :x, :y, :width, :height, :slice_name]
+    defstruct [
+      :id,
+      :type,
+      :label,
+      :swimlane,
+      :props,
+      :fields,
+      :x,
+      :y,
+      :width,
+      :height,
+      :slice_name
+    ]
   end
 
   defmodule Connection do
@@ -45,6 +58,11 @@ defmodule EventModeler.Canvas.Layout do
     defstruct [:from_slice, :to_slice, :type, :style, :from_x, :from_y, :to_x, :to_y]
   end
 
+  defmodule DomainBand do
+    @moduledoc false
+    defstruct [:name, :y, :height, :color, :description]
+  end
+
   defmodule LayoutResult do
     @moduledoc false
     defstruct [
@@ -54,37 +72,58 @@ defmodule EventModeler.Canvas.Layout do
       connections: [],
       swimlanes: [],
       slice_labels: [],
-      slice_connections: []
+      slice_connections: [],
+      domain_bands: []
     ]
   end
+
+  @domain_header_height 30
+  @domain_gap 20
+
+  @detailed_element_height 120
 
   @doc """
   Computes layout positions for all elements in a parsed Event Model.
   Returns a `%LayoutResult{}` with positioned elements and connections.
-  """
-  @spec compute(%EventModel{}) :: %LayoutResult{}
-  def compute(%EventModel{slices: slices}) do
-    # Collect all unique typed swimlanes
-    all_swimlanes = collect_swimlanes(slices)
 
-    # Assign vertical positions per swimlane (sorted by type then name)
-    swimlane_y = assign_swimlane_positions(all_swimlanes)
+  Options:
+    - `:view_mode` - `:compact` (default) or `:detailed` (shows field schemas)
+  """
+  @spec compute(%EventModel{}, keyword()) :: %LayoutResult{}
+  def compute(event_model, opts \\ [])
+
+  def compute(%EventModel{slices: slices, domains: domains} = event_model, opts) do
+    view_mode = Keyword.get(opts, :view_mode, :compact)
+    has_domains = domains != nil and domains != []
+    elem_height = if view_mode == :detailed, do: @detailed_element_height, else: @element_height
+
+    # Collect all unique typed swimlanes (with domain info when available)
+    all_swimlanes = collect_swimlanes(slices, has_domains)
+
+    # Assign vertical positions — domain-grouped or flat
+    {swimlane_y, domain_bands} =
+      if has_domains do
+        assign_domain_grouped_positions(all_swimlanes, event_model, elem_height)
+      else
+        {assign_swimlane_positions(all_swimlanes, elem_height), []}
+      end
 
     # Position elements slice by slice, left to right
     {positioned, connections, slice_labels, total_width} =
-      layout_slices(slices, swimlane_y)
+      layout_slices(slices, swimlane_y, elem_height, view_mode)
 
     # Calculate canvas dimensions
-    total_height = calculate_height(swimlane_y)
+    total_height = calculate_height(swimlane_y, elem_height)
 
     # Build swimlane data for rendering (with type info)
     swimlane_data =
-      Enum.map(all_swimlanes, fn %Swimlane{name: name, type: type} ->
+      Enum.map(all_swimlanes, fn %Swimlane{name: name, type: type, domain: domain} ->
         %{
           name: name,
           type: type,
-          y: Map.get(swimlane_y, name, @padding),
-          height: @element_height + @v_gap
+          domain: domain,
+          y: Map.get(swimlane_y, swimlane_key(name, domain), @padding),
+          height: elem_height + @v_gap
         }
       end)
 
@@ -96,6 +135,7 @@ defmodule EventModeler.Canvas.Layout do
       swimlanes: swimlane_data,
       slice_labels: slice_labels,
       slice_connections: slice_conns,
+      domain_bands: domain_bands,
       width: max(total_width + @padding * 2, 800),
       height: max(total_height + @padding * 2, 400)
     }
@@ -203,54 +243,116 @@ defmodule EventModeler.Canvas.Layout do
     |> Enum.uniq_by(fn c -> {c.from_slice, c.to_slice} end)
   end
 
-  defp collect_swimlanes(slices) do
+  defp collect_swimlanes(slices, has_domains) do
     slices
     |> Enum.flat_map(fn slice ->
+      slice_domain = if has_domains, do: slice.domain, else: nil
+
       Enum.map(slice.steps, fn step ->
         name = step.swimlane || Swimlane.default_name(Swimlane.type_for_element(step.type))
         type = Swimlane.type_for_element(step.type)
-        %Swimlane{name: name, type: type}
+        domain = if has_domains, do: slice_domain, else: nil
+        %Swimlane{name: name, type: type, domain: domain}
       end)
     end)
-    |> Enum.uniq_by(fn %Swimlane{name: name, type: type} -> {name, type} end)
-    |> Enum.sort_by(fn %Swimlane{name: name, type: type} ->
-      {Swimlane.sort_order(type), name}
+    |> Enum.uniq_by(fn %Swimlane{name: name, type: type, domain: domain} ->
+      {name, type, domain}
+    end)
+    |> Enum.sort_by(fn %Swimlane{name: name, type: type, domain: domain} ->
+      {domain || "", Swimlane.sort_order(type), name}
     end)
   end
 
-  defp assign_swimlane_positions(swimlanes) do
+  defp assign_swimlane_positions(swimlanes, elem_height) do
     swimlanes
     |> Enum.with_index()
-    |> Map.new(fn {%Swimlane{name: name}, idx} ->
-      {name, @padding + idx * (@element_height + @v_gap)}
+    |> Map.new(fn {%Swimlane{name: name, domain: domain}, idx} ->
+      {swimlane_key(name, domain), @padding + idx * (elem_height + @v_gap)}
     end)
   end
 
-  defp calculate_height(swimlane_y) do
+  defp assign_domain_grouped_positions(swimlanes, event_model, elem_height) do
+    domain_map =
+      Map.new(event_model.domains || [], fn d -> {d.name, d} end)
+
+    # Group swimlanes by domain, preserving order
+    domain_order =
+      swimlanes
+      |> Enum.map(& &1.domain)
+      |> Enum.uniq()
+      |> Enum.reject(&is_nil/1)
+
+    # Add nil domain at end for any elements without domain
+    has_nil = Enum.any?(swimlanes, &is_nil(&1.domain))
+    domain_order = if has_nil, do: domain_order ++ [nil], else: domain_order
+
+    grouped = Enum.group_by(swimlanes, & &1.domain)
+
+    {swimlane_y, domain_bands, _y} =
+      Enum.reduce(domain_order, {%{}, [], @padding}, fn domain_name, {y_map, bands, y} ->
+        domain_swimlanes =
+          (Map.get(grouped, domain_name) || [])
+          |> Enum.sort_by(fn sl -> {Swimlane.sort_order(sl.type), sl.name} end)
+
+        # Domain header
+        band_y = y
+        content_y = y + @domain_header_height
+
+        # Assign positions to swimlanes within this domain
+        {updated_y_map, next_y} =
+          Enum.reduce(domain_swimlanes, {y_map, content_y}, fn sl, {acc, current_y} ->
+            key = swimlane_key(sl.name, sl.domain)
+            {Map.put(acc, key, current_y), current_y + elem_height + @v_gap}
+          end)
+
+        domain_info = if domain_name, do: Map.get(domain_map, domain_name), else: nil
+
+        band = %DomainBand{
+          name: domain_name || "Unassigned",
+          y: band_y,
+          height: next_y - band_y,
+          color: if(domain_info, do: domain_info.color, else: nil),
+          description: if(domain_info, do: domain_info.description, else: nil)
+        }
+
+        {updated_y_map, bands ++ [band], next_y + @domain_gap}
+      end)
+
+    {swimlane_y, domain_bands}
+  end
+
+  defp swimlane_key(name, nil), do: name
+  defp swimlane_key(name, domain), do: "#{domain}::#{name}"
+
+  defp calculate_height(swimlane_y, elem_height) do
     if map_size(swimlane_y) == 0 do
       0
     else
       max_y = swimlane_y |> Map.values() |> Enum.max()
-      max_y + @element_height + @v_gap
+      max_y + elem_height + @v_gap
     end
   end
 
-  defp layout_slices(slices, swimlane_y) do
+  defp layout_slices(slices, swimlane_y, elem_height, view_mode) do
     initial_x = @swimlane_label_width + @padding
 
     {positioned, connections, labels, final_x} =
       Enum.reduce(slices, {[], [], [], initial_x}, fn slice, {elems, conns, labels, x_offset} ->
         {slice_elems, slice_conns, next_x} =
-          layout_slice(slice, swimlane_y, x_offset)
+          layout_slice(slice, swimlane_y, x_offset, elem_height, view_mode)
 
         {min_y, max_y_bottom} = slice_vertical_bounds(slice_elems)
+        detected_pattern = Pattern.detect(slice)
 
         label = %{
           name: slice.name,
           x: x_offset,
           width: next_x - x_offset - @slice_gap,
           y: min_y,
-          height: max_y_bottom - min_y
+          height: max_y_bottom - min_y,
+          pattern: detected_pattern,
+          pattern_label: if(detected_pattern, do: Pattern.label(detected_pattern), else: nil),
+          domain: slice.domain
         }
 
         {elems ++ slice_elems, conns ++ slice_conns, labels ++ [label], next_x}
@@ -259,16 +361,28 @@ defmodule EventModeler.Canvas.Layout do
     {positioned, connections, labels, final_x}
   end
 
-  defp layout_slice(slice, swimlane_y, start_x) do
+  defp layout_slice(slice, swimlane_y, start_x, elem_height, view_mode) do
+    # In detailed mode, elements with fields get taller
     {elements, _x} =
       Enum.reduce(slice.steps, {[], start_x}, fn step, {acc, x} ->
         swimlane =
           step.swimlane || Swimlane.default_name(Swimlane.type_for_element(step.type))
 
-        y = Map.get(swimlane_y, swimlane, @padding)
+        # Look up Y position using domain-aware key, falling back to plain name
+        key = swimlane_key(swimlane, slice.domain)
+        y = Map.get(swimlane_y, key, Map.get(swimlane_y, swimlane, @padding))
 
         offset_x = step.props["position_offset_x"] || 0
         offset_y = step.props["position_offset_y"] || 0
+
+        # In detailed mode, height scales with number of fields
+        height =
+          if view_mode == :detailed and step.fields != [] do
+            field_count = length(step.fields)
+            max(elem_height, @element_height + field_count * 18)
+          else
+            elem_height
+          end
 
         elem = %PositionedElement{
           id: step.id,
@@ -276,10 +390,11 @@ defmodule EventModeler.Canvas.Layout do
           label: step.label,
           swimlane: swimlane,
           props: step.props,
+          fields: step.fields || [],
           x: x + offset_x,
           y: y + offset_y,
           width: @element_width,
-          height: @element_height,
+          height: height,
           slice_name: slice.name
         }
 
