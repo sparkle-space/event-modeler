@@ -246,10 +246,17 @@ defmodule EventModeler.EventModel.Serializer do
           ["          #{name}: #{v}"]
 
         %{} = map ->
-          # Render as inline YAML flow mapping: {type: uuid, generated: true}
+          # Render as inline YAML flow mapping with sorted keys for stable output
+          field_key_order = ["type", "of", "generated", "cardinality", "enum"]
+
+          sorted_keys =
+            Enum.sort_by(Map.keys(map), fn k ->
+              Enum.find_index(field_key_order, &(&1 == k)) || 99
+            end)
+
           inner =
-            Enum.map_join(map, ", ", fn {k, v} ->
-              "#{k}: #{format_field_value(v)}"
+            Enum.map_join(sorted_keys, ", ", fn k ->
+              "#{k}: #{format_field_value(Map.get(map, k))}"
             end)
 
           ["          #{name}: {#{inner}}"]
@@ -259,7 +266,13 @@ defmodule EventModeler.EventModel.Serializer do
 
   defp format_field_value(v) when is_boolean(v), do: to_string(v)
   defp format_field_value(v) when is_binary(v), do: v
-  defp format_field_value(v) when is_list(v), do: "[#{Enum.join(v, ", ")}]"
+
+  defp format_field_value(v) when is_list(v) do
+    # Quote string items to prevent YAML implicit typing (e.g., "on" -> true)
+    quoted = Enum.map_join(v, ", ", fn item -> "\"#{item}\"" end)
+    "[#{quoted}]"
+  end
+
   defp format_field_value(v), do: inspect(v)
 
   defp render_emlang_tests(nil), do: []

@@ -92,13 +92,13 @@ defmodule EventModeler.Canvas.CompletenessChecker do
     downcased = String.downcase(field_name)
 
     event_source =
-      Enum.find(event_fields, fn {name, source} ->
-        String.downcase(name) == downcased and source
+      Enum.find(event_fields, fn {name, _source} ->
+        String.downcase(name) == downcased
       end)
 
     command_source =
-      Enum.find(command_fields, fn {name, source} ->
-        String.downcase(name) == downcased and source
+      Enum.find(command_fields, fn {name, _source} ->
+        String.downcase(name) == downcased
       end)
 
     cond do

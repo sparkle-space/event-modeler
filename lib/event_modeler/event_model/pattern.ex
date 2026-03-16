@@ -52,7 +52,7 @@ defmodule EventModeler.EventModel.Pattern do
   Validates pattern constraints.
 
   Returns `{:ok, pattern}` or `{:error, reason}`.
-  For example, translation pattern should cross domain boundaries.
+  For translation patterns, validates that a Translator element is present.
   """
   @spec validate(Slice.t()) :: {:ok, pattern()} | {:error, String.t()}
   def validate(%Slice{} = slice) do
@@ -60,7 +60,6 @@ defmodule EventModeler.EventModel.Pattern do
 
     case pattern do
       :translation ->
-        # Translation should involve cross-domain elements
         has_translator = Enum.any?(slice.steps, &(&1.type == :translator))
 
         if has_translator do
