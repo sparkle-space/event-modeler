@@ -45,6 +45,7 @@ defmodule EventModelerWeb.BoardLive do
                    can_redo: false,
                    show_shortcuts: false,
                    show_slice_dropdown: false,
+                   view_mode: :compact,
                    # Spec card state
                    specs_expanded: false,
                    spec_cards: [],
@@ -86,6 +87,17 @@ defmodule EventModelerWeb.BoardLive do
 
   def handle_event("fit_to_window", _params, socket) do
     {:noreply, push_event(socket, "fit_to_window", %{})}
+  end
+
+  def handle_event("toggle_view_mode", _params, socket) do
+    case Board.toggle_view_mode(socket.assigns.file_path) do
+      {:ok, new_mode} ->
+        socket = assign(socket, view_mode: new_mode) |> refresh_state()
+        {:noreply, socket}
+
+      {:error, _} ->
+        {:noreply, socket}
+    end
   end
 
   def handle_event("undo", _params, socket) do
@@ -955,6 +967,13 @@ defmodule EventModelerWeb.BoardLive do
               title="Fit to window (Ctrl+0)"
             >
               Fit
+            </button>
+            <button
+              phx-click="toggle_view_mode"
+              class="bg-[var(--color-surface-alt)] text-[var(--color-text-primary)] px-2 py-1.5 rounded-[var(--radius-element)] text-sm hover:opacity-80 transition-opacity border border-[var(--color-border)]"
+              title="Toggle compact/detailed view"
+            >
+              {if @view_mode == :compact, do: "Detailed", else: "Compact"}
             </button>
             <a
               href={~p"/boards/#{Base.url_encode64(@file_path, padding: false)}/export"}
