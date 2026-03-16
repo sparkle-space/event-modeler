@@ -1184,11 +1184,21 @@ defmodule EventModelerWeb.BoardLive do
                     <path
                       d={sc.path}
                       fill="none"
-                      stroke="var(--color-slice-connection)"
+                      stroke={
+                        if(sc.style == :dashed,
+                          do: "var(--color-external-connection)",
+                          else: "var(--color-slice-connection)"
+                        )
+                      }
                       stroke-width="2"
-                      stroke-dasharray="8,4"
+                      stroke-dasharray={if(sc.style == :dashed, do: "6,4", else: "8,4")}
                       opacity="0.8"
-                      marker-end="url(#arrowhead-slice)"
+                      marker-end={
+                        if(sc.style == :dashed,
+                          do: "url(#arrowhead-slice-external)",
+                          else: "url(#arrowhead-slice)"
+                        )
+                      }
                       style="pointer-events: none;"
                     />
                   <% else %>

@@ -314,7 +314,9 @@ defmodule EventModeler.Canvas.Layout do
           consume_conns ++ produce_conns
       end
     end)
-    |> Enum.uniq_by(fn c -> {c.from_slice, c.to_slice} end)
+    |> Enum.uniq_by(fn c ->
+      {c.from_slice, c.to_slice, c.from_element_id, c.to_element_id}
+    end)
   end
 
   # Find the event element in source_slice whose label matches the event_ref
