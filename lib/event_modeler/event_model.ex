@@ -10,6 +10,7 @@ defmodule EventModeler.EventModel do
     :version,
     :created,
     :updated,
+    :format,
     :dependencies,
     :tags,
     :overview,
@@ -21,6 +22,7 @@ defmodule EventModeler.EventModel do
     :sources,
     :event_stream,
     :raw_markdown,
+    domains: [],
     sections: %{}
   ]
 
@@ -31,6 +33,7 @@ defmodule EventModeler.EventModel do
           version: integer() | nil,
           created: String.t() | nil,
           updated: String.t() | nil,
+          format: String.t() | nil,
           dependencies: [String.t()],
           tags: [String.t()],
           overview: String.t() | nil,
@@ -42,6 +45,7 @@ defmodule EventModeler.EventModel do
           sources: String.t() | nil,
           event_stream: [EventModeler.EventModel.EventEntry.t()],
           raw_markdown: String.t() | nil,
+          domains: [EventModeler.EventModel.Domain.t()],
           sections: map()
         }
 end

@@ -204,11 +204,13 @@ defmodule EventModeler.Canvas.ConnectionRulesTest do
       assert length(targets) == 2
     end
 
-    test "event can target view and automation" do
+    test "event can target view, automation, processor, and translator" do
       targets = ConnectionRules.valid_targets(:event)
       assert :view in targets
       assert :automation in targets
-      assert length(targets) == 2
+      assert :processor in targets
+      assert :translator in targets
+      assert length(targets) == 4
     end
 
     test "wireframe can target command and view" do
@@ -232,11 +234,13 @@ defmodule EventModeler.Canvas.ConnectionRulesTest do
   end
 
   describe "valid_sources/1" do
-    test "command can be sourced from automation and wireframe" do
+    test "command can be sourced from automation, processor, translator, and wireframe" do
       sources = ConnectionRules.valid_sources(:command)
       assert :automation in sources
+      assert :processor in sources
+      assert :translator in sources
       assert :wireframe in sources
-      assert length(sources) == 2
+      assert length(sources) == 4
     end
 
     test "event can only be sourced from command" do
@@ -265,15 +269,19 @@ defmodule EventModeler.Canvas.ConnectionRulesTest do
   end
 
   describe "all_valid/0" do
-    test "returns all 8 valid connection pairs" do
+    test "returns all 12 valid connection pairs" do
       valid = ConnectionRules.all_valid()
-      assert length(valid) == 8
+      assert length(valid) == 12
       assert {:command, :event} in valid
       assert {:command, :exception} in valid
       assert {:event, :view} in valid
       assert {:event, :automation} in valid
+      assert {:event, :processor} in valid
+      assert {:event, :translator} in valid
       assert {:exception, :view} in valid
       assert {:automation, :command} in valid
+      assert {:processor, :command} in valid
+      assert {:translator, :command} in valid
       assert {:wireframe, :command} in valid
       assert {:wireframe, :view} in valid
     end

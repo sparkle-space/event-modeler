@@ -9,6 +9,7 @@ defmodule EventModeler.EventModel.Parser do
   alias EventModeler.EventModel
 
   alias EventModeler.EventModel.{
+    Domain,
     FrontmatterParser,
     SectionParser,
     EmlangParser,
@@ -28,15 +29,19 @@ defmodule EventModeler.EventModel.Parser do
          {:ok, event_stream} <- EventStreamParser.parse(markdown) do
       slices_with_wireframes = attach_wireframe_descriptions(slices, sections["Slices"])
 
+      domains = parse_domains(frontmatter["domains"])
+
       event_model = %EventModel{
         title: frontmatter["title"],
         status: frontmatter["status"],
         domain: frontmatter["domain"],
+        format: frontmatter["format"],
         version: frontmatter["version"],
         created: to_string_or_nil(frontmatter["created"]),
         updated: to_string_or_nil(frontmatter["updated"]),
         dependencies: frontmatter["dependencies"] || [],
         tags: frontmatter["tags"] || [],
+        domains: domains,
         overview: sections["Overview"],
         key_ideas: SectionParser.extract_key_ideas(sections["Key Ideas"]),
         slices: slices_with_wireframes,
@@ -58,6 +63,10 @@ defmodule EventModeler.EventModel.Parser do
 
   defp to_string_or_nil(nil), do: nil
   defp to_string_or_nil(value), do: to_string(value)
+
+  defp parse_domains(nil), do: []
+  defp parse_domains(domains) when is_list(domains), do: Enum.map(domains, &Domain.from_yaml/1)
+  defp parse_domains(_), do: []
 
   defp attach_wireframe_descriptions(slices, nil), do: slices
 

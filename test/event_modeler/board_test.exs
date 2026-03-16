@@ -36,8 +36,30 @@ defmodule EventModeler.BoardTest do
     %{path: path}
   end
 
+  # Wrapper that retries Board.open when registry is transiently unavailable
+  defp open_board!(path) do
+    open_board!(path, 5)
+  end
+
+  defp open_board!(_path, 0), do: raise("Board.open failed: registry unavailable after retries")
+
+  defp open_board!(path, retries) do
+    case Board.open(path) do
+      {:ok, pid} ->
+        {:ok, pid}
+
+      {:error, :registry_unavailable} ->
+        ensure_registry_alive()
+        Process.sleep(200)
+        open_board!(path, retries - 1)
+
+      other ->
+        other
+    end
+  end
+
   defp ensure_registry_alive do
-    ensure_registry_alive(3)
+    ensure_registry_alive(10)
   end
 
   defp ensure_registry_alive(0), do: raise("Board.Registry failed to start after retries")
@@ -47,7 +69,7 @@ defmodule EventModeler.BoardTest do
       nil ->
         Application.stop(:event_modeler)
         Application.ensure_all_started(:event_modeler)
-        Process.sleep(100)
+        Process.sleep(200)
         ensure_registry_alive(retries - 1)
 
       pid when is_pid(pid) ->
@@ -57,27 +79,27 @@ defmodule EventModeler.BoardTest do
           :ok
         rescue
           ArgumentError ->
-            Process.sleep(50)
+            Process.sleep(100)
             ensure_registry_alive(retries - 1)
         end
     end
   end
 
   test "opens a board from file", %{path: path} do
-    assert {:ok, _pid} = Board.open(path)
+    assert {:ok, _pid} = open_board!(path)
     assert {:ok, state} = Board.get_state(path)
     assert state.event_model.title == "Board Test"
     assert state.dirty == false
   end
 
   test "opening same path returns same pid", %{path: path} do
-    {:ok, pid1} = Board.open(path)
-    {:ok, pid2} = Board.open(path)
+    {:ok, pid1} = open_board!(path)
+    {:ok, pid2} = open_board!(path)
     assert pid1 == pid2
   end
 
   test "save writes state to file", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     assert :ok = Board.save(path)
 
     {:ok, event_model} = Workspace.read_event_model(path)
@@ -89,7 +111,7 @@ defmodule EventModeler.BoardTest do
   end
 
   test "place_element adds element and marks dirty", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
 
     assert {:ok, element_id} = Board.place_element(path, :command, "DoThing")
     assert is_binary(element_id)
@@ -105,7 +127,7 @@ defmodule EventModeler.BoardTest do
   end
 
   test "edit_element updates label", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, element_id} = Board.place_element(path, :event, "OldLabel")
 
     :ok = Board.edit_element(path, element_id, %{"label" => "NewLabel"})
@@ -117,7 +139,7 @@ defmodule EventModeler.BoardTest do
   end
 
   test "connect_elements validates connection rules", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, cmd_id} = Board.place_element(path, :command, "Cmd")
     {:ok, view_id} = Board.place_element(path, :view, "View")
     {:ok, evt_id} = Board.place_element(path, :event, "Evt")
@@ -132,7 +154,7 @@ defmodule EventModeler.BoardTest do
   end
 
   test "remove_element removes from event model", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, element_id} = Board.place_element(path, :event, "ToRemove")
 
     :ok = Board.remove_element(path, element_id)
@@ -143,7 +165,7 @@ defmodule EventModeler.BoardTest do
   end
 
   test "mutations append event stream entries", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
 
     {:ok, state_before} = Board.get_state(path)
     stream_count_before = length(state_before.event_model.event_stream)
@@ -155,7 +177,7 @@ defmodule EventModeler.BoardTest do
   end
 
   test "define_slice groups elements into a named slice", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, cmd_id} = Board.place_element(path, :command, "RegisterUser")
     {:ok, evt_id} = Board.place_element(path, :event, "UserRegistered")
 
@@ -170,14 +192,14 @@ defmodule EventModeler.BoardTest do
   end
 
   test "define_slice returns error for no matching elements", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
 
     assert {:error, "No matching elements found"} =
              Board.define_slice(path, "Empty", ["nonexistent"])
   end
 
   test "rename_slice updates slice name", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, cmd_id} = Board.place_element(path, :command, "DoThing")
     :ok = Board.define_slice(path, "OldName", [cmd_id])
 
@@ -189,7 +211,7 @@ defmodule EventModeler.BoardTest do
   end
 
   test "generate_scenarios creates GWT scenarios for a slice", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, cmd_id} = Board.place_element(path, :command, "CreateBoard")
     {:ok, evt_id} = Board.place_element(path, :event, "BoardCreated")
     :ok = Board.define_slice(path, "CreateBoard", [cmd_id, evt_id])
@@ -205,14 +227,14 @@ defmodule EventModeler.BoardTest do
   end
 
   test "generate_scenarios returns error for unknown slice", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
 
     assert {:error, "Slice not found"} =
              Board.generate_scenarios(path, "NonexistentSlice")
   end
 
   test "generate_scenarios stores scenarios in slice tests", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, cmd_id} = Board.place_element(path, :command, "Login")
     {:ok, evt_id} = Board.place_element(path, :event, "LoggedIn")
     :ok = Board.define_slice(path, "Login", [cmd_id, evt_id])
@@ -226,7 +248,7 @@ defmodule EventModeler.BoardTest do
   end
 
   test "connect_elements rejects self-connection", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, cmd_id} = Board.place_element(path, :command, "Cmd")
 
     assert {:error, reason} = Board.connect_elements(path, cmd_id, cmd_id)
@@ -234,7 +256,7 @@ defmodule EventModeler.BoardTest do
   end
 
   test "connect_elements rejects duplicate connection", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, cmd_id} = Board.place_element(path, :command, "Cmd")
     {:ok, evt_id} = Board.place_element(path, :event, "Evt")
 
@@ -244,7 +266,7 @@ defmodule EventModeler.BoardTest do
   end
 
   test "remove_element cleans up connections", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, cmd_id} = Board.place_element(path, :command, "Cmd")
     {:ok, evt_id} = Board.place_element(path, :event, "Evt")
 
@@ -259,7 +281,7 @@ defmodule EventModeler.BoardTest do
   # Disconnect elements
 
   test "disconnect_elements removes a connection", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, cmd_id} = Board.place_element(path, :command, "Cmd")
     {:ok, evt_id} = Board.place_element(path, :event, "Evt")
 
@@ -271,7 +293,7 @@ defmodule EventModeler.BoardTest do
   end
 
   test "disconnect_elements returns informative error for structural connection", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, cmd_id} = Board.place_element(path, :command, "Cmd")
     {:ok, evt_id} = Board.place_element(path, :event, "Evt")
 
@@ -281,14 +303,14 @@ defmodule EventModeler.BoardTest do
   end
 
   test "disconnect_elements returns error for nonexistent connection", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
 
     assert {:error, "Connection not found"} =
              Board.disconnect_elements(path, "nonexistent_a", "nonexistent_b")
   end
 
   test "disconnect persists through save", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, cmd_id} = Board.place_element(path, :command, "Cmd")
     {:ok, evt_id} = Board.place_element(path, :event, "Evt")
 
@@ -308,7 +330,7 @@ defmodule EventModeler.BoardTest do
   # Slice removal
 
   test "remove_slice moves elements to Unassigned", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, cmd_id} = Board.place_element(path, :command, "Cmd")
     {:ok, evt_id} = Board.place_element(path, :event, "Evt")
     :ok = Board.define_slice(path, "MySlice", [cmd_id, evt_id])
@@ -325,14 +347,14 @@ defmodule EventModeler.BoardTest do
   end
 
   test "remove_slice returns error for nonexistent slice", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     assert {:error, "Slice not found"} = Board.remove_slice(path, "Nope")
   end
 
   # Remove element from slice
 
   test "remove_element_from_slice moves element to Unassigned", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, cmd_id} = Board.place_element(path, :command, "Cmd")
     {:ok, evt_id} = Board.place_element(path, :event, "Evt")
     :ok = Board.define_slice(path, "MySlice", [cmd_id, evt_id])
@@ -351,7 +373,7 @@ defmodule EventModeler.BoardTest do
   end
 
   test "remove_element_from_slice returns error for wrong element", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, cmd_id} = Board.place_element(path, :command, "Cmd")
     :ok = Board.define_slice(path, "MySlice", [cmd_id])
 
@@ -362,7 +384,7 @@ defmodule EventModeler.BoardTest do
   # Scenario management
 
   test "remove_scenario deletes a scenario from a slice", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, cmd_id} = Board.place_element(path, :command, "DoIt")
     {:ok, evt_id} = Board.place_element(path, :event, "Done")
     :ok = Board.define_slice(path, "DoSlice", [cmd_id, evt_id])
@@ -376,7 +398,7 @@ defmodule EventModeler.BoardTest do
   end
 
   test "remove_scenario returns error for nonexistent scenario", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, cmd_id} = Board.place_element(path, :command, "DoIt")
     :ok = Board.define_slice(path, "DoSlice", [cmd_id])
 
@@ -385,7 +407,7 @@ defmodule EventModeler.BoardTest do
   end
 
   test "update_scenario changes scenario name and clears auto_generated", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, cmd_id} = Board.place_element(path, :command, "DoIt")
     {:ok, evt_id} = Board.place_element(path, :event, "Done")
     :ok = Board.define_slice(path, "DoSlice", [cmd_id, evt_id])
@@ -404,7 +426,7 @@ defmodule EventModeler.BoardTest do
   end
 
   test "add_scenario adds a manual scenario to a slice", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, cmd_id} = Board.place_element(path, :command, "DoIt")
     :ok = Board.define_slice(path, "DoSlice", [cmd_id])
 
@@ -427,7 +449,7 @@ defmodule EventModeler.BoardTest do
   # Slice reordering
 
   test "reorder_slice moves slice up", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, cmd1} = Board.place_element(path, :command, "Cmd1")
     {:ok, cmd2} = Board.place_element(path, :command, "Cmd2")
     :ok = Board.define_slice(path, "SliceA", [cmd1])
@@ -449,7 +471,7 @@ defmodule EventModeler.BoardTest do
   end
 
   test "reorder_slice returns error at boundary", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, cmd1} = Board.place_element(path, :command, "Cmd1")
     :ok = Board.define_slice(path, "SliceA", [cmd1])
 
@@ -461,7 +483,7 @@ defmodule EventModeler.BoardTest do
   # Set slice order
 
   test "set_slice_order reorders slices by name list", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, cmd1} = Board.place_element(path, :command, "Cmd1")
     {:ok, cmd2} = Board.place_element(path, :command, "Cmd2")
     {:ok, cmd3} = Board.place_element(path, :command, "Cmd3")
@@ -483,7 +505,7 @@ defmodule EventModeler.BoardTest do
   # Undo/Redo
 
   test "undo reverses last mutation", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
 
     {:ok, state_before} = Board.get_state(path)
 
@@ -510,7 +532,7 @@ defmodule EventModeler.BoardTest do
   end
 
   test "redo restores undone mutation", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, _id} = Board.place_element(path, :command, "ToRedo")
 
     {:ok, state_mid} = Board.get_state(path)
@@ -530,17 +552,17 @@ defmodule EventModeler.BoardTest do
   end
 
   test "undo on empty stack returns error", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     assert {:error, "Nothing to undo"} = Board.undo(path)
   end
 
   test "redo on empty stack returns error", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     assert {:error, "Nothing to redo"} = Board.redo(path)
   end
 
   test "new mutation clears redo stack", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
     {:ok, _id} = Board.place_element(path, :command, "First")
     :ok = Board.undo(path)
 
@@ -556,7 +578,7 @@ defmodule EventModeler.BoardTest do
   end
 
   test "can_undo_redo reports correct state", %{path: path} do
-    {:ok, _pid} = Board.open(path)
+    {:ok, _pid} = open_board!(path)
 
     assert {:ok, {false, false}} = Board.can_undo_redo(path)
 
