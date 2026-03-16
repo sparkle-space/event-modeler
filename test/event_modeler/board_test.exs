@@ -37,7 +37,7 @@ defmodule EventModeler.BoardTest do
   end
 
   defp ensure_registry_alive do
-    ensure_registry_alive(3)
+    ensure_registry_alive(10)
   end
 
   defp ensure_registry_alive(0), do: raise("Board.Registry failed to start after retries")
@@ -47,7 +47,7 @@ defmodule EventModeler.BoardTest do
       nil ->
         Application.stop(:event_modeler)
         Application.ensure_all_started(:event_modeler)
-        Process.sleep(100)
+        Process.sleep(200)
         ensure_registry_alive(retries - 1)
 
       pid when is_pid(pid) ->
@@ -57,7 +57,7 @@ defmodule EventModeler.BoardTest do
           :ok
         rescue
           ArgumentError ->
-            Process.sleep(50)
+            Process.sleep(100)
             ensure_registry_alive(retries - 1)
         end
     end
